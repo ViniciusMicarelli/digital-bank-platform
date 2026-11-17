@@ -62,6 +62,36 @@ func SignAccessToken(k SigningKey, customerID uuid.UUID, now time.Time) (string,
 	return s, exp, err
 }
 
+// Step-up tokens prove a fresh re-authentication for sensitive actions
+// (revealing card data). Their audience differs from access tokens, so one
+// can never be used as the other.
+const (
+	StepUpAudience = "digital-bank-step-up"
+	StepUpTTL      = 5 * time.Minute
+)
+
+// StepUpClaims carry how the customer re-authenticated (RFC 8176 "amr").
+type StepUpClaims struct {
+	jwt.RegisteredClaims
+	AMR []string `json:"amr"`
+}
+
+// SignStepUpToken issues a short-lived token after a fresh password (+ TOTP) check.
+func SignStepUpToken(k SigningKey, customerID uuid.UUID, amr []string, now time.Time) (string, time.Time, error) {
+	exp := now.Add(StepUpTTL)
+	tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, StepUpClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer: Issuer, Subject: customerID.String(), Audience: jwt.ClaimStrings{StepUpAudience},
+			IssuedAt: jwt.NewNumericDate(now), NotBefore: jwt.NewNumericDate(now), ExpiresAt: jwt.NewNumericDate(exp),
+			ID: uuid.NewString(),
+		},
+		AMR: amr,
+	})
+	tok.Header["kid"] = k.Kid
+	s, err := tok.SignedString(k.Private)
+	return s, exp, err
+}
+
 // NewRefreshToken returns an opaque 256-bit token and the hash to store.
 func NewRefreshToken() (token string, hash []byte) {
 	b := make([]byte, 32)

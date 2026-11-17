@@ -110,8 +110,8 @@ func (a *API) cardControls(w http.ResponseWriter, r *http.Request, c *cardv1.Car
 	writeJSON(w, http.StatusOK, cardJSON(resp.GetCard()))
 }
 
-// revealCard returns the full card data to its holder. Responses are not
-// cacheable; step-up authentication (recent MFA) is planned.
+// revealCard returns the full card data to its holder. It sits behind
+// step-up authentication and responses are not cacheable.
 func (a *API) revealCard(w http.ResponseWriter, r *http.Request, c *cardv1.Card) {
 	resp, err := a.c.Cards.RevealCardDetails(r.Context(), &cardv1.RevealCardDetailsRequest{Id: c.GetId()})
 	if err != nil {
@@ -123,6 +123,63 @@ func (a *API) revealCard(w http.ResponseWriter, r *http.Request, c *cardv1.Card)
 		"expiry_year": resp.GetExpiryYear(), "cvv": resp.GetCvv()})
 }
 
+// ---- tokens (wallets) ----
+
+func tokenJSON(t *cardv1.CardToken) map[string]any {
+	return map[string]any{"id": t.GetId(), "card_id": t.GetCardId(), "wallet": t.GetWallet(),
+		"device_name": t.GetDeviceName(), "status": t.GetStatus(), "last4": t.GetLast4(), "created_at": ts(t.GetCreatedAt())}
+}
+
+// tokenizeCard provisions a wallet token. The token number goes to the
+// wallet once (in the sandbox, to the caller) and is never shown again.
+func (a *API) tokenizeCard(w http.ResponseWriter, r *http.Request, c *cardv1.Card) {
+	var req struct {
+		Wallet     string `json:"wallet"`
+		DeviceName string `json:"device_name"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	resp, err := a.c.Cards.TokenizeCard(r.Context(), &cardv1.TokenizeCardRequest{CardId: c.GetId(), Wallet: req.Wallet, DeviceName: req.DeviceName})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	out := tokenJSON(resp.GetToken())
+	out["token_pan"] = resp.GetTokenPan()
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusCreated, out)
+}
+
+func (a *API) listTokens(w http.ResponseWriter, r *http.Request, c *cardv1.Card) {
+	resp, err := a.c.Cards.ListTokens(r.Context(), &cardv1.ListTokensRequest{CardId: c.GetId()})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	out := []map[string]any{}
+	for _, t := range resp.GetTokens() {
+		out = append(out, tokenJSON(t))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"tokens": out})
+}
+
+func (a *API) updateToken(action string) func(http.ResponseWriter, *http.Request, *cardv1.Card) {
+	return func(w http.ResponseWriter, r *http.Request, c *cardv1.Card) {
+		id := r.PathValue("tokenID")
+		if _, err := uuid.Parse(id); err != nil {
+			writeError(w, r.Context(), http.StatusNotFound, "NOT_FOUND", "token not found")
+			return
+		}
+		resp, err := a.c.Cards.UpdateToken(r.Context(), &cardv1.UpdateTokenRequest{CardId: c.GetId(), TokenId: id, Action: action})
+		if err != nil {
+			writeGRPCError(w, r.Context(), err)
+			return
+		}
+		writeJSON(w, http.StatusOK, tokenJSON(resp.GetToken()))
+	}
+}
+
 // ---- simulated card network (sandbox) ----
 
 func authorizationJSON(a *cardv1.Authorization) map[string]any {
@@ -130,7 +187,7 @@ func authorizationJSON(a *cardv1.Authorization) map[string]any {
 		"id": a.GetId(), "network_reference": a.GetNetworkReference(),
 		"status": a.GetStatus().String()[len("AUTHORIZATION_STATUS_"):], "response_code": a.GetResponseCode(),
 		"reason": a.GetReason(), "amount": moneyJSON(a.GetAmount()), "cleared_amount": moneyJSON(a.GetClearedAmount()),
-		"merchant_name": a.GetMerchantName(),
+		"merchant_name": a.GetMerchantName(), "card_id": a.GetCardId(), "token_id": a.GetTokenId(),
 	}
 }
 

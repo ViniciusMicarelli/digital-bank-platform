@@ -265,3 +265,38 @@ func TestOrphanReservationIsReleased(t *testing.T) {
 		t.Fatalf("after cleanup: %+v, balance %d", got, e.txs.balance[account])
 	}
 }
+
+func TestTokenPurchases(t *testing.T) {
+	e := setup(t)
+	c, _ := e.issue(t)
+	tok, tokenPAN, err := e.svc.Tokenize(e.ctx, c.ID, domain.ApplePay, "iPhone da Ana")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := domain.Purchase{NetworkReference: uuid.NewString(), ExpiryMonth: tok.ExpiryMonth, ExpiryYear: tok.ExpiryYear,
+		Amount: money.MustParse("12", money.BRL), MerchantName: "CAFE", MCC: "5814", Country: "BR", Channel: domain.Contactless}
+	a, err := e.svc.Authorize(e.ctx, tokenPAN, p)
+	if err != nil || a.Status != domain.Approved || a.TokenID != tok.ID || a.CardID != c.ID {
+		t.Fatalf("token purchase = %+v, %v", a, err)
+	}
+	if _, err := e.svc.UpdateToken(e.ctx, c.ID, tok.ID, "SUSPEND"); err != nil {
+		t.Fatal(err)
+	}
+	p.NetworkReference = uuid.NewString()
+	if a, _ := e.svc.Authorize(e.ctx, tokenPAN, p); a.Code != domain.CodeRestrictedCard {
+		t.Fatalf("suspended token = %+v", a)
+	}
+	// The card itself keeps working.
+	_, d := e.issue(t)
+	if a, _ := e.svc.Authorize(e.ctx, d.PAN, purchase(d, "5")); a.Status != domain.Approved {
+		t.Fatalf("card after token suspension = %+v", a)
+	}
+	if _, err := e.svc.UpdateToken(e.ctx, uuid.New(), tok.ID, "RESUME"); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatal("a token can only be managed through its card")
+	}
+	var dump string
+	_ = e.pool.QueryRow(e.ctx, `SELECT row_to_json(t)::text FROM card_tokens t WHERE id = $1`, tok.ID).Scan(&dump)
+	if strings.Contains(dump, tokenPAN) {
+		t.Fatal("token number stored in clear text")
+	}
+}

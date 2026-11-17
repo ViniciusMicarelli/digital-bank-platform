@@ -60,6 +60,18 @@ func (s *Server) Logout(ctx context.Context, req *identityv1.LogoutRequest) (*id
 	return &identityv1.LogoutResponse{}, nil
 }
 
+func (s *Server) StepUp(ctx context.Context, req *identityv1.StepUpRequest) (*identityv1.StepUpResponse, error) {
+	id, err := uuid.Parse(req.GetCustomerId())
+	if err != nil {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", "customer_id must be a UUID")
+	}
+	tok, exp, err := s.app.StepUp(ctx, id, req.GetPassword(), req.GetTotpCode())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &identityv1.StepUpResponse{StepUpToken: tok, ExpiresAt: timestamppb.New(exp)}, nil
+}
+
 func (s *Server) EnrollTotp(ctx context.Context, req *identityv1.EnrollTotpRequest) (*identityv1.EnrollTotpResponse, error) {
 	id, err := uuid.Parse(req.GetCustomerId())
 	if err != nil {

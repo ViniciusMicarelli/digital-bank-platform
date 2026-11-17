@@ -26,6 +26,9 @@ const (
 	CardService_UnblockCard_FullMethodName       = "/bank.card.v1.CardService/UnblockCard"
 	CardService_UpdateControls_FullMethodName    = "/bank.card.v1.CardService/UpdateControls"
 	CardService_RevealCardDetails_FullMethodName = "/bank.card.v1.CardService/RevealCardDetails"
+	CardService_TokenizeCard_FullMethodName      = "/bank.card.v1.CardService/TokenizeCard"
+	CardService_ListTokens_FullMethodName        = "/bank.card.v1.CardService/ListTokens"
+	CardService_UpdateToken_FullMethodName       = "/bank.card.v1.CardService/UpdateToken"
 	CardService_Authorize_FullMethodName         = "/bank.card.v1.CardService/Authorize"
 	CardService_Clear_FullMethodName             = "/bank.card.v1.CardService/Clear"
 	CardService_Reverse_FullMethodName           = "/bank.card.v1.CardService/Reverse"
@@ -48,6 +51,11 @@ type CardServiceClient interface {
 	UpdateControls(ctx context.Context, in *UpdateControlsRequest, opts ...grpc.CallOption) (*UpdateControlsResponse, error)
 	// Returns the full card number, expiry and CVV to the card holder.
 	RevealCardDetails(ctx context.Context, in *RevealCardDetailsRequest, opts ...grpc.CallOption) (*RevealCardDetailsResponse, error)
+	// Provisions a token (a different card number) for a wallet or a merchant.
+	TokenizeCard(ctx context.Context, in *TokenizeCardRequest, opts ...grpc.CallOption) (*TokenizeCardResponse, error)
+	ListTokens(ctx context.Context, in *ListTokensRequest, opts ...grpc.CallOption) (*ListTokensResponse, error)
+	// SUSPEND, RESUME or DELETE one token without touching the card.
+	UpdateToken(ctx context.Context, in *UpdateTokenRequest, opts ...grpc.CallOption) (*UpdateTokenResponse, error)
 	// Real-time authorization. Idempotent on network_reference. Declines are
 	// normal responses (status DECLINED with an ISO 8583-style response code).
 	Authorize(ctx context.Context, in *AuthorizeRequest, opts ...grpc.CallOption) (*AuthorizeResponse, error)
@@ -135,6 +143,36 @@ func (c *cardServiceClient) RevealCardDetails(ctx context.Context, in *RevealCar
 	return out, nil
 }
 
+func (c *cardServiceClient) TokenizeCard(ctx context.Context, in *TokenizeCardRequest, opts ...grpc.CallOption) (*TokenizeCardResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TokenizeCardResponse)
+	err := c.cc.Invoke(ctx, CardService_TokenizeCard_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cardServiceClient) ListTokens(ctx context.Context, in *ListTokensRequest, opts ...grpc.CallOption) (*ListTokensResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTokensResponse)
+	err := c.cc.Invoke(ctx, CardService_ListTokens_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cardServiceClient) UpdateToken(ctx context.Context, in *UpdateTokenRequest, opts ...grpc.CallOption) (*UpdateTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateTokenResponse)
+	err := c.cc.Invoke(ctx, CardService_UpdateToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *cardServiceClient) Authorize(ctx context.Context, in *AuthorizeRequest, opts ...grpc.CallOption) (*AuthorizeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AuthorizeResponse)
@@ -182,6 +220,11 @@ type CardServiceServer interface {
 	UpdateControls(context.Context, *UpdateControlsRequest) (*UpdateControlsResponse, error)
 	// Returns the full card number, expiry and CVV to the card holder.
 	RevealCardDetails(context.Context, *RevealCardDetailsRequest) (*RevealCardDetailsResponse, error)
+	// Provisions a token (a different card number) for a wallet or a merchant.
+	TokenizeCard(context.Context, *TokenizeCardRequest) (*TokenizeCardResponse, error)
+	ListTokens(context.Context, *ListTokensRequest) (*ListTokensResponse, error)
+	// SUSPEND, RESUME or DELETE one token without touching the card.
+	UpdateToken(context.Context, *UpdateTokenRequest) (*UpdateTokenResponse, error)
 	// Real-time authorization. Idempotent on network_reference. Declines are
 	// normal responses (status DECLINED with an ISO 8583-style response code).
 	Authorize(context.Context, *AuthorizeRequest) (*AuthorizeResponse, error)
@@ -219,6 +262,15 @@ func (UnimplementedCardServiceServer) UpdateControls(context.Context, *UpdateCon
 }
 func (UnimplementedCardServiceServer) RevealCardDetails(context.Context, *RevealCardDetailsRequest) (*RevealCardDetailsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevealCardDetails not implemented")
+}
+func (UnimplementedCardServiceServer) TokenizeCard(context.Context, *TokenizeCardRequest) (*TokenizeCardResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TokenizeCard not implemented")
+}
+func (UnimplementedCardServiceServer) ListTokens(context.Context, *ListTokensRequest) (*ListTokensResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTokens not implemented")
+}
+func (UnimplementedCardServiceServer) UpdateToken(context.Context, *UpdateTokenRequest) (*UpdateTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateToken not implemented")
 }
 func (UnimplementedCardServiceServer) Authorize(context.Context, *AuthorizeRequest) (*AuthorizeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Authorize not implemented")
@@ -376,6 +428,60 @@ func _CardService_RevealCardDetails_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CardService_TokenizeCard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TokenizeCardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CardServiceServer).TokenizeCard(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CardService_TokenizeCard_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CardServiceServer).TokenizeCard(ctx, req.(*TokenizeCardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CardService_ListTokens_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTokensRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CardServiceServer).ListTokens(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CardService_ListTokens_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CardServiceServer).ListTokens(ctx, req.(*ListTokensRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CardService_UpdateToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CardServiceServer).UpdateToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CardService_UpdateToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CardServiceServer).UpdateToken(ctx, req.(*UpdateTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CardService_Authorize_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AuthorizeRequest)
 	if err := dec(in); err != nil {
@@ -464,6 +570,18 @@ var CardService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RevealCardDetails",
 			Handler:    _CardService_RevealCardDetails_Handler,
+		},
+		{
+			MethodName: "TokenizeCard",
+			Handler:    _CardService_TokenizeCard_Handler,
+		},
+		{
+			MethodName: "ListTokens",
+			Handler:    _CardService_ListTokens_Handler,
+		},
+		{
+			MethodName: "UpdateToken",
+			Handler:    _CardService_UpdateToken_Handler,
 		},
 		{
 			MethodName: "Authorize",

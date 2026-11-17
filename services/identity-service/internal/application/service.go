@@ -133,6 +133,64 @@ func (s *Service) Login(ctx context.Context, email, password, code string) (uuid
 	return customer, pair, loginErr
 }
 
+// StepUp re-authenticates a logged-in customer (password, plus TOTP when
+// enabled) and returns a 5-minute step-up token. Failures count towards the
+// account lockout like login failures.
+func (s *Service) StepUp(ctx context.Context, customer uuid.UUID, password, code string) (string, time.Time, error) {
+	now := s.now()
+	var (
+		token   string
+		exp     time.Time
+		stepErr error
+	)
+	err := s.store.InTx(ctx, func(tx ports.Tx) error {
+		stepErr = nil
+		c, err := tx.CredentialsForUpdate(ctx, customer)
+		if err != nil {
+			return err
+		}
+		amr := []string{"pwd"}
+		switch {
+		case c.Locked(now):
+			stepErr = domain.ErrLocked
+			return nil
+		case !domain.VerifyPassword(password, c.PasswordHash):
+			c.RegisterFailure(now)
+			stepErr = domain.ErrInvalidCredentials
+			return tx.SaveCredentials(ctx, c)
+		case c.TOTPEnabled && code == "":
+			stepErr = domain.ErrMFARequired
+			return nil
+		case c.TOTPEnabled:
+			step, ok, err := s.checkTOTP(c, code, now)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				c.RegisterFailure(now)
+				stepErr = domain.ErrInvalidMFACode
+				return tx.SaveCredentials(ctx, c)
+			}
+			c.TOTPLastStep = step
+			amr = append(amr, "otp")
+		}
+		c.RegisterSuccess()
+		if err := tx.SaveCredentials(ctx, c); err != nil {
+			return err
+		}
+		key, err := s.signingKey(ctx)
+		if err != nil {
+			return err
+		}
+		token, exp, err = domain.SignStepUpToken(key, customer, amr, now)
+		return err
+	})
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return token, exp, stepErr
+}
+
 // Refresh rotates a refresh token. A token that was already rotated means it
 // leaked (or was replayed): the whole family is revoked.
 func (s *Service) Refresh(ctx context.Context, token string) (TokenPair, error) {

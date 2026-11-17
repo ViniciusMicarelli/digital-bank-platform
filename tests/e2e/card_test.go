@@ -22,7 +22,10 @@ func TestDebitCard(t *testing.T) {
 		t.Fatalf("issue: %d %v", status, card)
 	}
 	base := "/v1/accounts/" + accID + "/cards/" + card["id"].(string)
-	_, d := ana.call("POST", base+"/reveal", nil, nil)
+	if status, body := ana.call("POST", base+"/reveal", nil, nil); status != 403 || body["error"].(map[string]any)["code"] != "STEP_UP_REQUIRED" {
+		t.Fatalf("reveal without step-up: %d %v", status, body)
+	}
+	_, d := ana.call("POST", base+"/reveal", nil, ana.stepUp())
 	pan := d["pan"].(string)
 	if pan[len(pan)-4:] != card["last4"] {
 		t.Fatalf("reveal = %v", d)
@@ -95,5 +98,55 @@ func TestDebitCard(t *testing.T) {
 			t.Fatalf("statement = %v", st)
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func TestCardTokens(t *testing.T) {
+	ana := login(t, "ana-token-"+uuid.NewString()[:8])
+	_, acc := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza", "document": "529.982.247-25"}, idem())
+	accID := acc["id"].(string)
+	key := "ana." + uuid.NewString()[:8] + "@example.com"
+	ana.call("POST", "/v1/accounts/"+accID+"/pix/keys", map[string]string{"type": "EMAIL", "value": key}, nil)
+	ana.call("POST", "/v1/sandbox/pix-in", map[string]string{"key": key, "amount": "100.00"}, nil)
+	_, card := ana.call("POST", "/v1/accounts/"+accID+"/cards", map[string]string{"kind": "VIRTUAL"}, idem())
+	base := "/v1/accounts/" + accID + "/cards/" + card["id"].(string)
+
+	wallet := map[string]string{"wallet": "APPLE_PAY", "device_name": "iPhone da Ana"}
+	if status, _ := ana.call("POST", base+"/tokens", wallet, nil); status != 403 {
+		t.Fatalf("tokenize without step-up: %d", status)
+	}
+	status, tok := ana.call("POST", base+"/tokens", wallet, ana.stepUp())
+	tokenPAN, _ := tok["token_pan"].(string)
+	if status != 201 || tok["status"] != "ACTIVE" || len(tokenPAN) != 16 || tokenPAN[:6] != "999998" {
+		t.Fatalf("tokenize: %d %v", status, tok)
+	}
+	pay := func() map[string]any {
+		_, a := ana.call("POST", "/v1/sandbox/card-network/authorizations", map[string]any{
+			"pan": tokenPAN, "expiry_month": card["expiry_month"], "expiry_year": card["expiry_year"],
+			"amount": "9.90", "merchant_name": "CAFE DO PONTO", "mcc": "5814", "country": "BR", "channel": "CONTACTLESS",
+		}, nil)
+		return a
+	}
+	if a := pay(); a["status"] != "APPROVED" || a["token_id"] != tok["id"] || a["card_id"] != card["id"] {
+		t.Fatalf("wallet purchase: %v", a)
+	}
+	tokenPath := base + "/tokens/" + tok["id"].(string)
+	if _, s := ana.call("POST", tokenPath+"/suspend", nil, nil); s["status"] != "SUSPENDED" {
+		t.Fatalf("suspend: %v", s)
+	}
+	if a := pay(); a["response_code"] != "62" {
+		t.Fatalf("suspended token: %v", a)
+	}
+	if _, l := ana.call("GET", base+"/tokens", nil, nil); len(l["tokens"].([]any)) != 1 {
+		t.Fatalf("tokens = %v", l)
+	}
+	ana.call("DELETE", tokenPath, nil, nil)
+	if _, l := ana.call("GET", base+"/tokens", nil, nil); len(l["tokens"].([]any)) != 0 {
+		t.Fatalf("deleted token still listed: %v", l)
+	}
+
+	bruno := login(t, "bruno-token-"+uuid.NewString()[:8])
+	if status, _ := bruno.call("GET", base+"/tokens", nil, nil); status != 404 {
+		t.Fatalf("another customer listing tokens: %d", status)
 	}
 }

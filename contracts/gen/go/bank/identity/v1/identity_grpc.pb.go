@@ -23,6 +23,7 @@ const (
 	IdentityService_Login_FullMethodName            = "/bank.identity.v1.IdentityService/Login"
 	IdentityService_Refresh_FullMethodName          = "/bank.identity.v1.IdentityService/Refresh"
 	IdentityService_Logout_FullMethodName           = "/bank.identity.v1.IdentityService/Logout"
+	IdentityService_StepUp_FullMethodName           = "/bank.identity.v1.IdentityService/StepUp"
 	IdentityService_EnrollTotp_FullMethodName       = "/bank.identity.v1.IdentityService/EnrollTotp"
 	IdentityService_ConfirmTotp_FullMethodName      = "/bank.identity.v1.IdentityService/ConfirmTotp"
 	IdentityService_GetJwks_FullMethodName          = "/bank.identity.v1.IdentityService/GetJwks"
@@ -44,6 +45,9 @@ type IdentityServiceClient interface {
 	// presenting a used one revokes the whole session (reason REFRESH_TOKEN_REUSED).
 	Refresh(ctx context.Context, in *RefreshRequest, opts ...grpc.CallOption) (*RefreshResponse, error)
 	Logout(ctx context.Context, in *LogoutRequest, opts ...grpc.CallOption) (*LogoutResponse, error)
+	// Re-authenticates a logged-in customer for a sensitive action; returns a
+	// 5-minute token with audience "digital-bank-step-up".
+	StepUp(ctx context.Context, in *StepUpRequest, opts ...grpc.CallOption) (*StepUpResponse, error)
 	// Starts TOTP enrollment; it is enabled after ConfirmTotp.
 	EnrollTotp(ctx context.Context, in *EnrollTotpRequest, opts ...grpc.CallOption) (*EnrollTotpResponse, error)
 	ConfirmTotp(ctx context.Context, in *ConfirmTotpRequest, opts ...grpc.CallOption) (*ConfirmTotpResponse, error)
@@ -95,6 +99,16 @@ func (c *identityServiceClient) Logout(ctx context.Context, in *LogoutRequest, o
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(LogoutResponse)
 	err := c.cc.Invoke(ctx, IdentityService_Logout_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) StepUp(ctx context.Context, in *StepUpRequest, opts ...grpc.CallOption) (*StepUpResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StepUpResponse)
+	err := c.cc.Invoke(ctx, IdentityService_StepUp_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -156,6 +170,9 @@ type IdentityServiceServer interface {
 	// presenting a used one revokes the whole session (reason REFRESH_TOKEN_REUSED).
 	Refresh(context.Context, *RefreshRequest) (*RefreshResponse, error)
 	Logout(context.Context, *LogoutRequest) (*LogoutResponse, error)
+	// Re-authenticates a logged-in customer for a sensitive action; returns a
+	// 5-minute token with audience "digital-bank-step-up".
+	StepUp(context.Context, *StepUpRequest) (*StepUpResponse, error)
 	// Starts TOTP enrollment; it is enabled after ConfirmTotp.
 	EnrollTotp(context.Context, *EnrollTotpRequest) (*EnrollTotpResponse, error)
 	ConfirmTotp(context.Context, *ConfirmTotpRequest) (*ConfirmTotpResponse, error)
@@ -184,6 +201,9 @@ func (UnimplementedIdentityServiceServer) Refresh(context.Context, *RefreshReque
 }
 func (UnimplementedIdentityServiceServer) Logout(context.Context, *LogoutRequest) (*LogoutResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Logout not implemented")
+}
+func (UnimplementedIdentityServiceServer) StepUp(context.Context, *StepUpRequest) (*StepUpResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StepUp not implemented")
 }
 func (UnimplementedIdentityServiceServer) EnrollTotp(context.Context, *EnrollTotpRequest) (*EnrollTotpResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method EnrollTotp not implemented")
@@ -290,6 +310,24 @@ func _IdentityService_Logout_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IdentityService_StepUp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StepUpRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).StepUp(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_StepUp_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).StepUp(ctx, req.(*StepUpRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _IdentityService_EnrollTotp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EnrollTotpRequest)
 	if err := dec(in); err != nil {
@@ -384,6 +422,10 @@ var IdentityService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Logout",
 			Handler:    _IdentityService_Logout_Handler,
+		},
+		{
+			MethodName: "StepUp",
+			Handler:    _IdentityService_StepUp_Handler,
 		},
 		{
 			MethodName: "EnrollTotp",

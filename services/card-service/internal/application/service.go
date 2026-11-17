@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -196,14 +197,12 @@ func (s *Service) Authorize(ctx context.Context, pan string, p domain.Purchase) 
 		ID: uuid.Must(uuid.NewV7()), NetworkReference: p.NetworkReference, Purchase: p,
 		Status: domain.PendingReversal, Code: domain.CodeIssuerUnavailable, Reason: "processing",
 	}
-	card, cardErr := domain.Card{}, error(nil)
-	if domain.ValidPAN(pan) {
-		card, cardErr = s.store.CardByPANIndex(ctx, secretbox.BlindIndex(s.keys.panIndex, pan))
-	} else {
-		cardErr = domain.ErrNotFound
-	}
+	card, token, cardErr := s.findCard(ctx, pan)
 	if cardErr == nil {
 		a.CardID, a.AccountID = card.ID, card.AccountID
+		if token != nil {
+			a.TokenID = token.ID
+		}
 	} else if !errors.Is(cardErr, domain.ErrNotFound) {
 		return domain.Authorization{}, cardErr
 	}
@@ -219,6 +218,8 @@ func (s *Service) Authorize(ctx context.Context, pan string, p domain.Purchase) 
 	var d domain.Decision
 	if cardErr != nil {
 		d = domain.Decision{Code: domain.CodeInvalidCard, Reason: "unknown card"}
+	} else if token != nil {
+		d = card.DecideToken(p, *token, s.now())
 	} else {
 		d = card.Decide(p, domain.DeriveCVV(s.keys.cvk, pan, card.ExpiryMonth, card.ExpiryYear), s.now())
 	}
@@ -237,6 +238,70 @@ func (s *Service) Authorize(ctx context.Context, pan string, p domain.Purchase) 
 		return s.decide(ctx, a, domain.Declined, domain.DeclineCodeFor(res.FailureReason), res.FailureReason)
 	}
 	return s.decide(ctx, a, domain.Approved, domain.CodeApproved, "")
+}
+
+// findCard resolves a card number: a card in the vault, or a token of one.
+func (s *Service) findCard(ctx context.Context, pan string) (domain.Card, *domain.Token, error) {
+	if !domain.ValidPAN(pan) {
+		return domain.Card{}, nil, domain.ErrNotFound
+	}
+	index := secretbox.BlindIndex(s.keys.panIndex, pan)
+	card, err := s.store.CardByPANIndex(ctx, index)
+	if !errors.Is(err, domain.ErrNotFound) {
+		return card, nil, err
+	}
+	t, err := s.store.TokenByPANIndex(ctx, index)
+	if err != nil {
+		return domain.Card{}, nil, err
+	}
+	card, err = s.store.Card(ctx, t.CardID)
+	return card, &t, err
+}
+
+func tokenAAD(t uuid.UUID) []byte { return []byte("card-token:" + t.String()) }
+
+// Tokenize provisions a token for a wallet or merchant. The token number is
+// returned once (to the wallet) and kept encrypted in the vault.
+func (s *Service) Tokenize(ctx context.Context, cardID uuid.UUID, wallet domain.Wallet, device string) (domain.Token, string, error) {
+	c, err := s.store.Card(ctx, cardID)
+	if err != nil {
+		return domain.Token{}, "", err
+	}
+	t, pan, err := domain.NewToken(c, wallet, device)
+	if err != nil {
+		return domain.Token{}, "", err
+	}
+	ev, err := s.event(ctx, "card.token.created", t.ID.String(), map[string]string{
+		"token_id": t.ID.String(), "card_id": c.ID.String(), "wallet": string(t.Wallet), "last4": t.Last4})
+	if err != nil {
+		return domain.Token{}, "", err
+	}
+	if err := s.store.InsertToken(ctx, t, s.keys.box.Seal([]byte(pan), tokenAAD(t.ID)), secretbox.BlindIndex(s.keys.panIndex, pan), ev); err != nil {
+		return domain.Token{}, "", err
+	}
+	t.CreatedAt = s.now()
+	return t, pan, nil
+}
+
+func (s *Service) Tokens(ctx context.Context, cardID uuid.UUID) ([]domain.Token, error) {
+	return s.store.Tokens(ctx, cardID)
+}
+
+// UpdateToken suspends, resumes or deletes one token of a card.
+func (s *Service) UpdateToken(ctx context.Context, cardID, tokenID uuid.UUID, action string) (domain.Token, error) {
+	t, err := s.store.Token(ctx, tokenID)
+	if err != nil || t.CardID != cardID {
+		return domain.Token{}, fmt.Errorf("%w: token", domain.ErrNotFound)
+	}
+	if err := t.Transition(action); err != nil {
+		return domain.Token{}, err
+	}
+	ev, err := s.event(ctx, "card.token."+strings.ToLower(string(t.Status)), t.ID.String(), map[string]string{
+		"token_id": t.ID.String(), "card_id": cardID.String(), "status": string(t.Status)})
+	if err != nil {
+		return domain.Token{}, err
+	}
+	return t, s.store.SaveToken(ctx, t, ev)
 }
 
 func (s *Service) metadata(a domain.Authorization, c domain.Card) map[string]string {

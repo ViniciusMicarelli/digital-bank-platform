@@ -19,6 +19,12 @@ service CardService {
   // Returns the full card number, expiry and CVV to the card holder.
   rpc RevealCardDetails(RevealCardDetailsRequest) returns (RevealCardDetailsResponse);
 
+  // Provisions a token (a different card number) for a wallet or a merchant.
+  rpc TokenizeCard(TokenizeCardRequest) returns (TokenizeCardResponse);
+  rpc ListTokens(ListTokensRequest) returns (ListTokensResponse);
+  // SUSPEND, RESUME or DELETE one token without touching the card.
+  rpc UpdateToken(UpdateTokenRequest) returns (UpdateTokenResponse);
+
   // Real-time authorization. Idempotent on network_reference. Declines are
   // normal responses (status DECLINED with an ISO 8583-style response code).
   rpc Authorize(AuthorizeRequest) returns (AuthorizeResponse);
@@ -155,6 +161,8 @@ message Authorization {
   string country = 11;
   Channel channel = 12;
   google.protobuf.Timestamp created_at = 13;
+  // Set when the purchase was made with a token.
+  string token_id = 14;
 }
 
 message AuthorizeRequest {
@@ -193,4 +201,46 @@ message ReverseRequest {
 
 message ReverseResponse {
   Authorization authorization = 1;
+}
+
+message CardToken {
+  string id = 1;
+  string card_id = 2;
+  // APPLE_PAY, GOOGLE_PAY, SAMSUNG_PAY, MERCHANT.
+  string wallet = 3;
+  string device_name = 4;
+  // ACTIVE, SUSPENDED, DELETED.
+  string status = 5;
+  string last4 = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message TokenizeCardRequest {
+  string card_id = 1;
+  string wallet = 2;
+  string device_name = 3;
+}
+
+message TokenizeCardResponse {
+  CardToken token = 1;
+  // Delivered once to the wallet; never shown again.
+  string token_pan = 2;
+}
+
+message ListTokensRequest {
+  string card_id = 1;
+}
+
+message ListTokensResponse {
+  repeated CardToken tokens = 1;
+}
+
+message UpdateTokenRequest {
+  string card_id = 1;
+  string token_id = 2;
+  string action = 3;
+}
+
+message UpdateTokenResponse {
+  CardToken token = 1;
 }

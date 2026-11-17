@@ -17,8 +17,9 @@ import (
 
 // Must match identity-service's domain.Issuer / domain.Audience.
 const (
-	Issuer   = "digital-bank-identity"
-	Audience = "digital-bank-api"
+	Issuer         = "digital-bank-identity"
+	Audience       = "digital-bank-api"
+	StepUpAudience = "digital-bank-step-up"
 )
 
 var ErrInvalidToken = errors.New("invalid or expired token")
@@ -84,6 +85,16 @@ func (v *Verifier) key(ctx context.Context, kid string) (ed25519.PublicKey, erro
 
 // Verify returns the customer id (subject) of a valid access token.
 func (v *Verifier) Verify(ctx context.Context, token string) (string, error) {
+	return v.verify(ctx, token, Audience)
+}
+
+// VerifyStepUp returns the customer id of a valid step-up token (a fresh
+// re-authentication, required for sensitive actions).
+func (v *Verifier) VerifyStepUp(ctx context.Context, token string) (string, error) {
+	return v.verify(ctx, token, StepUpAudience)
+}
+
+func (v *Verifier) verify(ctx context.Context, token, audience string) (string, error) {
 	claims := &jwt.RegisteredClaims{}
 	_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
 		kid, _ := t.Header["kid"].(string)
@@ -91,7 +102,7 @@ func (v *Verifier) Verify(ctx context.Context, token string) (string, error) {
 	},
 		jwt.WithValidMethods([]string{jwt.SigningMethodEdDSA.Alg()}),
 		jwt.WithIssuer(Issuer),
-		jwt.WithAudience(Audience),
+		jwt.WithAudience(audience),
 		jwt.WithExpirationRequired(),
 		jwt.WithTimeFunc(v.now),
 	)

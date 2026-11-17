@@ -123,3 +123,17 @@ func (a *API) perIP(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+
+// steppedUp requires a step-up token (X-Step-Up-Token) for the same
+// customer: a fresh password (+ TOTP) check, valid for 5 minutes.
+func (a *API) steppedUp(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sub, err := a.auth.VerifyStepUp(r.Context(), r.Header.Get("X-Step-Up-Token"))
+		if err != nil || sub != customerID(r.Context()) {
+			writeError(w, r.Context(), http.StatusForbidden, "STEP_UP_REQUIRED",
+				"confirm your password at POST /v1/auth/step-up and send the token in X-Step-Up-Token")
+			return
+		}
+		next(w, r)
+	}
+}

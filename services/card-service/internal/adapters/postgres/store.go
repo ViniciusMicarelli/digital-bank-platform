@@ -111,17 +111,68 @@ func (s *Store) SaveCard(ctx context.Context, c domain.Card, events ...outbox.Me
 	})
 }
 
-const authCols = `id, network_reference, card_id, status, response_code, reason, amount, currency, cleared_amount,
+const tokenCols = `id, card_id, wallet, device_name, status, last4, expiry_month, expiry_year, created_at`
+
+func scanToken(row pgx.Row) (domain.Token, error) {
+	var (
+		t              domain.Token
+		wallet, status string
+	)
+	err := row.Scan(&t.ID, &t.CardID, &wallet, &t.DeviceName, &status, &t.Last4, &t.ExpiryMonth, &t.ExpiryYear, &t.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return t, fmt.Errorf("%w: token", domain.ErrNotFound)
+	}
+	t.Wallet, t.Status = domain.Wallet(wallet), domain.TokenStatus(status)
+	return t, err
+}
+
+func (s *Store) InsertToken(ctx context.Context, t domain.Token, panEnc, panIndex []byte, ev outbox.Message) error {
+	return pg.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `INSERT INTO card_tokens (id, card_id, wallet, device_name, status, last4, expiry_month,
+			expiry_year, pan_enc, pan_index) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+			t.ID, t.CardID, t.Wallet, t.DeviceName, t.Status, t.Last4, t.ExpiryMonth, t.ExpiryYear, panEnc, panIndex); err != nil {
+			return err
+		}
+		return outbox.Insert(ctx, tx, ev)
+	})
+}
+
+func (s *Store) Tokens(ctx context.Context, card uuid.UUID) ([]domain.Token, error) {
+	rows, err := s.pool.Query(ctx, `SELECT `+tokenCols+` FROM card_tokens WHERE card_id = $1 AND status <> 'DELETED' ORDER BY created_at`, card)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (domain.Token, error) { return scanToken(r) })
+}
+
+func (s *Store) Token(ctx context.Context, id uuid.UUID) (domain.Token, error) {
+	return scanToken(s.pool.QueryRow(ctx, `SELECT `+tokenCols+` FROM card_tokens WHERE id = $1`, id))
+}
+
+func (s *Store) TokenByPANIndex(ctx context.Context, index []byte) (domain.Token, error) {
+	return scanToken(s.pool.QueryRow(ctx, `SELECT `+tokenCols+` FROM card_tokens WHERE pan_index = $1`, index))
+}
+
+func (s *Store) SaveToken(ctx context.Context, t domain.Token, ev outbox.Message) error {
+	return pg.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `UPDATE card_tokens SET status = $2, updated_at = now() WHERE id = $1`, t.ID, t.Status); err != nil {
+			return err
+		}
+		return outbox.Insert(ctx, tx, ev)
+	})
+}
+
+const authCols = `id, network_reference, card_id, token_id, status, response_code, reason, amount, currency, cleared_amount,
 	merchant_name, mcc, country, channel, transaction_id, created_at`
 
 func scanAuth(row pgx.Row) (domain.Authorization, error) {
 	var (
 		a                         domain.Authorization
-		card, txID                *uuid.UUID
+		card, token, txID         *uuid.UUID
 		status, currency, channel string
 		amount                    int64
 	)
-	err := row.Scan(&a.ID, &a.NetworkReference, &card, &status, &a.Code, &a.Reason, &amount, &currency, &a.Cleared,
+	err := row.Scan(&a.ID, &a.NetworkReference, &card, &token, &status, &a.Code, &a.Reason, &amount, &currency, &a.Cleared,
 		&a.Purchase.MerchantName, &a.Purchase.MCC, &a.Purchase.Country, &channel, &txID, &a.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return a, fmt.Errorf("%w: authorization", domain.ErrNotFound)
@@ -132,6 +183,9 @@ func scanAuth(row pgx.Row) (domain.Authorization, error) {
 	a.Status, a.Purchase.Channel, a.Purchase.NetworkReference = domain.AuthStatus(status), domain.Channel(channel), a.NetworkReference
 	if card != nil {
 		a.CardID = *card
+	}
+	if token != nil {
+		a.TokenID = *token
 	}
 	if txID != nil {
 		a.TransactionID = *txID
@@ -149,10 +203,10 @@ func nullable(id uuid.UUID) *uuid.UUID {
 
 func (s *Store) ClaimAuthorization(ctx context.Context, a domain.Authorization) (*domain.Authorization, error) {
 	p := a.Purchase
-	tag, err := s.pool.Exec(ctx, `INSERT INTO authorizations (id, network_reference, card_id, status, response_code, reason,
+	tag, err := s.pool.Exec(ctx, `INSERT INTO authorizations (id, network_reference, card_id, token_id, status, response_code, reason,
 		amount, currency, merchant_name, mcc, country, channel)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT (network_reference) DO NOTHING`,
-		a.ID, a.NetworkReference, nullable(a.CardID), a.Status, a.Code, a.Reason, p.Amount.Minor(), string(p.Amount.Currency()),
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (network_reference) DO NOTHING`,
+		a.ID, a.NetworkReference, nullable(a.CardID), nullable(a.TokenID), a.Status, a.Code, a.Reason, p.Amount.Minor(), string(p.Amount.Currency()),
 		p.MerchantName, p.MCC, p.Country, p.Channel)
 	if err != nil || tag.RowsAffected() == 1 {
 		return nil, err

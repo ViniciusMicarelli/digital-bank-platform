@@ -19,6 +19,7 @@
 |---|---|---|
 | 400 | Malformed request | `INVALID_JSON`, `INVALID_AMOUNT`, `IDEMPOTENCY_KEY_REQUIRED` |
 | 401 | Missing or invalid token / credentials | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `MFA_REQUIRED`, `ACCOUNT_LOCKED`, `REFRESH_TOKEN_REUSED` |
+| 403 | Sensitive action without a fresh step-up token | `STEP_UP_REQUIRED` |
 | 404 | Not found, or not yours | `NOT_FOUND` |
 | 409 | Same key, different request; or still processing | `IDEMPOTENCY_CONFLICT`, `IN_PROGRESS` |
 | 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS`, `QR_CODE_UNAVAILABLE`, `REFUND_TOO_LARGE`, `NOT_REFUNDABLE`, `CHARGE_NOT_ALLOWED`, `MANDATE_NOT_ACTIVE` |
@@ -36,6 +37,7 @@
 | `POST` | `/v1/auth/login` | `{email, password, totp_code?}` → access + refresh tokens |
 | `POST` | `/v1/auth/refresh` | `{refresh_token}` → new pair (the old token stops working) |
 | `POST` | `/v1/auth/logout` | `{refresh_token}` → ends the session |
+| `POST` | `/v1/auth/step-up` | `{password, totp_code?}` → `step_up_token` (5 min), sent as `X-Step-Up-Token` on sensitive actions (🔐) |
 | `POST` | `/v1/auth/mfa/totp` | Start TOTP enrollment → `{secret, otpauth_uri}` |
 | `POST` | `/v1/auth/mfa/totp/confirm` | `{code}` → enables TOTP |
 | `POST` | `/v1/accounts` | Open an account `{holder_name, document}` · Idempotency-Key |
@@ -64,7 +66,12 @@
 | `POST` / `GET` | `/v1/accounts/{id}/cards` | Issue a debit card `{kind: PHYSICAL\|VIRTUAL}` (Idempotency-Key) / list cards |
 | `POST` | `/v1/accounts/{id}/cards/{cardID}/block` · `/unblock` | Block (`{reason}`) / unblock |
 | `PUT` | `/v1/accounts/{id}/cards/{cardID}/controls` | `{online, international, contactless}` |
-| `POST` | `/v1/accounts/{id}/cards/{cardID}/reveal` | Card number, expiry, CVV |
+| `POST` | `/v1/accounts/{id}/cards/{cardID}/reveal` | 🔐 Card number, expiry, CVV |
+| `POST` | `/v1/accounts/{id}/cards/{cardID}/tokens` | 🔐 `{wallet, device_name}` → wallet token (`token_pan` returned once) |
+| `GET` | `/v1/accounts/{id}/cards/{cardID}/tokens` | Active and suspended tokens |
+| `POST` | `/v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}/suspend` | Suspend one device |
+| `POST` | `/v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}/resume` | 🔐 Resume it |
+| `DELETE` | `/v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}` | Delete it for good |
 | `POST` | `/v1/sandbox/card-network/authorizations` | *(sandbox)* Network authorization `{pan, expiry_month, expiry_year, cvv, amount, merchant_name, mcc, country, channel}` |
 | `POST` | `/v1/sandbox/card-network/authorizations/{id}/clear` · `/reverse` | *(sandbox)* Clearing `{amount?}` / merchant reversal |
 | `POST` | `/v1/sandbox/pix-in` | *(sandbox only)* Simulate an incoming Pix `{key, amount, payer_name}` |

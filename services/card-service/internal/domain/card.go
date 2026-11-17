@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -29,10 +30,15 @@ var (
 // assigned to any real issuer.
 const BIN = "999999"
 
+// TokenBIN is the range of device / merchant token numbers (never physical cards).
+const TokenBIN = "999998"
+
 // NewPAN returns a random 16-digit card number under BIN with a valid Luhn
 // check digit.
-func NewPAN() string {
-	digits := []byte(BIN)
+func NewPAN() string { return newPAN(BIN) }
+
+func newPAN(bin string) string {
+	digits := []byte(bin)
 	for len(digits) < 15 {
 		n, _ := rand.Int(rand.Reader, big.NewInt(10))
 		digits = append(digits, byte('0'+n.Int64()))
@@ -236,18 +242,36 @@ func decline(code, reason string) Decision { return Decision{Code: code, Reason:
 // Decide applies the card checks in the order a network expects. The CVV is
 // compared with the derived value (constant time); it is required online.
 func (c Card) Decide(p Purchase, expectedCVV string, now time.Time) Decision {
+	return c.decide(p, expectedCVV, now, nil)
+}
+
+// DecideToken authorizes a purchase made with a token: the token's own
+// status and expiry apply, and no CVV is needed (wallets send a cryptogram
+// that the network validates).
+func (c Card) DecideToken(p Purchase, t Token, now time.Time) Decision {
+	return c.decide(p, "", now, &t)
+}
+
+func (c Card) decide(p Purchase, expectedCVV string, now time.Time, tok *Token) Decision {
+	month, year := c.ExpiryMonth, c.ExpiryYear
+	if tok != nil {
+		if tok.Status != TokenActive {
+			return decline(CodeRestrictedCard, "token "+strings.ToLower(string(tok.Status)))
+		}
+		month, year = tok.ExpiryMonth, tok.ExpiryYear
+	}
 	switch {
 	case c.Status == Cancelled:
 		return decline(CodeRestrictedCard, "card cancelled")
 	case c.Status == Blocked:
 		return decline(CodeRestrictedCard, "card blocked")
-	case p.ExpiryMonth != c.ExpiryMonth || p.ExpiryYear != c.ExpiryYear:
+	case p.ExpiryMonth != month || p.ExpiryYear != year:
 		return decline(CodeExpiredCard, "expiry date does not match")
 	case c.Expired(now):
 		return decline(CodeExpiredCard, "card expired")
-	case p.Channel == Online && p.CVV == "":
+	case tok == nil && p.Channel == Online && p.CVV == "":
 		return decline(CodeWrongCVV, "CVV required for card-not-present purchases")
-	case p.CVV != "" && !hmac.Equal([]byte(p.CVV), []byte(expectedCVV)):
+	case tok == nil && p.CVV != "" && !hmac.Equal([]byte(p.CVV), []byte(expectedCVV)):
 		return decline(CodeWrongCVV, "wrong CVV")
 	case p.Channel == Online && !c.Controls.Online:
 		return decline(CodeNotPermitted, "online purchases disabled")
@@ -293,6 +317,7 @@ type Authorization struct {
 	ID               uuid.UUID
 	NetworkReference string
 	CardID           uuid.UUID
+	TokenID          uuid.UUID // set when paid with a wallet / card-on-file token
 	AccountID        uuid.UUID // not stored; filled from the card when needed
 	Status           AuthStatus
 	Code             string
@@ -305,3 +330,67 @@ type Authorization struct {
 
 // TransactionKey is the idempotency key of the reservation in transaction-service.
 func (a Authorization) TransactionKey() string { return "card:" + a.ID.String() }
+
+type Wallet string
+
+const (
+	ApplePay   Wallet = "APPLE_PAY"
+	GooglePay  Wallet = "GOOGLE_PAY"
+	SamsungPay Wallet = "SAMSUNG_PAY"
+	Merchant   Wallet = "MERCHANT" // card on file at a merchant
+)
+
+type TokenStatus string
+
+const (
+	TokenActive    TokenStatus = "ACTIVE"
+	TokenSuspended TokenStatus = "SUSPENDED"
+	TokenDeleted   TokenStatus = "DELETED"
+)
+
+// Token is a stand-in card number for one wallet or merchant.
+type Token struct {
+	ID          uuid.UUID
+	CardID      uuid.UUID
+	Wallet      Wallet
+	DeviceName  string
+	Status      TokenStatus
+	Last4       string
+	ExpiryMonth int
+	ExpiryYear  int
+	CreatedAt   time.Time
+}
+
+// NewToken provisions a token for an active card; it shares the card's expiry.
+func NewToken(c Card, wallet Wallet, device string) (Token, string, error) {
+	switch {
+	case c.Status != Active:
+		return Token{}, "", fmt.Errorf("%w: card is %s", ErrInvalidTransition, c.Status)
+	case wallet != ApplePay && wallet != GooglePay && wallet != SamsungPay && wallet != Merchant:
+		return Token{}, "", fmt.Errorf("%w: unknown wallet", ErrInvalidArgument)
+	case device == "" || len(device) > 64:
+		return Token{}, "", fmt.Errorf("%w: device name is required", ErrInvalidArgument)
+	}
+	pan := newPAN(TokenBIN)
+	return Token{
+		ID: uuid.Must(uuid.NewV7()), CardID: c.ID, Wallet: wallet, DeviceName: device, Status: TokenActive,
+		Last4: pan[len(pan)-4:], ExpiryMonth: c.ExpiryMonth, ExpiryYear: c.ExpiryYear,
+	}, pan, nil
+}
+
+// Transition applies SUSPEND, RESUME or DELETE.
+func (t *Token) Transition(action string) error {
+	switch {
+	case t.Status == TokenDeleted:
+		return fmt.Errorf("%w: token is deleted", ErrInvalidTransition)
+	case action == "SUSPEND" && t.Status == TokenActive:
+		t.Status = TokenSuspended
+	case action == "RESUME" && t.Status == TokenSuspended:
+		t.Status = TokenActive
+	case action == "DELETE":
+		t.Status = TokenDeleted
+	default:
+		return fmt.Errorf("%w: cannot %s a %s token", ErrInvalidTransition, strings.ToLower(action), t.Status)
+	}
+	return nil
+}

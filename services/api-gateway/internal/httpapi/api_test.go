@@ -23,6 +23,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
+	cardv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/card/v1"
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
@@ -89,6 +90,7 @@ func (f *fakeIdentity) Login(_ context.Context, in *identityv1.LoginRequest, _ .
 type harness struct {
 	srv     *httptest.Server
 	sign    func(sub string) string
+	stepUp  func(sub string) string
 	txs     *fakeTxs
 	account string
 }
@@ -98,15 +100,18 @@ func newHarness(t *testing.T, opts Options) harness {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	jwk := auth.JWK{Kid: "test", Kty: "OKP", Crv: "Ed25519", X: base64.RawURLEncoding.EncodeToString(pub)}
 	verifier := auth.NewVerifier(func(context.Context) ([]auth.JWK, error) { return []auth.JWK{jwk}, nil })
-	sign := func(sub string) string {
-		tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.RegisteredClaims{
-			Subject: sub, Issuer: auth.Issuer, Audience: jwt.ClaimStrings{auth.Audience},
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
-		})
-		tok.Header["kid"] = "test"
-		s, _ := tok.SignedString(priv)
-		return s
+	signFor := func(aud string) func(string) string {
+		return func(sub string) string {
+			tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.RegisteredClaims{
+				Subject: sub, Issuer: auth.Issuer, Audience: jwt.ClaimStrings{aud},
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+			})
+			tok.Header["kid"] = "test"
+			s, _ := tok.SignedString(priv)
+			return s
+		}
 	}
+	sign := signFor(auth.Audience)
 	account := uuid.NewString()
 	txs := &fakeTxs{}
 	if opts.Limiter == nil {
@@ -115,10 +120,11 @@ func newHarness(t *testing.T, opts Options) harness {
 	api := New(Clients{
 		Identity: &fakeIdentity{sign: sign},
 		Accounts: &fakeAccounts{owners: map[string]string{account: "ana"}}, Txs: txs,
+		Cards: &fakeCards{account: account},
 	}, verifier, slog.New(slog.NewTextHandler(io.Discard, nil)), opts)
 	srv := httptest.NewServer(api.Handler())
 	t.Cleanup(srv.Close)
-	return harness{srv: srv, sign: sign, txs: txs, account: account}
+	return harness{srv: srv, sign: sign, stepUp: signFor(auth.StepUpAudience), txs: txs, account: account}
 }
 
 func (h harness) do(t *testing.T, method, path, customer, body string, headers map[string]string) (*http.Response, map[string]any) {
@@ -246,4 +252,35 @@ func TestRouteLabel(t *testing.T) {
 func testutilCount(t *testing.T, route string) float64 {
 	t.Helper()
 	return testutil.ToFloat64(httpRequests.WithLabelValues(route, "200"))
+}
+
+type fakeCards struct {
+	cardv1.CardServiceClient
+	account string
+}
+
+func (f *fakeCards) GetCard(_ context.Context, in *cardv1.GetCardRequest, _ ...grpc.CallOption) (*cardv1.GetCardResponse, error) {
+	return &cardv1.GetCardResponse{Card: &cardv1.Card{Id: in.GetId(), AccountId: f.account}}, nil
+}
+
+func (f *fakeCards) RevealCardDetails(context.Context, *cardv1.RevealCardDetailsRequest, ...grpc.CallOption) (*cardv1.RevealCardDetailsResponse, error) {
+	return &cardv1.RevealCardDetailsResponse{Pan: "9999990000000001", Cvv: "123"}, nil
+}
+
+func TestRevealRequiresStepUp(t *testing.T) {
+	h := newHarness(t, Options{})
+	path := "/v1/accounts/" + h.account + "/cards/" + uuid.NewString() + "/reveal"
+	if resp, body := h.do(t, "POST", path, "ana", "", nil); resp.StatusCode != 403 || errCode(body) != "STEP_UP_REQUIRED" {
+		t.Fatalf("without step-up: %d %v", resp.StatusCode, body)
+	}
+	if resp, _ := h.do(t, "POST", path, "ana", "", map[string]string{"X-Step-Up-Token": h.stepUp("bruno")}); resp.StatusCode != 403 {
+		t.Fatalf("someone else's step-up token: %d", resp.StatusCode)
+	}
+	if resp, _ := h.do(t, "POST", path, "ana", "", map[string]string{"X-Step-Up-Token": h.sign("ana")}); resp.StatusCode != 403 {
+		t.Fatalf("an access token used as step-up: %d", resp.StatusCode)
+	}
+	resp, body := h.do(t, "POST", path, "ana", "", map[string]string{"X-Step-Up-Token": h.stepUp("ana")})
+	if resp.StatusCode != 200 || body["pan"] != "9999990000000001" || resp.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("with step-up: %d %v", resp.StatusCode, body)
+	}
 }

@@ -11,10 +11,11 @@ Debit cards: issuing, controls and real-time **purchase authorization**, then cl
 | Issue physical (5 years) and virtual (1 year) debit cards for active accounts, idempotent | ✅ |
 | Block / unblock; cards follow the account (blocked account → cards blocked, closed → cancelled) | ✅ |
 | Controls: online, international (off by default), contactless | ✅ |
-| Reveal card number, expiry and CVV to the holder (`Cache-Control: no-store`) | ✅ (step-up MFA planned) |
+| Reveal card number, expiry and CVV to the holder, behind step-up authentication (`Cache-Control: no-store`) | ✅ |
+| Wallet tokens (BIN `999998`): a different number per device (Apple Pay, Google Pay, Samsung Pay, merchant), encrypted in the vault with its own blind index, suspendable/deletable without touching the card; token purchases need no CVV and resolve to the card | ✅ |
 | Real-time authorization with ISO 8583-style response codes | ✅ |
 | Clearing (full or partial) and merchant reversal | ✅ |
-| Credit function (needs credit-service), tokenization for wallets, 3-D Secure | planned |
+| Credit function (needs credit-service), 3-D Secure | planned |
 
 ## Card Vault
 
@@ -57,15 +58,16 @@ Defined in [`contracts/proto/bank/card/v1/card.proto`](../../contracts/proto/ban
 | `IssueCard` / `GetCard` / `ListCards` | Issue and query |
 | `BlockCard` / `UnblockCard` / `UpdateControls` | Customer controls |
 | `RevealCardDetails` | PAN, expiry, CVV |
+| `TokenizeCard` / `ListTokens` / `UpdateToken` | Wallet tokens (the token number is returned once) |
 | `Authorize` / `Clear` / `Reverse` | Network-facing |
 
 ## Events
 
 | Publishes (`bank.card.events`) | Consumes |
 |---|---|
-| `card.issued`, `card.blocked`, `card.unblocked`, `card.controls.changed` | `account.blocked`, `account.unblocked`, `account.closed` |
+| `card.issued`, `card.blocked`, `card.unblocked`, `card.controls.changed`, `card.token.created`, `card.token.suspended`, `card.token.active`, `card.token.deleted` | `account.blocked`, `account.unblocked`, `account.closed` |
 | `card.authorization.approved`, `card.authorization.declined`, `card.authorization.reversed`, `card.purchase.cleared` | |
 
 ## Data
 
-`cards`, `card_vault`, `authorizations`, `outbox`, `inbox`.
+`cards`, `card_vault`, `card_tokens`, `authorizations` (with `token_id` when paid by token), `outbox`, `inbox`.

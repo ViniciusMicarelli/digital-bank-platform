@@ -93,6 +93,22 @@ func (a *API) logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (a *API) stepUp(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Password string `json:"password"`
+		TOTPCode string `json:"totp_code"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	resp, err := a.c.Identity.StepUp(r.Context(), &identityv1.StepUpRequest{CustomerId: customerID(r.Context()), Password: req.Password, TotpCode: req.TOTPCode})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"step_up_token": resp.GetStepUpToken(), "expires_at": ts(resp.GetExpiresAt())})
+}
+
 func (a *API) enrollTOTP(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.c.Identity.EnrollTotp(r.Context(), &identityv1.EnrollTotpRequest{CustomerId: customerID(r.Context())})
 	if err != nil {

@@ -65,9 +65,14 @@ step "Ana gets a virtual debit card and buys at a bakery (simulated card network
 CARD=$(call POST "/v1/accounts/$ANA_ACC/cards" "$ANA" '{"kind":"VIRTUAL"}' "$(uuid)")
 echo "$CARD" | jq -c '{last4, holder_name, expiry: "\(.expiry_month)/\(.expiry_year)", controls}'
 CARD_ID=$(echo "$CARD" | jq -r .id)
-DETAILS=$(call POST "/v1/accounts/$ANA_ACC/cards/$CARD_ID/reveal" "$ANA")
+# Sensitive actions need a fresh password check (step-up).
+STEP_UP=$(curl -sS -X POST "$API/v1/auth/step-up" -H "Authorization: Bearer $ANA" -d "{\"password\":\"$PASSWORD\"}" | jq -r .step_up_token)
+DETAILS=$(curl -sS -X POST "$API/v1/accounts/$ANA_ACC/cards/$CARD_ID/reveal" -H "Authorization: Bearer $ANA" -H "X-Step-Up-Token: $STEP_UP")
 AUTH=$(call POST /v1/sandbox/card-network/authorizations "$ANA" "$(echo "$DETAILS" | jq -c '{pan, expiry_month, expiry_year, cvv, amount: "42.00", merchant_name: "PADARIA SAO JOSE", mcc: "5462", country: "BR", channel: "ONLINE"}')")
 echo "$AUTH" | jq -c '{status, response_code, amount}'
+WALLET=$(curl -sS -X POST "$API/v1/accounts/$ANA_ACC/cards/$CARD_ID/tokens" -H "Authorization: Bearer $ANA" -H "X-Step-Up-Token: $STEP_UP" -d '{"wallet":"APPLE_PAY","device_name":"iPhone da Ana"}')
+echo "$WALLET" | jq -c '{wallet, device_name, token_last4: .last4, status}'
+call POST /v1/sandbox/card-network/authorizations "$ANA" "$(jq -nc --arg pan "$(echo "$WALLET" | jq -r .token_pan)" --argjson d "$DETAILS" '{pan: $pan, expiry_month: $d.expiry_month, expiry_year: $d.expiry_year, amount: "7.50", merchant_name: "CAFE DO PONTO", mcc: "5814", country: "BR", channel: "CONTACTLESS"}')" | jq -c '{wallet_purchase: .status, response_code, token_id}'
 call POST "/v1/sandbox/card-network/authorizations/$(echo "$AUTH" | jq -r .id)/clear" "$ANA" '{"amount":"40.00"}' | jq -c '{status, cleared_amount}'
 call POST /v1/sandbox/card-network/authorizations "$ANA" "$(echo "$DETAILS" | jq -c '{pan, expiry_month, expiry_year, cvv, amount: "10.00", merchant_name: "NYC STORE", mcc: "5311", country: "US", channel: "ONLINE"}')" | jq -c '{international_purchase: .status, response_code, reason}'
 

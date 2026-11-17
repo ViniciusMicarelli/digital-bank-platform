@@ -62,6 +62,16 @@ func login(t *testing.T, name string) *client {
 	return c
 }
 
+// stepUp re-confirms the password and returns the X-Step-Up-Token header.
+func (c *client) stepUp() map[string]string {
+	c.t.Helper()
+	status, body := c.call("POST", "/v1/auth/step-up", map[string]string{"password": e2ePassword}, nil)
+	if status != 200 {
+		c.t.Fatalf("step-up: %d %v", status, body)
+	}
+	return map[string]string{"X-Step-Up-Token": body["step_up_token"].(string)}
+}
+
 func idem() map[string]string { return map[string]string{"Idempotency-Key": uuid.NewString()} }
 
 func amountOf(v any) string { return v.(map[string]any)["amount"].(string) }

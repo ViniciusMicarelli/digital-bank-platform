@@ -906,6 +906,118 @@ func (x *RotateSigningKeyResponse) GetKid() string {
 	return ""
 }
 
+type StepUpRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CustomerId    string                 `protobuf:"bytes,1,opt,name=customer_id,json=customerId,proto3" json:"customer_id,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	TotpCode      string                 `protobuf:"bytes,3,opt,name=totp_code,json=totpCode,proto3" json:"totp_code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StepUpRequest) Reset() {
+	*x = StepUpRequest{}
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StepUpRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StepUpRequest) ProtoMessage() {}
+
+func (x *StepUpRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StepUpRequest.ProtoReflect.Descriptor instead.
+func (*StepUpRequest) Descriptor() ([]byte, []int) {
+	return file_bank_identity_v1_identity_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *StepUpRequest) GetCustomerId() string {
+	if x != nil {
+		return x.CustomerId
+	}
+	return ""
+}
+
+func (x *StepUpRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+func (x *StepUpRequest) GetTotpCode() string {
+	if x != nil {
+		return x.TotpCode
+	}
+	return ""
+}
+
+type StepUpResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	StepUpToken   string                 `protobuf:"bytes,1,opt,name=step_up_token,json=stepUpToken,proto3" json:"step_up_token,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StepUpResponse) Reset() {
+	*x = StepUpResponse{}
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StepUpResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StepUpResponse) ProtoMessage() {}
+
+func (x *StepUpResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StepUpResponse.ProtoReflect.Descriptor instead.
+func (*StepUpResponse) Descriptor() ([]byte, []int) {
+	return file_bank_identity_v1_identity_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *StepUpResponse) GetStepUpToken() string {
+	if x != nil {
+		return x.StepUpToken
+	}
+	return ""
+}
+
+func (x *StepUpResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
 var File_bank_identity_v1_identity_proto protoreflect.FileDescriptor
 
 const file_bank_identity_v1_identity_proto_rawDesc = "" +
@@ -962,12 +1074,22 @@ const file_bank_identity_v1_identity_proto_rawDesc = "" +
 	"\x04keys\x18\x01 \x03(\v2\x15.bank.identity.v1.JwkR\x04keys\"\x19\n" +
 	"\x17RotateSigningKeyRequest\",\n" +
 	"\x18RotateSigningKeyResponse\x12\x10\n" +
-	"\x03kid\x18\x01 \x01(\tR\x03kid2\xbb\x05\n" +
+	"\x03kid\x18\x01 \x01(\tR\x03kid\"i\n" +
+	"\rStepUpRequest\x12\x1f\n" +
+	"\vcustomer_id\x18\x01 \x01(\tR\n" +
+	"customerId\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1b\n" +
+	"\ttotp_code\x18\x03 \x01(\tR\btotpCode\"o\n" +
+	"\x0eStepUpResponse\x12\"\n" +
+	"\rstep_up_token\x18\x01 \x01(\tR\vstepUpToken\x129\n" +
+	"\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\x88\x06\n" +
 	"\x0fIdentityService\x12Q\n" +
 	"\bRegister\x12!.bank.identity.v1.RegisterRequest\x1a\".bank.identity.v1.RegisterResponse\x12H\n" +
 	"\x05Login\x12\x1e.bank.identity.v1.LoginRequest\x1a\x1f.bank.identity.v1.LoginResponse\x12N\n" +
 	"\aRefresh\x12 .bank.identity.v1.RefreshRequest\x1a!.bank.identity.v1.RefreshResponse\x12K\n" +
-	"\x06Logout\x12\x1f.bank.identity.v1.LogoutRequest\x1a .bank.identity.v1.LogoutResponse\x12W\n" +
+	"\x06Logout\x12\x1f.bank.identity.v1.LogoutRequest\x1a .bank.identity.v1.LogoutResponse\x12K\n" +
+	"\x06StepUp\x12\x1f.bank.identity.v1.StepUpRequest\x1a .bank.identity.v1.StepUpResponse\x12W\n" +
 	"\n" +
 	"EnrollTotp\x12#.bank.identity.v1.EnrollTotpRequest\x1a$.bank.identity.v1.EnrollTotpResponse\x12Z\n" +
 	"\vConfirmTotp\x12$.bank.identity.v1.ConfirmTotpRequest\x1a%.bank.identity.v1.ConfirmTotpResponse\x12N\n" +
@@ -987,7 +1109,7 @@ func file_bank_identity_v1_identity_proto_rawDescGZIP() []byte {
 	return file_bank_identity_v1_identity_proto_rawDescData
 }
 
-var file_bank_identity_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_bank_identity_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_bank_identity_v1_identity_proto_goTypes = []any{
 	(*TokenPair)(nil),                // 0: bank.identity.v1.TokenPair
 	(*RegisterRequest)(nil),          // 1: bank.identity.v1.RegisterRequest
@@ -1007,35 +1129,40 @@ var file_bank_identity_v1_identity_proto_goTypes = []any{
 	(*GetJwksResponse)(nil),          // 15: bank.identity.v1.GetJwksResponse
 	(*RotateSigningKeyRequest)(nil),  // 16: bank.identity.v1.RotateSigningKeyRequest
 	(*RotateSigningKeyResponse)(nil), // 17: bank.identity.v1.RotateSigningKeyResponse
-	(*timestamppb.Timestamp)(nil),    // 18: google.protobuf.Timestamp
+	(*StepUpRequest)(nil),            // 18: bank.identity.v1.StepUpRequest
+	(*StepUpResponse)(nil),           // 19: bank.identity.v1.StepUpResponse
+	(*timestamppb.Timestamp)(nil),    // 20: google.protobuf.Timestamp
 }
 var file_bank_identity_v1_identity_proto_depIdxs = []int32{
-	18, // 0: bank.identity.v1.TokenPair.access_expires_at:type_name -> google.protobuf.Timestamp
-	18, // 1: bank.identity.v1.TokenPair.refresh_expires_at:type_name -> google.protobuf.Timestamp
+	20, // 0: bank.identity.v1.TokenPair.access_expires_at:type_name -> google.protobuf.Timestamp
+	20, // 1: bank.identity.v1.TokenPair.refresh_expires_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: bank.identity.v1.LoginResponse.tokens:type_name -> bank.identity.v1.TokenPair
 	0,  // 3: bank.identity.v1.RefreshResponse.tokens:type_name -> bank.identity.v1.TokenPair
 	13, // 4: bank.identity.v1.GetJwksResponse.keys:type_name -> bank.identity.v1.Jwk
-	1,  // 5: bank.identity.v1.IdentityService.Register:input_type -> bank.identity.v1.RegisterRequest
-	3,  // 6: bank.identity.v1.IdentityService.Login:input_type -> bank.identity.v1.LoginRequest
-	5,  // 7: bank.identity.v1.IdentityService.Refresh:input_type -> bank.identity.v1.RefreshRequest
-	7,  // 8: bank.identity.v1.IdentityService.Logout:input_type -> bank.identity.v1.LogoutRequest
-	9,  // 9: bank.identity.v1.IdentityService.EnrollTotp:input_type -> bank.identity.v1.EnrollTotpRequest
-	11, // 10: bank.identity.v1.IdentityService.ConfirmTotp:input_type -> bank.identity.v1.ConfirmTotpRequest
-	14, // 11: bank.identity.v1.IdentityService.GetJwks:input_type -> bank.identity.v1.GetJwksRequest
-	16, // 12: bank.identity.v1.IdentityService.RotateSigningKey:input_type -> bank.identity.v1.RotateSigningKeyRequest
-	2,  // 13: bank.identity.v1.IdentityService.Register:output_type -> bank.identity.v1.RegisterResponse
-	4,  // 14: bank.identity.v1.IdentityService.Login:output_type -> bank.identity.v1.LoginResponse
-	6,  // 15: bank.identity.v1.IdentityService.Refresh:output_type -> bank.identity.v1.RefreshResponse
-	8,  // 16: bank.identity.v1.IdentityService.Logout:output_type -> bank.identity.v1.LogoutResponse
-	10, // 17: bank.identity.v1.IdentityService.EnrollTotp:output_type -> bank.identity.v1.EnrollTotpResponse
-	12, // 18: bank.identity.v1.IdentityService.ConfirmTotp:output_type -> bank.identity.v1.ConfirmTotpResponse
-	15, // 19: bank.identity.v1.IdentityService.GetJwks:output_type -> bank.identity.v1.GetJwksResponse
-	17, // 20: bank.identity.v1.IdentityService.RotateSigningKey:output_type -> bank.identity.v1.RotateSigningKeyResponse
-	13, // [13:21] is the sub-list for method output_type
-	5,  // [5:13] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	20, // 5: bank.identity.v1.StepUpResponse.expires_at:type_name -> google.protobuf.Timestamp
+	1,  // 6: bank.identity.v1.IdentityService.Register:input_type -> bank.identity.v1.RegisterRequest
+	3,  // 7: bank.identity.v1.IdentityService.Login:input_type -> bank.identity.v1.LoginRequest
+	5,  // 8: bank.identity.v1.IdentityService.Refresh:input_type -> bank.identity.v1.RefreshRequest
+	7,  // 9: bank.identity.v1.IdentityService.Logout:input_type -> bank.identity.v1.LogoutRequest
+	18, // 10: bank.identity.v1.IdentityService.StepUp:input_type -> bank.identity.v1.StepUpRequest
+	9,  // 11: bank.identity.v1.IdentityService.EnrollTotp:input_type -> bank.identity.v1.EnrollTotpRequest
+	11, // 12: bank.identity.v1.IdentityService.ConfirmTotp:input_type -> bank.identity.v1.ConfirmTotpRequest
+	14, // 13: bank.identity.v1.IdentityService.GetJwks:input_type -> bank.identity.v1.GetJwksRequest
+	16, // 14: bank.identity.v1.IdentityService.RotateSigningKey:input_type -> bank.identity.v1.RotateSigningKeyRequest
+	2,  // 15: bank.identity.v1.IdentityService.Register:output_type -> bank.identity.v1.RegisterResponse
+	4,  // 16: bank.identity.v1.IdentityService.Login:output_type -> bank.identity.v1.LoginResponse
+	6,  // 17: bank.identity.v1.IdentityService.Refresh:output_type -> bank.identity.v1.RefreshResponse
+	8,  // 18: bank.identity.v1.IdentityService.Logout:output_type -> bank.identity.v1.LogoutResponse
+	19, // 19: bank.identity.v1.IdentityService.StepUp:output_type -> bank.identity.v1.StepUpResponse
+	10, // 20: bank.identity.v1.IdentityService.EnrollTotp:output_type -> bank.identity.v1.EnrollTotpResponse
+	12, // 21: bank.identity.v1.IdentityService.ConfirmTotp:output_type -> bank.identity.v1.ConfirmTotpResponse
+	15, // 22: bank.identity.v1.IdentityService.GetJwks:output_type -> bank.identity.v1.GetJwksResponse
+	17, // 23: bank.identity.v1.IdentityService.RotateSigningKey:output_type -> bank.identity.v1.RotateSigningKeyResponse
+	15, // [15:24] is the sub-list for method output_type
+	6,  // [6:15] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_bank_identity_v1_identity_proto_init() }
@@ -1049,7 +1176,7 @@ func file_bank_identity_v1_identity_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_identity_v1_identity_proto_rawDesc), len(file_bank_identity_v1_identity_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

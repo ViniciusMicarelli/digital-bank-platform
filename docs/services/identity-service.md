@@ -15,7 +15,8 @@ Who the customer is. It owns credentials and sessions, issues access tokens, and
 | Rotating refresh tokens (30 days, stored as SHA-256), reuse detection revoking the whole family, logout | ✅ |
 | JWKS (`GetJwks`) and key rotation (`RotateSigningKey`, automatic after 30 days); retired keys stay published for 20 min | ✅ |
 | Signing keys and TOTP seeds encrypted at rest (AES-256-GCM under `IDENTITY_KEK`, bound to their row) | ✅ |
-| Password reset, device binding, step-up authentication, session listing | planned |
+| Step-up tokens (`StepUp`): password (+ TOTP when enabled) re-checked with lockout; 5-minute token, audience `digital-bank-step-up`, `amr` claim, required by the gateway for sensitive actions | ✅ |
+| Password reset, device binding, session listing | planned |
 
 ## Token Flow
 

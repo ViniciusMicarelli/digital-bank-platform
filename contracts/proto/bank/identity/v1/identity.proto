@@ -15,6 +15,9 @@ service IdentityService {
   // presenting a used one revokes the whole session (reason REFRESH_TOKEN_REUSED).
   rpc Refresh(RefreshRequest) returns (RefreshResponse);
   rpc Logout(LogoutRequest) returns (LogoutResponse);
+  // Re-authenticates a logged-in customer for a sensitive action; returns a
+  // 5-minute token with audience "digital-bank-step-up".
+  rpc StepUp(StepUpRequest) returns (StepUpResponse);
 
   // Starts TOTP enrollment; it is enabled after ConfirmTotp.
   rpc EnrollTotp(EnrollTotpRequest) returns (EnrollTotpResponse);
@@ -107,4 +110,15 @@ message RotateSigningKeyRequest {}
 
 message RotateSigningKeyResponse {
   string kid = 1;
+}
+
+message StepUpRequest {
+  string customer_id = 1;
+  string password = 2;
+  string totp_code = 3;
+}
+
+message StepUpResponse {
+  string step_up_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
 }

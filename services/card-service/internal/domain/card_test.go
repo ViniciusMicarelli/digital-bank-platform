@@ -90,3 +90,38 @@ func TestDecide(t *testing.T) {
 		t.Fatal("expiry is the end of the expiry month")
 	}
 }
+
+func TestTokens(t *testing.T) {
+	now := time.Date(2026, 11, 17, 12, 0, 0, 0, time.UTC)
+	c := card(t, now)
+	tok, pan, err := NewToken(c, ApplePay, "iPhone da Ana")
+	if err != nil || !strings.HasPrefix(pan, TokenBIN) || !ValidPAN(pan) || tok.Last4 != pan[12:] {
+		t.Fatalf("token = %+v %s %v", tok, pan, err)
+	}
+	p := purchase(c, Contactless, "BR", "5411", "30", "")
+	if d := c.DecideToken(p, tok, now); !d.Approve {
+		t.Fatalf("token purchase: %+v", d)
+	}
+	online := purchase(c, Online, "BR", "5411", "30", "")
+	if d := c.DecideToken(online, tok, now); !d.Approve {
+		t.Fatalf("in-app purchase with a token needs no CVV: %+v", d)
+	}
+	_ = tok.Transition("SUSPEND")
+	if d := c.DecideToken(p, tok, now); d.Code != CodeRestrictedCard {
+		t.Fatalf("suspended token: %+v", d)
+	}
+	_ = tok.Transition("RESUME")
+	blocked := c
+	_ = blocked.Block("lost")
+	if d := blocked.DecideToken(p, tok, now); d.Code != CodeRestrictedCard {
+		t.Fatalf("token of a blocked card: %+v", d)
+	}
+	_ = tok.Transition("DELETE")
+	if err := tok.Transition("RESUME"); err == nil {
+		t.Fatal("a deleted token cannot come back")
+	}
+	_ = c.Block("x")
+	if _, _, err := NewToken(c, GooglePay, "Pixel"); err == nil {
+		t.Fatal("tokenizing a blocked card")
+	}
+}

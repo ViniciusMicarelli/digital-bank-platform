@@ -22,6 +22,12 @@ type Store interface {
 	PANEnc(ctx context.Context, cardID uuid.UUID) ([]byte, error)
 	SaveCard(ctx context.Context, c domain.Card, events ...outbox.Message) error
 
+	InsertToken(ctx context.Context, t domain.Token, panEnc, panIndex []byte, ev outbox.Message) error
+	Tokens(ctx context.Context, card uuid.UUID) ([]domain.Token, error)
+	Token(ctx context.Context, id uuid.UUID) (domain.Token, error)
+	TokenByPANIndex(ctx context.Context, index []byte) (domain.Token, error)
+	SaveToken(ctx context.Context, t domain.Token, ev outbox.Message) error
+
 	// ClaimAuthorization inserts a, unless its network reference exists
 	// (network retry); then it returns the stored one.
 	ClaimAuthorization(ctx context.Context, a domain.Authorization) (existing *domain.Authorization, err error)

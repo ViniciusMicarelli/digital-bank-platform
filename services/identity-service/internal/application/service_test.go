@@ -212,3 +212,43 @@ func TestKeyRotation(t *testing.T) {
 		t.Fatalf("expired key still published: %d keys", len(keys))
 	}
 }
+
+func TestStepUp(t *testing.T) {
+	svc, _, now := setup(t)
+	ctx := context.Background()
+	id, _ := svc.Register(ctx, "ana@example.com", password, "Ana Souza")
+
+	tok, _, err := svc.StepUp(ctx, id, password, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims := &domain.StepUpClaims{}
+	keys, _ := svc.JWKS(ctx)
+	x, _ := base64.RawURLEncoding.DecodeString(keys[0].X)
+	if _, err := jwt.ParseWithClaims(tok, claims, func(*jwt.Token) (any, error) { return ed25519.PublicKey(x), nil },
+		jwt.WithAudience(domain.StepUpAudience)); err != nil || claims.Subject != id.String() || claims.AMR[0] != "pwd" {
+		t.Fatalf("step-up token: %+v %v", claims, err)
+	}
+	// It is not an access token.
+	if _, err := verify(t, svc, tok); err == nil {
+		t.Fatal("a step-up token was accepted as an access token")
+	}
+	if _, _, err := svc.StepUp(ctx, id, "wrong password!!", ""); !errors.Is(err, domain.ErrInvalidCredentials) {
+		t.Fatalf("wrong password err = %v", err)
+	}
+
+	secret, _, _ := svc.EnrollTOTP(ctx, id)
+	code, _ := domain.TOTPCode(secret, domain.TOTPStep(*now))
+	_ = svc.ConfirmTOTP(ctx, id, code)
+	if _, _, err := svc.StepUp(ctx, id, password, ""); !errors.Is(err, domain.ErrMFARequired) {
+		t.Fatalf("TOTP enabled, no code: %v", err)
+	}
+	*now = now.Add(30 * time.Second)
+	next, _ := domain.TOTPCode(secret, domain.TOTPStep(*now))
+	tok, _, err = svc.StepUp(ctx, id, password, next)
+	claims = &domain.StepUpClaims{}
+	_, _ = jwt.ParseWithClaims(tok, claims, func(*jwt.Token) (any, error) { return ed25519.PublicKey(x), nil })
+	if err != nil || len(claims.AMR) != 2 || claims.AMR[1] != "otp" {
+		t.Fatalf("step-up with TOTP: %+v %v", claims, err)
+	}
+}

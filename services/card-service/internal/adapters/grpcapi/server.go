@@ -77,6 +77,9 @@ func authPB(a domain.Authorization) *cardv1.Authorization {
 	if a.CardID != uuid.Nil {
 		out.CardId = a.CardID.String()
 	}
+	if a.TokenID != uuid.Nil {
+		out.TokenId = a.TokenID.String()
+	}
 	for k, v := range channels {
 		if v == a.Purchase.Channel {
 			out.Channel = k
@@ -172,6 +175,55 @@ func (s *Server) RevealCardDetails(ctx context.Context, req *cardv1.RevealCardDe
 		return nil, toStatus(err)
 	}
 	return &cardv1.RevealCardDetailsResponse{Pan: d.PAN, ExpiryMonth: int32(d.ExpiryMonth), ExpiryYear: int32(d.ExpiryYear), Cvv: d.CVV}, nil
+}
+
+func tokenPB(t domain.Token) *cardv1.CardToken {
+	return &cardv1.CardToken{Id: t.ID.String(), CardId: t.CardID.String(), Wallet: string(t.Wallet),
+		DeviceName: t.DeviceName, Status: string(t.Status), Last4: t.Last4, CreatedAt: timestamppb.New(t.CreatedAt)}
+}
+
+func (s *Server) TokenizeCard(ctx context.Context, req *cardv1.TokenizeCardRequest) (*cardv1.TokenizeCardResponse, error) {
+	id, err := parseID(req.GetCardId())
+	if err != nil {
+		return nil, err
+	}
+	t, pan, err := s.app.Tokenize(ctx, id, domain.Wallet(req.GetWallet()), req.GetDeviceName())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &cardv1.TokenizeCardResponse{Token: tokenPB(t), TokenPan: pan}, nil
+}
+
+func (s *Server) ListTokens(ctx context.Context, req *cardv1.ListTokensRequest) (*cardv1.ListTokensResponse, error) {
+	id, err := parseID(req.GetCardId())
+	if err != nil {
+		return nil, err
+	}
+	list, err := s.app.Tokens(ctx, id)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	resp := &cardv1.ListTokensResponse{}
+	for _, t := range list {
+		resp.Tokens = append(resp.Tokens, tokenPB(t))
+	}
+	return resp, nil
+}
+
+func (s *Server) UpdateToken(ctx context.Context, req *cardv1.UpdateTokenRequest) (*cardv1.UpdateTokenResponse, error) {
+	card, err := parseID(req.GetCardId())
+	if err != nil {
+		return nil, err
+	}
+	token, err := parseID(req.GetTokenId())
+	if err != nil {
+		return nil, err
+	}
+	t, err := s.app.UpdateToken(ctx, card, token, req.GetAction())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &cardv1.UpdateTokenResponse{Token: tokenPB(t)}, nil
 }
 
 func (s *Server) Authorize(ctx context.Context, req *cardv1.AuthorizeRequest) (*cardv1.AuthorizeResponse, error) {

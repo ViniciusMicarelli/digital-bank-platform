@@ -119,7 +119,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Pix Automático: a payer authorizes a receiver (mandate with a maximum amount and frequency); the receiver's charges are paid automatically within it.
 - Dynamic QR codes: the BR Code carries a URL; the payload is served as a JWS signed by the bank (Ed25519), verified before paying.
 
-## Phase 14 — Cards: step-up and tokenization
+## Phase 14 — Cards: step-up and tokenization ✅
 
 - Step-up authentication: revealing card data requires a fresh password (+ TOTP when enabled) confirmation, proven by a short-lived step-up token.
 - Tokenization: device tokens (a different card number per wallet) mapped to the card in the vault, suspendable on their own; authorizations by token resolve to the card.
