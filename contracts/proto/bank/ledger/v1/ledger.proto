@@ -1,0 +1,218 @@
+syntax = "proto3";
+
+package bank.ledger.v1;
+
+import "bank/common/v1/money.proto";
+import "google/protobuf/timestamp.proto";
+
+// LedgerService is the source of truth for all money. Every movement is an
+// immutable, balanced, double-entry journal entry (the postings sum to zero).
+service LedgerService {
+  // Creates a ledger account. Idempotent on the client-provided id.
+  rpc CreateLedgerAccount(CreateLedgerAccountRequest) returns (CreateLedgerAccountResponse);
+  rpc GetLedgerAccount(GetLedgerAccountRequest) returns (GetLedgerAccountResponse);
+
+  // Posts a balanced journal entry. Idempotent on idempotency_key.
+  rpc PostEntry(PostEntryRequest) returns (PostEntryResponse);
+  rpc GetEntry(GetEntryRequest) returns (GetEntryResponse);
+  // Posts the opposite of an entry. An entry can be reversed only once.
+  rpc ReverseEntry(ReverseEntryRequest) returns (ReverseEntryResponse);
+
+  // Reserves funds: moves value from available to pending. Idempotent on idempotency_key.
+  rpc Hold(HoldRequest) returns (HoldResponse);
+  // Posts the held amount (or less) to the hold's counter account.
+  rpc Capture(CaptureRequest) returns (CaptureResponse);
+  // Returns held funds to available.
+  rpc Release(ReleaseRequest) returns (ReleaseResponse);
+
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+  // Posted balance as of a point in time, rebuilt from postings.
+  rpc GetBalanceAt(GetBalanceAtRequest) returns (GetBalanceAtResponse);
+  rpc ListPostings(ListPostingsRequest) returns (ListPostingsResponse);
+}
+
+enum AccountKind {
+  ACCOUNT_KIND_UNSPECIFIED = 0;
+  // A customer account: cannot go below -overdraft_limit.
+  ACCOUNT_KIND_CUSTOMER = 1;
+  // A bank-internal account (settlement, funding, revenue): no balance floor.
+  ACCOUNT_KIND_INTERNAL = 2;
+}
+
+message LedgerAccount {
+  string id = 1;
+  AccountKind kind = 2;
+  string currency = 3;
+  int64 overdraft_limit_minor_units = 4;
+  // Optional unique, human readable code for internal accounts, e.g. "pix-settlement".
+  string code = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message Posting {
+  string account_id = 1;
+  // Signed: positive credits the account (increases its balance), negative debits it.
+  bank.common.v1.Money amount = 2;
+}
+
+message JournalEntry {
+  string id = 1;
+  string idempotency_key = 2;
+  repeated Posting postings = 3;
+  string description = 4;
+  map<string, string> metadata = 5;
+  // Set when this entry reverses another one.
+  string reverses_entry_id = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+enum HoldStatus {
+  HOLD_STATUS_UNSPECIFIED = 0;
+  HOLD_STATUS_ACTIVE = 1;
+  HOLD_STATUS_CAPTURED = 2;
+  HOLD_STATUS_RELEASED = 3;
+}
+
+message HoldInfo {
+  string id = 1;
+  string idempotency_key = 2;
+  string account_id = 3;
+  string counter_account_id = 4;
+  bank.common.v1.Money amount = 5;
+  HoldStatus status = 6;
+  // Entry posted on capture.
+  string capture_entry_id = 7;
+  string description = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message Balance {
+  string account_id = 1;
+  // Sum of all postings.
+  bank.common.v1.Money posted = 2;
+  // Sum of active holds.
+  bank.common.v1.Money pending = 3;
+  // posted - pending.
+  bank.common.v1.Money available = 4;
+}
+
+message AccountPosting {
+  int64 id = 1;
+  string entry_id = 2;
+  bank.common.v1.Money amount = 3;
+  string description = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateLedgerAccountRequest {
+  // Client-provided UUID, so retries are idempotent.
+  string id = 1;
+  AccountKind kind = 2;
+  string currency = 3;
+  int64 overdraft_limit_minor_units = 4;
+  string code = 5;
+}
+
+message CreateLedgerAccountResponse {
+  LedgerAccount account = 1;
+}
+
+message GetLedgerAccountRequest {
+  string id = 1;
+}
+
+message GetLedgerAccountResponse {
+  LedgerAccount account = 1;
+}
+
+message PostEntryRequest {
+  string idempotency_key = 1;
+  repeated Posting postings = 2;
+  string description = 3;
+  map<string, string> metadata = 4;
+}
+
+message PostEntryResponse {
+  JournalEntry entry = 1;
+}
+
+message GetEntryRequest {
+  string id = 1;
+}
+
+message GetEntryResponse {
+  JournalEntry entry = 1;
+}
+
+message ReverseEntryRequest {
+  string idempotency_key = 1;
+  string entry_id = 2;
+  string description = 3;
+}
+
+message ReverseEntryResponse {
+  JournalEntry entry = 1;
+}
+
+message HoldRequest {
+  string idempotency_key = 1;
+  // Account whose funds are reserved.
+  string account_id = 2;
+  // Account credited on capture.
+  string counter_account_id = 3;
+  // Positive amount to reserve.
+  bank.common.v1.Money amount = 4;
+  string description = 5;
+}
+
+message HoldResponse {
+  HoldInfo hold = 1;
+}
+
+message CaptureRequest {
+  string hold_id = 1;
+  // Optional partial capture; must not exceed the held amount. The rest is released.
+  bank.common.v1.Money amount = 2;
+}
+
+message CaptureResponse {
+  HoldInfo hold = 1;
+  JournalEntry entry = 2;
+}
+
+message ReleaseRequest {
+  string hold_id = 1;
+}
+
+message ReleaseResponse {
+  HoldInfo hold = 1;
+}
+
+message GetBalanceRequest {
+  string account_id = 1;
+}
+
+message GetBalanceResponse {
+  Balance balance = 1;
+}
+
+message GetBalanceAtRequest {
+  string account_id = 1;
+  google.protobuf.Timestamp at = 2;
+}
+
+message GetBalanceAtResponse {
+  bank.common.v1.Money posted = 1;
+}
+
+message ListPostingsRequest {
+  string account_id = 1;
+  // Defaults to 50, maximum 200.
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListPostingsResponse {
+  repeated AccountPosting postings = 1;
+  string next_page_token = 2;
+}

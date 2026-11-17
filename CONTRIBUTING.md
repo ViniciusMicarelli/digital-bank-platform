@@ -9,7 +9,7 @@
 
 ## Code guidelines
 
-- **Go 1.23+**, formatted with `gofmt`, clean under `go vet`.
+- **Go 1.26+**, formatted with `gofmt`, clean under `go vet`.
 - Each service is its own module under `services/<name>` and is registered in `go.work` (`go work use ./services/<name>`).
 - Services follow the hexagonal layout: `internal/domain` (no I/O), `internal/application` (use cases), `internal/ports` (interfaces), `internal/adapters` (postgres, grpc, kafka, http).
 - **Money is never a float.** Use `packages/go-common/money`, which stores int64 minor units.

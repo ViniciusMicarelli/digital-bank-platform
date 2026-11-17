@@ -19,7 +19,7 @@ The platform is designed as a cloud-native, event-driven system optimized for fi
 
 | Layer | Technology |
 |-------|-----------|
-| Language | Go 1.23+ |
+| Language | Go 1.26+ |
 | Internal API | gRPC + Protocol Buffers |
 | External API | REST + OpenAPI 3.1 |
 | Messaging | Apache Kafka |

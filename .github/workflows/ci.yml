@@ -8,10 +8,32 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bank
+          POSTGRES_PASSWORD: bank
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -U bank"
+          --health-interval 2s --health-timeout 3s --health-retries 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.work
+      - run: make tools
       - run: make lint
+      - name: Generated code is up to date
+        run: make generate && git diff --exit-code contracts/gen
       - run: make test
+
+  docker:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [ledger-service]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --build-arg SERVICE=${{ matrix.service }} -t ${{ matrix.service }} .

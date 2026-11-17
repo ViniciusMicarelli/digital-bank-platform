@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package bank.common.v1;
+
+// Money is an exact amount in minor units (e.g. cents) of an ISO 4217 currency.
+// Floating point is never used for money.
+message Money {
+  // Signed amount in minor units. 1050 BRL = R$ 10,50.
+  int64 minor_units = 1;
+  // ISO 4217 alphabetic code, e.g. "BRL".
+  string currency = 2;
+}

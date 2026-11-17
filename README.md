@@ -3,10 +3,10 @@
 A cloud-native digital banking platform built in **Go** with a microservices architecture: checking accounts, a double-entry ledger, Pix instant payments, cards, bill payments and statements.
 
 ![Status](https://img.shields.io/badge/status-work%20in%20progress-yellow)
-![Go](https://img.shields.io/badge/go-1.23+-00ADD8?logo=go)
+![Go](https://img.shields.io/badge/go-1.26+-00ADD8?logo=go)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-> **Status:** early stage. The architecture is documented in [`docs/`](docs/README.md) and the code is being built one vertical slice at a time, starting with the ledger. See the [roadmap](#roadmap).
+> **Status:** in progress. The code is built one vertical slice at a time, following the [phased roadmap](docs/ROADMAP.md).
 
 ## Architecture at a glance
 
@@ -35,7 +35,7 @@ Full documentation: [docs/README.md](docs/README.md). Decisions: [docs/decisions
 
 ## Getting started
 
-Requirements: Go 1.23+.
+Requirements: Go 1.26+, Docker.
 
 ```bash
 make help    # list targets
@@ -47,7 +47,7 @@ make lint    # gofmt + go vet
 
 - [x] Architecture docs and ADRs
 - [x] `packages/go-common/money`: exact money type, no floats, overflow-checked
-- [ ] **ledger-service**: journal entries, balanced postings, idempotency, derived balances (PostgreSQL)
+- [x] **ledger-service**: journal entries, balanced postings, holds, reversals, idempotency (PostgreSQL + gRPC)
 - [ ] **account-service**: open/close accounts, linked to ledger accounts
 - [ ] Local stack with Docker Compose + migrations + integration tests
 - [ ] Internal transfers end to end (account → ledger → statement)

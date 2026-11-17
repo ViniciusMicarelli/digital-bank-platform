@@ -101,33 +101,23 @@ CREATE INDEX idx_journal_table_record ON users_journal(table_name, record_id);
 
 ### Ledger Tables
 
-```sql
--- Customer accounts (write source)
-CREATE TABLE IF NOT EXISTS ledgers_accounts_customers (
-  customer_id CHAR(20) PRIMARY KEY,
-  account_balance NUMERIC(18,2) NOT NULL DEFAULT 0,
-  currency_code CHAR(3) NOT NULL DEFAULT 'BRL',
-  cell_id VARCHAR(50)
-);
+Money is stored as `BIGINT` minor units, never `NUMERIC` or floats. Postings are signed: positive credits an account, negative debits it.
 
--- Ledger entries (append-only, immutable)
-CREATE TABLE IF NOT EXISTS ledgers_entries (
-  id BIGSERIAL PRIMARY KEY,
-  counterparty_customer_id CHAR(20) NOT NULL,
-  counterparty_account_no VARCHAR(50),
-  counterparty_account_id VARCHAR(50),
-  transaction_id VARCHAR(50) NOT NULL,
-  credit_ledger VARCHAR(100),
-  debit_ledger VARCHAR(100),
-  currency_code CHAR(3) NOT NULL,
-  amount NUMERIC(18,2) NOT NULL,
-  description VARCHAR(255),
-  posted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  cell_id VARCHAR(50)
-);
-```
+| Table | Purpose |
+|---|---|
+| `ledger_accounts` | Accounts (`CUSTOMER` with an overdraft floor, or `INTERNAL`) |
+| `journal_entries` | Append-only entries, unique `idempotency_key` + request `fingerprint`, `reverses_entry_id` (unique: one reversal per entry) |
+| `postings` | Signed amounts per account per entry |
+| `balances` | Snapshot: `posted` (sum of postings) and `pending` (active holds), updated in the same transaction |
+| `holds` | Two-phase reservations (`ACTIVE` → `CAPTURED` / `RELEASED`) |
+| `outbox` | Events waiting to be published |
 
-See [ledger-service documentation](../services/ledger-service.md) for full table definitions.
+The database enforces the core rules as a second line of defense:
+
+- a deferred constraint trigger rejects any entry whose postings do not sum to zero or mix currencies;
+- triggers make `journal_entries` and `postings` append-only.
+
+Full schema: [`services/ledger-service/migrations/0001_init.up.sql`](../../services/ledger-service/migrations/0001_init.up.sql).
 
 ## Partitioning Strategy
 
@@ -246,24 +236,10 @@ pgbouncer:
 
 ## Migration Strategy
 
-### Tools
-
-- [`golang-migrate`](https://github.com/golang-migrate/migrate) for versioning
-- Migration files stored in `services/<service>/migrations/`
-
-### Workflow
-
-1. Create migration: `migrate create 001_add_field --ext sql --idempotent`
-2. Write schema changes (DDL)
-3. Test locally: `make db-up && make migrate`
-4. Deploy to dev: `migrate -database https://dev.db -path ./migrations -verbose`
-5. Deploy to staging: repeat step 4
-6. Deploy to production: repeat step 4
-
-### Rollback
-
-- `migrate -database prod -path ./migrations -down 1`
-- Keep migrations for 2 years (can recreate schema)
+- Each service embeds its SQL files (`services/<service>/migrations/NNNN_name.up.sql`) and applies them on startup with `packages/go-platform/postgres.Migrate`.
+- Applied versions are tracked in `schema_migrations`; a Postgres advisory lock makes concurrent replicas safe.
+- Migrations are forward-only. A bad change is fixed with a new migration (expand/contract for breaking changes).
+- Integration tests run every migration on a fresh database (`packages/go-platform/pgtest`).
 
 ## Backup Strategy
 

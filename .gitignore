@@ -7,9 +7,6 @@ coverage.*
 go.work.sum
 vendor/
 
-# Generated code
-contracts/gen/
-
 # Environment & secrets
 .env
 .env.*
