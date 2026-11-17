@@ -19,5 +19,5 @@ make run-ledger    # go run ./services/ledger-service/cmd/server
 ## Endpoints
 
 - REST API: http://127.0.0.1:8000
-- gRPC: 127.0.0.1:9001 (ledger) … 9005 (statement)
+- gRPC (mTLS, `make certs`): 127.0.0.1:9001 (ledger) … 9006 (identity)
 - Jaeger: http://127.0.0.1:16686 · Prometheus: http://127.0.0.1:9090

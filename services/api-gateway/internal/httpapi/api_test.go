@@ -28,6 +28,7 @@ import (
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/api-gateway/internal/auth"
+	"github.com/ViniciusMicarelli/digital-bank-platform/services/api-gateway/internal/ratelimit"
 )
 
 // fakeAccounts implements only what the tests call; other methods panic.
@@ -108,8 +109,8 @@ func newHarness(t *testing.T, opts Options) harness {
 	}
 	account := uuid.NewString()
 	txs := &fakeTxs{}
-	if opts.RateLimit == 0 {
-		opts.RateLimit = 1000
+	if opts.Limiter == nil {
+		opts.Limiter = ratelimit.NewMemory(1000, 1000)
 	}
 	api := New(Clients{
 		Identity: &fakeIdentity{sign: sign},
@@ -207,7 +208,7 @@ func TestTransferValidationAndIdempotency(t *testing.T) {
 }
 
 func TestLoginProxyAndAuthRateLimit(t *testing.T) {
-	h := newHarness(t, Options{AuthRateLimit: 1}) // burst of 5 per IP
+	h := newHarness(t, Options{AuthLimiter: ratelimit.NewMemory(1, 5)})
 	resp, body := h.do(t, "POST", "/v1/auth/login", "", `{"email":"ana@example.com","password":"correct horse battery"}`, nil)
 	if resp.StatusCode != 200 || body["token_type"] != "Bearer" {
 		t.Fatalf("login: %d %v", resp.StatusCode, body)

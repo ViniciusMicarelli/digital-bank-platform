@@ -24,6 +24,7 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/correlation"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/api-gateway/internal/auth"
+	"github.com/ViniciusMicarelli/digital-bank-platform/services/api-gateway/internal/ratelimit"
 )
 
 // Clients are the internal services behind the gateway.
@@ -38,11 +39,11 @@ type Clients struct {
 type Options struct {
 	// Sandbox enables POST /v1/sandbox/pix-in to fund accounts in demos.
 	Sandbox bool
-	// RateLimit is requests per second per customer (burst = 2x).
-	RateLimit float64
-	// AuthRateLimit is requests per second per client IP on the public
-	// /v1/auth routes (burst = 2x), against credential stuffing.
-	AuthRateLimit float64
+	// Limiter limits authenticated requests per customer; AuthLimiter limits
+	// the public /v1/auth routes per client IP (credential stuffing). Both
+	// default to in-memory limiters; use ratelimit.Redis to share them
+	// across replicas.
+	Limiter, AuthLimiter ratelimit.Limiter
 }
 
 type API struct {
@@ -50,20 +51,18 @@ type API struct {
 	auth        *auth.Verifier
 	log         *slog.Logger
 	opts        Options
-	limiter     *limiter
-	authLimiter *limiter
+	limiter     ratelimit.Limiter
+	authLimiter ratelimit.Limiter
 }
 
 func New(c Clients, v *auth.Verifier, log *slog.Logger, opts Options) *API {
-	if opts.RateLimit <= 0 {
-		opts.RateLimit = 20
+	if opts.Limiter == nil {
+		opts.Limiter = ratelimit.NewMemory(20, 40)
 	}
-	if opts.AuthRateLimit <= 0 {
-		opts.AuthRateLimit = 2
+	if opts.AuthLimiter == nil {
+		opts.AuthLimiter = ratelimit.NewMemory(2, 10)
 	}
-	return &API{c: c, auth: v, log: log, opts: opts,
-		limiter:     newLimiter(opts.RateLimit, int(opts.RateLimit*2)),
-		authLimiter: newLimiter(opts.AuthRateLimit, int(opts.AuthRateLimit*5))}
+	return &API{c: c, auth: v, log: log, opts: opts, limiter: opts.Limiter, authLimiter: opts.AuthLimiter}
 }
 
 // Handler returns the routed, observed HTTP handler.

@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"google.golang.org/grpc"
 
@@ -24,7 +26,26 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/api-gateway/internal/auth"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/api-gateway/internal/httpapi"
+	"github.com/ViniciusMicarelli/digital-bank-platform/services/api-gateway/internal/ratelimit"
 )
+
+// limiters shares rate limits through Redis when REDIS_ADDR is set, so every
+// replica enforces the same budget; otherwise each replica counts alone.
+func limiters(log *slog.Logger) httpapi.Options {
+	rps := float64(config.Int("RATE_LIMIT_RPS", 20))
+	authRPS := float64(config.Int("AUTH_RATE_LIMIT_RPS", 2))
+	opts := httpapi.Options{Sandbox: config.String("SANDBOX", "false") == "true"}
+	if addr := config.String("REDIS_ADDR", ""); addr != "" {
+		client := redis.NewClient(&redis.Options{Addr: addr})
+		opts.Limiter = ratelimit.NewRedis(client, "rl:", rps, int(rps*2), log)
+		opts.AuthLimiter = ratelimit.NewRedis(client, "rl:", authRPS, int(authRPS*5), log)
+		log.Info("rate limits shared through redis", "addr", addr)
+		return opts
+	}
+	opts.Limiter = ratelimit.NewMemory(rps, int(rps*2))
+	opts.AuthLimiter = ratelimit.NewMemory(authRPS, int(authRPS*5))
+	return opts
+}
 
 func main() {
 	log := config.Logger("api-gateway")
@@ -65,11 +86,7 @@ func main() {
 		Txs:       txv1.NewTransactionServiceClient(txs),
 		Pix:       pixv1.NewPixServiceClient(pix),
 		Statement: statementv1.NewStatementServiceClient(statement),
-	}, verifier, log, httpapi.Options{
-		Sandbox:       config.String("SANDBOX", "false") == "true",
-		RateLimit:     float64(config.Int("RATE_LIMIT_RPS", 20)),
-		AuthRateLimit: float64(config.Int("AUTH_RATE_LIMIT_RPS", 2)),
-	})
+	}, verifier, log, limiters(log))
 
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())

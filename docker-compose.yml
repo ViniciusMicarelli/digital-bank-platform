@@ -39,6 +39,15 @@ services:
       timeout: 10s
       retries: 40
 
+  redis:
+    image: redis:7-alpine
+    ports: ["6380:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
   ledger-service:
     build: { context: ., args: { SERVICE: ledger-service } }
     volumes:
@@ -173,6 +182,7 @@ services:
       SANDBOX: "true"
       # Tests and the demo log in many times from one IP; the default is 2/s.
       AUTH_RATE_LIMIT_RPS: "50"
+      REDIS_ADDR: redis:6379
       IDENTITY_ADDR: identity-service:9006
       ACCOUNT_ADDR: account-service:9002
       TRANSACTION_ADDR: transaction-service:9003
@@ -181,6 +191,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     ports: ["8000:8080"]
     depends_on:
+      redis: { condition: service_healthy }
       identity-service: { condition: service_started }
       account-service: { condition: service_started }
       transaction-service: { condition: service_started }

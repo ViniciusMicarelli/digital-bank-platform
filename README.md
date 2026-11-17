@@ -6,7 +6,7 @@ A digital bank built in **Go** as event-driven microservices: checking accounts,
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ```bash
-make up     # Postgres, Kafka, 7 services, Jaeger, Prometheus
+make up     # dev certificates, Postgres, Kafka, Redis, 7 services, Jaeger, Prometheus
 make demo   # a customer journey through the REST API
 make e2e    # end-to-end tests against the running stack
 ```
@@ -61,6 +61,8 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 
 **Authentication done properly.** Passwords hashed with argon2id, lockout, TOTP MFA with replay protection. Access tokens are Ed25519 JWTs: the gateway verifies them from a JWKS and cannot mint them. Refresh tokens rotate, and replaying an old one revokes the whole session. Signing keys and TOTP seeds are encrypted at rest. → [identity](docs/services/identity-service.md)
 
+**Zero trust inside.** Services talk over mutual TLS 1.3 with SPIFFE identities, and each one authorizes its callers: the gateway's certificate gets `PERMISSION_DENIED` from the ledger. CPFs are encrypted at rest with a blind index (an expand/contract migration encrypted the existing rows), and rate limits are shared across gateway replicas through Redis. → [security](docs/architecture/security.md)
+
 **Observable.** One request is one trace across all services (OpenTelemetry → Jaeger). Correlation IDs travel through gRPC metadata and Kafka events. Prometheus metrics with low-cardinality labels, business counters, alert rules and a Grafana dashboard. → [observability](docs/architecture/observability.md)
 
 ## Getting Started
@@ -86,7 +88,12 @@ make demo    # walk through the public API
 | http://127.0.0.1:9090 | Prometheus (metrics, alerts) |
 | http://127.0.0.1:3000 | Grafana (`make up-obs`) |
 
-Internal gRPC services listen on `:9001`–`:9006` with reflection enabled (`grpcurl -plaintext 127.0.0.1:9001 list`).
+Internal gRPC services listen on `:9001`–`:9006` over mTLS, with reflection enabled:
+
+```bash
+grpcurl -cacert infrastructure/certs/ca.pem -cert infrastructure/certs/dev-client.pem \
+  -key infrastructure/certs/dev-client-key.pem 127.0.0.1:9001 list
+```
 
 ## Tests
 

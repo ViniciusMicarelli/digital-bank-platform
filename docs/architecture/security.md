@@ -12,13 +12,26 @@ This document describes the security architecture of the Digital Bank Platform. 
 | Rotating refresh tokens stored hashed, with reuse detection that revokes the session | identity-service |
 | Secrets at rest (signing keys, TOTP seeds) encrypted with AES-256-GCM, bound to their row | `packages/go-platform/secretbox` |
 | Object-level authorization: every account route checks ownership and answers 404 otherwise | [api-gateway](../services/api-gateway.md) |
-| Rate limits per customer, and per IP on login/sign-up | api-gateway |
+| Rate limits per customer, and per IP on login/sign-up, shared by all replicas through Redis (GCRA, fails open) | api-gateway |
+| Mutual TLS 1.3 between services with SPIFFE identities; each service authorizes its callers (e.g. only account- and transaction-service may call the ledger) | `packages/go-platform/mtls` |
+| CPF encrypted at rest (AES-256-GCM bound to the account) with an HMAC blind index; legacy rows encrypted on startup | account-service |
 | Strict input handling: unknown JSON fields rejected, 64 KiB bodies, decimal-string amounts, safe correlation IDs | api-gateway |
 | Idempotency keys scoped per customer | api-gateway, [ADR-0016](../decisions/0016-idempotency.md) |
 | No PII in events (ids only); documents masked in Pix lookups | all services |
 | Ledger integrity in the database: balanced entries, append-only journal | ledger-service |
 
-Not yet: mTLS between services, field-level encryption of documents and names, a KMS for the KEK, audit log shipping. See the [roadmap](../ROADMAP.md).
+Not yet: a KMS for the key-encryption keys, TLS for Postgres and Kafka, certificate rotation (dev certificates last 90 days), audit log shipping. See the [roadmap](../ROADMAP.md).
+
+### Who may call whom (mTLS)
+
+| Service | Allowed callers |
+|---|---|
+| ledger-service | account-service, transaction-service |
+| account-service | api-gateway, transaction-service, pix-service |
+| transaction-service | api-gateway, pix-service |
+| pix-service, statement-service, identity-service | api-gateway |
+
+`dev-client` (the e2e tests, `grpcurl`) is added to every list in docker compose only. Run `make certs` to (re)generate the development CA; production would use SPIRE, cert-manager or a cloud CA with short-lived certificates.
 
 ---
 

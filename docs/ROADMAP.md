@@ -84,12 +84,17 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Private keys and TOTP secrets encrypted at rest (AES-256-GCM, [ADR-0015](decisions/0015-encryption.md)).
 - The gateway's development login is removed; e2e and the demo use real sign-up and login.
 
+## Phase 9 — Security hardening ✅
+
+- Mutual TLS 1.3 between services with SPIFFE identities and per-service caller authorization ([ADR-0014](decisions/0014-zero-trust-security.md)).
+- CPF encrypted at rest with a blind index, legacy rows encrypted by an expand/contract migration ([ADR-0015](decisions/0015-encryption.md)).
+- Rate limits shared across gateway replicas through Redis (GCRA, fail open).
+
 ## Next
 
 Ordered by value for the platform:
 
-1. **Security hardening**: mTLS between services ([ADR-0014](decisions/0014-zero-trust-security.md)), field-level encryption of documents ([ADR-0015](decisions/0015-encryption.md)), shared rate limiter.
-2. **Pix**: QR codes (EMV BR Code), refunds, scheduled Pix.
-3. **card-service**: debit card authorization using ledger holds (< 200 ms), clearing via capture.
-4. **Operations**: Kubernetes manifests / Helm, Terraform, idempotency-key retention jobs, ledger reconciliation job.
-5. **credit-service**, **payment-service** (boleto), **notification-service**, **user-service** (KYC). Each reuses the ledger holds, sagas and outbox built above.
+1. **Pix**: QR codes (EMV BR Code), refunds, scheduled Pix.
+2. **card-service**: debit card authorization using ledger holds (< 200 ms), clearing via capture.
+3. **Operations**: Kubernetes manifests / Helm, Terraform, a KMS for key-encryption keys, certificate rotation, idempotency-key retention jobs, ledger reconciliation job, dropping the plaintext `accounts.document` column (contract step).
+4. **credit-service**, **payment-service** (boleto), **notification-service**, **user-service** (KYC). Each reuses the ledger holds, sagas and outbox built above.

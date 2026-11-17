@@ -9,14 +9,12 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"go.opentelemetry.io/otel/trace"
-	"golang.org/x/time/rate"
 
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/correlation"
 )
@@ -101,7 +99,7 @@ func (a *API) authenticated(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, r.Context(), http.StatusUnauthorized, "UNAUTHENTICATED", err.Error())
 			return
 		}
-		if !a.limiter.allow(customer) {
+		if !a.limiter.Allow(r.Context(), "cust:"+customer) {
 			w.Header().Set("Retry-After", "1")
 			writeError(w, r.Context(), http.StatusTooManyRequests, "RATE_LIMITED", "too many requests")
 			return
@@ -117,35 +115,11 @@ func (a *API) perIP(next http.HandlerFunc) http.HandlerFunc {
 		if err != nil {
 			ip = r.RemoteAddr
 		}
-		if !a.authLimiter.allow(ip) {
+		if !a.authLimiter.Allow(r.Context(), "ip:"+ip) {
 			w.Header().Set("Retry-After", "1")
 			writeError(w, r.Context(), http.StatusTooManyRequests, "RATE_LIMITED", "too many requests")
 			return
 		}
 		next(w, r)
 	}
-}
-
-// limiter is a token bucket per customer. In-memory, so per gateway replica;
-// a shared limiter (Redis) is the next step when running several replicas.
-type limiter struct {
-	mu      sync.Mutex
-	buckets map[string]*rate.Limiter
-	rps     rate.Limit
-	burst   int
-}
-
-func newLimiter(rps float64, burst int) *limiter {
-	return &limiter{buckets: map[string]*rate.Limiter{}, rps: rate.Limit(rps), burst: burst}
-}
-
-func (l *limiter) allow(key string) bool {
-	l.mu.Lock()
-	b, ok := l.buckets[key]
-	if !ok {
-		b = rate.NewLimiter(l.rps, l.burst)
-		l.buckets[key] = b
-	}
-	l.mu.Unlock()
-	return b.Allow()
 }
