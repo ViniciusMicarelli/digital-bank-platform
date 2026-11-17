@@ -1,312 +1,254 @@
-// Package money provides currency-aware numeric types and calculations
-// for financial operations. It implements the ISO 4217 currency code standard.
+// Package money provides an immutable, currency-aware monetary value.
+//
+// Amounts are stored as int64 minor units (e.g. cents). Floating point is
+// never used: values are parsed from and formatted to decimal strings.
+// All arithmetic checks for currency mismatch and int64 overflow.
 package money
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
-	"math/big"
 	"strconv"
+	"strings"
 )
 
-// ISO 4217 currency codes
-var Currencies = map[string]*Currency{
-	"BRL": {Code: "BRL", Numeric: "986", DecimalPlaces: 2, Name: "Brazilian Real"},
-	"USD": {Code: "USD", Numeric: "840", DecimalPlaces: 2, Name: "US Dollar"},
-	"EUR": {Code: "EUR", Numeric: "978", DecimalPlaces: 2, Name: "Euro"},
-	"GBP": {Code: "GBP", Numeric: "826", DecimalPlaces: 2, Name: "Pound Sterling"},
-	"JPY": {Code: "JPY", Numeric: "392", DecimalPlaces: 0, Name: "Japanese Yen"},
+// Currency is an ISO 4217 alphabetic code.
+type Currency string
+
+const (
+	BRL Currency = "BRL"
+	USD Currency = "USD"
+	EUR Currency = "EUR"
+)
+
+// decimals holds the number of minor-unit digits for each supported currency.
+var decimals = map[Currency]int{
+	BRL: 2,
+	USD: 2,
+	EUR: 2,
 }
 
-// Currency represents an ISO 4217 currency code.
-type Currency struct {
-	Code         string // 3-letter currency code (e.g., BRL, USD)
-	Numeric      string // 3-digit numeric code
-	DecimalPlaces int     // Number of decimal places (0 for JPY)
-	Name         string
+var (
+	ErrUnsupportedCurrency = errors.New("money: unsupported currency")
+	ErrCurrencyMismatch    = errors.New("money: currency mismatch")
+	ErrOverflow            = errors.New("money: amount overflows int64")
+	ErrInvalidAmount       = errors.New("money: invalid amount")
+)
+
+// Decimals returns the number of minor-unit digits for c.
+func (c Currency) Decimals() (int, error) {
+	d, ok := decimals[c]
+	if !ok {
+		return 0, fmt.Errorf("%w: %q", ErrUnsupportedCurrency, string(c))
+	}
+	return d, nil
 }
 
-// Validate checks if the currency is valid.
-func (c *Currency) Validate() error {
-	if _, ok := Currencies[c.Code]; !ok {
-		return fmt.Errorf("invalid currency code: %s", c.Code)
-	}
-	if len(c.Numeric) != 3 {
-		return fmt.Errorf("invalid currency numeric code")
-	}
-	if c.DecimalPlaces < 0 || c.DecimalPlaces > 6 {
-		return fmt.Errorf("invalid decimal places: %d", c.DecimalPlaces)
-	}
-	return nil
-}
-
-// Money represents a monetary value with currency.
+// Money is an amount in minor units of a given currency.
+// The zero value is not valid; build values with New or Parse.
 type Money struct {
-	Currency  *Currency
-	AmountInt int64 // Amount in minor units (cents for BRL/USD, yen for JPY)
+	amount   int64
+	currency Currency
 }
 
-// New creates a new Money instance.
-func New(amount int64, code string) (*Money, error) {
-	c, ok := Currencies[code]
-	if !ok {
-		return nil, fmt.Errorf("unsupported currency: %s", code)
+// New returns minor units of currency c (New(1050, BRL) is R$ 10,50).
+// Negative amounts are allowed: ledger postings are signed.
+func New(minor int64, c Currency) (Money, error) {
+	if _, err := c.Decimals(); err != nil {
+		return Money{}, err
 	}
-	if amount < 0 {
-		return nil, errors.New("amount cannot be negative")
-	}
-	return &Money{
-		Currency:  c,
-		AmountInt: amount,
-	}, nil
+	return Money{amount: minor, currency: c}, nil
 }
 
-// NewWithDecimal creates money from a decimal amount.
-func NewWithDecimal(amount float64, code string) (*Money, error) {
-	c, ok := Currencies[code]
-	if !ok {
-		return nil, fmt.Errorf("unsupported currency: %s", code)
+// Zero returns a zero amount of currency c.
+func Zero(c Currency) (Money, error) { return New(0, c) }
+
+// Parse reads a decimal string such as "10.5", "-0.01" or "1234".
+// It rejects more fractional digits than the currency allows.
+func Parse(s string, c Currency) (Money, error) {
+	d, err := c.Decimals()
+	if err != nil {
+		return Money{}, err
 	}
-	major := int64(amount)
-	minor := float64(amount-major) * math.Pow(10, float64(c.DecimalPlaces))
-	amountInt := major*int64(math.Pow(10, float64(c.DecimalPlaces))) + int64(minor)
-	return New(amountInt, code)
+	invalid := fmt.Errorf("%w: %q", ErrInvalidAmount, s)
+
+	neg := false
+	switch {
+	case strings.HasPrefix(s, "-"):
+		neg, s = true, s[1:]
+	case strings.HasPrefix(s, "+"):
+		s = s[1:]
+	}
+	intPart, fracPart, hasDot := strings.Cut(s, ".")
+	if intPart == "" || (hasDot && fracPart == "") || len(fracPart) > d ||
+		!isDigits(intPart) || !isDigits(fracPart) {
+		return Money{}, invalid
+	}
+	fracPart += strings.Repeat("0", d-len(fracPart))
+
+	minor, err := strconv.ParseInt(intPart+fracPart, 10, 64)
+	if err != nil {
+		return Money{}, fmt.Errorf("%w: %q", ErrOverflow, s)
+	}
+	if neg {
+		minor = -minor
+	}
+	return Money{amount: minor, currency: c}, nil
 }
 
-// Value returns the amount as a formatted string.
-func (m *Money) Value() string {
-	if m == nil {
-		return ""
+// MustParse is like Parse but panics on error. Intended for tests and constants.
+func MustParse(s string, c Currency) Money {
+	m, err := Parse(s, c)
+	if err != nil {
+		panic(err)
 	}
-	places := m.Currency.DecimalPlaces
-	if places == 0 {
-		return fmt.Sprintf("%d", m.AmountInt)
-	}
-	if m.AmountInt >= 0 {
-		return fmt.Sprintf("%0.*d", places, m.AmountInt)
-	}
-	return fmt.Sprintf("%-.*d", places, m.AmountInt)
+	return m
 }
 
-// Minor returns the amount in minor units (cents, yen, etc.).
-func (m *Money) Minor() int64 {
-	if m == nil {
-		return 0
+func isDigits(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
 	}
-	return m.AmountInt
+	return true
 }
 
-// Major returns the amount in major units (dollars, euros, etc.).
-func (m *Money) Major() float64 {
-	if m == nil {
-		return 0
+// Minor returns the amount in minor units.
+func (m Money) Minor() int64 { return m.amount }
+
+// Currency returns the currency.
+func (m Money) Currency() Currency { return m.currency }
+
+func (m Money) IsZero() bool     { return m.amount == 0 }
+func (m Money) IsNegative() bool { return m.amount < 0 }
+func (m Money) IsPositive() bool { return m.amount > 0 }
+
+// Neg returns -m.
+func (m Money) Neg() (Money, error) {
+	if m.amount == math.MinInt64 {
+		return Money{}, ErrOverflow
 	}
-	return float64(m.AmountInt) / math.Pow(10, float64(m.Currency.DecimalPlaces))
+	return Money{amount: -m.amount, currency: m.currency}, nil
 }
 
-// MarshalJSON implements json.Marshaler.
-func (m *Money) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf(`{"currency":"%s","amount":"%s"}`, m.Currency.Code, m.Value())), nil
+// Add returns m + o.
+func (m Money) Add(o Money) (Money, error) {
+	if m.currency != o.currency {
+		return Money{}, fmt.Errorf("%w: %s and %s", ErrCurrencyMismatch, m.currency, o.currency)
+	}
+	sum := m.amount + o.amount
+	// Overflow happened if both operands share a sign that the result lacks.
+	if (m.amount > 0 && o.amount > 0 && sum < 0) || (m.amount < 0 && o.amount < 0 && sum >= 0) {
+		return Money{}, ErrOverflow
+	}
+	return Money{amount: sum, currency: m.currency}, nil
 }
 
-// UnmarshalJSON implements json.Unmarshaler.
-func (m *Money) UnmarshalJSON(data []byte) error {
-	var raw map[string]string
-	if err := fmt.Sscanf(string(data), `{"currency":"%s","amount":"%s"}`, &raw["currency"], &raw["amount"]); err != nil {
+// Sub returns m - o.
+func (m Money) Sub(o Money) (Money, error) {
+	neg, err := o.Neg()
+	if err != nil {
+		return Money{}, err
+	}
+	return m.Add(neg)
+}
+
+// Cmp compares m and o: -1 if m < o, 0 if equal, +1 if m > o.
+func (m Money) Cmp(o Money) (int, error) {
+	if m.currency != o.currency {
+		return 0, fmt.Errorf("%w: %s and %s", ErrCurrencyMismatch, m.currency, o.currency)
+	}
+	switch {
+	case m.amount < o.amount:
+		return -1, nil
+	case m.amount > o.amount:
+		return 1, nil
+	}
+	return 0, nil
+}
+
+// Sum adds all values. They must share currency c; an empty list returns zero.
+func Sum(c Currency, values ...Money) (Money, error) {
+	total, err := Zero(c)
+	if err != nil {
+		return Money{}, err
+	}
+	for _, v := range values {
+		if total, err = total.Add(v); err != nil {
+			return Money{}, err
+		}
+	}
+	return total, nil
+}
+
+// Split divides m into n parts whose sum is exactly m. Leftover minor units
+// go to the first parts: R$ 10,00 / 3 = [3,34 3,33 3,33].
+func (m Money) Split(n int) ([]Money, error) {
+	if n <= 0 {
+		return nil, fmt.Errorf("money: split into %d parts", n)
+	}
+	q, r := m.amount/int64(n), m.amount%int64(n)
+	step := int64(1)
+	if r < 0 {
+		step, r = -1, -r
+	}
+	parts := make([]Money, n)
+	for i := range parts {
+		parts[i] = Money{amount: q, currency: m.currency}
+		if int64(i) < r {
+			parts[i].amount += step
+		}
+	}
+	return parts, nil
+}
+
+// Decimal formats the amount as a plain decimal string, e.g. "-10.50".
+func (m Money) Decimal() string {
+	d := decimals[m.currency]
+	if d == 0 {
+		return strconv.FormatInt(m.amount, 10)
+	}
+	// Work on the unsigned magnitude so math.MinInt64 is handled.
+	mag := uint64(m.amount)
+	sign := ""
+	if m.amount < 0 {
+		sign, mag = "-", -mag
+	}
+	digits := strconv.FormatUint(mag, 10)
+	if len(digits) <= d {
+		digits = strings.Repeat("0", d-len(digits)+1) + digits
+	}
+	cut := len(digits) - d
+	return sign + digits[:cut] + "." + digits[cut:]
+}
+
+// String implements fmt.Stringer, e.g. "BRL 10.50".
+func (m Money) String() string { return string(m.currency) + " " + m.Decimal() }
+
+type jsonMoney struct {
+	Amount   string   `json:"amount"`
+	Currency Currency `json:"currency"`
+}
+
+// MarshalJSON encodes as {"amount":"10.50","currency":"BRL"}. The amount is a
+// string so that clients never parse it as a float.
+func (m Money) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonMoney{Amount: m.Decimal(), Currency: m.currency})
+}
+
+// UnmarshalJSON decodes the format produced by MarshalJSON.
+func (m *Money) UnmarshalJSON(b []byte) error {
+	var j jsonMoney
+	if err := json.Unmarshal(b, &j); err != nil {
 		return err
 	}
-	code := raw["currency"]
-	c, ok := Currencies[code]
-	if !ok {
-		return fmt.Errorf("unsupported currency: %s", code)
+	parsed, err := Parse(j.Amount, j.Currency)
+	if err != nil {
+		return err
 	}
-	var amount string
-	fmt.Sscanf(raw["amount"], "%d.%d", &amount, &raw["amount"])
-	cents := 10
-	for i := 0; i < c.DecimalPlaces; i++ {
-		cents *= 10
-	}
-	var centsStr string
-	if len(raw["amount"]) > 0 {
-		centsStr = raw["amount"][:len(raw["amount"])-1]
-	} else {
-		centsStr = "0"
-	}
-	amountInt, _ := strconv.ParseInt(raw["amount"], 10, 64)
-	m.AmountInt = amountInt * cents
+	*m = parsed
 	return nil
-}
-
-// Equals checks if two Money values are equal.
-func (m *Money) Equals(other *Money) bool {
-	if m == nil && other == nil {
-		return true
-	}
-	if m == nil || other == nil {
-		return false
-	}
-	return m.Currency.Code == other.Currency.Code && m.AmountInt == other.AmountInt
-}
-
-// Add adds two money values (same currency).
-func (m *Money) Add(other *Money) (*Money, error) {
-	if m == nil && other == nil {
-		return nil, nil
-	}
-	if m == nil {
-		return other, nil
-	}
-	if other == nil {
-		return m, nil
-	}
-	if m.Currency.Code != other.Currency.Code {
-		return nil, errors.New("currencies must match")
-	}
-	return &Money{
-		Currency:  m.Currency,
-		AmountInt: m.AmountInt + other.AmountInt,
-	}, nil
-}
-
-// Subtract subtracts two money values (same currency).
-func (m *Money) Subtract(other *Money) (*Money, error) {
-	if m == nil && other == nil {
-		return nil, nil
-	}
-	if m == nil {
-		return other.Neg(), nil
-	}
-	if other == nil {
-		return m, nil
-	}
-	if m.Currency.Code != other.Currency.Code {
-		return nil, errors.New("currencies must match")
-	}
-	result := m.AmountInt - other.AmountInt
-	if result < 0 {
-		// Preserve sign by returning negative value
-	}
-	return &Money{
-		Currency:  m.Currency,
-		AmountInt: result,
-	}, nil
-}
-
-// Neg returns the negation of this money.
-func (m *Money) Neg() *Money {
-	if m == nil {
-		return nil
-	}
-	return &Money{
-		Currency:  m.Currency,
-		AmountInt: -m.AmountInt,
-	}
-}
-
-// Multiply multiplies money by an integer (for fees, installments, etc.).
-func (m *Money) Multiply(factor int64) *Money {
-	if m == nil {
-		return nil
-	}
-	return &Money{
-		Currency:  m.Currency,
-		AmountInt: m.AmountInt * factor,
-	}
-}
-
-// Div divides money by an integer (for averaging).
-func (m *Money) Div(factor int64) *Money {
-	if m == nil {
-		return nil
-	}
-	return &Money{
-		Currency:  m.Currency,
-		AmountInt: m.AmountInt / factor,
-	}
-}
-
-// MultiplyBig multiplies money by a big.Int (for high-precision calculations).
-func (m *Money) MultiplyBig(factor *big.Int) *Money {
-	if m == nil {
-		return nil
-	}
-	if factor.Sign() == 0 {
-		return New(0, m.Currency.Code)
-	}
-	result := new(big.Int)
-	result.Mul(big.NewInt(m.AmountInt), factor)
-	return &Money{
-		Currency:  m.Currency,
-		AmountInt: result.Int64(),
-	}
-}
-
-// ToDecimalString returns the amount as a decimal string.
-func (m *Money) ToDecimalString() string {
-	if m == nil {
-		return "0"
-	}
-	places := m.Currency.DecimalPlaces
-	return formatDecimal(m.AmountInt, places)
-}
-
-// FromDecimalString creates money from a decimal string.
-func FromDecimalString(s string, code string) (*Money, error) {
-	var amount float64
-	fmt.Sscanf(s, "%f", &amount)
-	return NewWithDecimal(amount, code)
-}
-
-// Compare returns the comparison result between two money values.
-func (m *Money) Compare(other *Money) int {
-	if m == nil && other == nil {
-		return 0
-	}
-	if m == nil {
-		return -1
-	}
-	if other == nil {
-		return 1
-	}
-	if m.Currency.Code != other.Currency.Code {
-		return -1 // Different currencies are not comparable
-	}
-	if m.AmountInt < other.AmountInt {
-		return -1
-	}
-	if m.AmountInt > other.AmountInt {
-		return 1
-	}
-	return 0
-}
-
-// Invariant checks if the sum of all postings equals zero.
-func (m *Money) Invariant() error {
-	// For double-entry ledger, all debits must equal all credits
-	positive := m.AmountInt
-	if positive < 0 {
-		positive = -positive
-	}
-	// Money value is always non-negative
-	if positive != 0 && m.AmountInt == 0 {
-		return errors.New("money value is invalid")
-	}
-	return nil
-}
-
-// Copy creates a deep copy of the money.
-func (m *Money) Copy() *Money {
-	if m == nil {
-		return nil
-	}
-	return &Money{
-		Currency:  &Currency{
-			Code:         m.Currency.Code,
-			Numeric:      m.Currency.Numeric,
-			DecimalPlaces: m.Currency.DecimalPlaces,
-			Name:         m.Currency.Name,
-		},
-		AmountInt: m.AmountInt,
-	}
 }
