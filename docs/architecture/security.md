@@ -1,6 +1,26 @@
 # Security Architecture
 
-This document describes the security architecture of the Digital Bank Platform.
+This document describes the security architecture of the Digital Bank Platform. The first section is what runs today; the rest is the target design.
+
+## Implemented
+
+| Control | Where |
+|---|---|
+| Passwords hashed with argon2id; lockout after 5 failures; equal cost for unknown emails | [identity-service](../services/identity-service.md) |
+| TOTP MFA with replay protection | identity-service |
+| Ed25519 access tokens (15 min) verified by the gateway from a JWKS; key rotation without downtime | identity-service, api-gateway |
+| Rotating refresh tokens stored hashed, with reuse detection that revokes the session | identity-service |
+| Secrets at rest (signing keys, TOTP seeds) encrypted with AES-256-GCM, bound to their row | `packages/go-platform/secretbox` |
+| Object-level authorization: every account route checks ownership and answers 404 otherwise | [api-gateway](../services/api-gateway.md) |
+| Rate limits per customer, and per IP on login/sign-up | api-gateway |
+| Strict input handling: unknown JSON fields rejected, 64 KiB bodies, decimal-string amounts, safe correlation IDs | api-gateway |
+| Idempotency keys scoped per customer | api-gateway, [ADR-0016](../decisions/0016-idempotency.md) |
+| No PII in events (ids only); documents masked in Pix lookups | all services |
+| Ledger integrity in the database: balanced entries, append-only journal | ledger-service |
+
+Not yet: mTLS between services, field-level encryption of documents and names, a KMS for the KEK, audit log shipping. See the [roadmap](../ROADMAP.md).
+
+---
 
 ## Security Principles
 
@@ -84,7 +104,7 @@ Every request validates:
 | Endpoint | Authentication | Authorization |
 |----------|----------------|---------------|
 | /v1/auth/login | None | None |
-| /v1/auth/token | None | None |
+| /v1/auth/login | None | Per-IP rate limit |
 | /v1/account/{id}/balance | JWT | account:read, customer:read |
 | /v1/payment/create | JWT + 2FA | payment:write, customer:read |
 | /internal/ledger/{id} | mTLS | ledger:all |

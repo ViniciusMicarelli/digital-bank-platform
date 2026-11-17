@@ -14,14 +14,21 @@ call() { # call METHOD PATH TOKEN [JSON] [IDEMPOTENCY_KEY]
   [[ -n "${5:-}" ]] && args+=(-H "Idempotency-Key: $5")
   curl "${args[@]}"
 }
-token() { curl -sS -X POST "$API/v1/auth/token" -d "{\"customer_id\":\"$1\"}" | jq -r .access_token; }
+PASSWORD='correct horse battery staple'
+# token NAME: signs up NAME@example.com and logs in; prints the access token.
+token() {
+  curl -sS -X POST "$API/v1/auth/register" -d "{\"email\":\"$1@example.com\",\"password\":\"$PASSWORD\",\"full_name\":\"$1\"}" >/dev/null
+  curl -sS -X POST "$API/v1/auth/login" -d "{\"email\":\"$1@example.com\",\"password\":\"$PASSWORD\"}" | jq -r .access_token
+}
 uuid() { python3 -c 'import uuid; print(uuid.uuid4())'; }
 
 SUFFIX=$(uuid | cut -c1-8)
+step "Ana and Bruno sign up and log in (identity-service issues Ed25519 tokens)"
 ANA=$(token "ana-$SUFFIX")
 BRUNO=$(token "bruno-$SUFFIX")
+echo "access token: ${ANA:0:40}…"
 
-step "Ana and Bruno open accounts"
+step "They open accounts"
 ANA_ACC=$(call POST /v1/accounts "$ANA" '{"holder_name":"Ana Souza","document":"529.982.247-25"}' "$(uuid)" | tee /dev/stderr | jq -r .id)
 BRUNO_ACC=$(call POST /v1/accounts "$BRUNO" '{"holder_name":"Bruno Lima","document":"111.444.777-35"}' "$(uuid)" | jq -r .id)
 

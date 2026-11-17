@@ -4,3 +4,4 @@ CREATE DATABASE account;
 CREATE DATABASE transaction;
 CREATE DATABASE pix;
 CREATE DATABASE statement;
+CREATE DATABASE identity;

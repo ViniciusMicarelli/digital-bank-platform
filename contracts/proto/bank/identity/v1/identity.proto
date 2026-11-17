@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package bank.identity.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// IdentityService authenticates customers. It issues short-lived Ed25519
+// access tokens (verified by anyone through GetJWKS) and rotating refresh tokens.
+service IdentityService {
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  // Fails with UNAUTHENTICATED and reason INVALID_CREDENTIALS, MFA_REQUIRED,
+  // INVALID_MFA_CODE or ACCOUNT_LOCKED.
+  rpc Login(LoginRequest) returns (LoginResponse);
+  // Exchanges a refresh token for a new pair. A refresh token works once;
+  // presenting a used one revokes the whole session (reason REFRESH_TOKEN_REUSED).
+  rpc Refresh(RefreshRequest) returns (RefreshResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+
+  // Starts TOTP enrollment; it is enabled after ConfirmTotp.
+  rpc EnrollTotp(EnrollTotpRequest) returns (EnrollTotpResponse);
+  rpc ConfirmTotp(ConfirmTotpRequest) returns (ConfirmTotpResponse);
+
+  // Public keys that verify access tokens (RFC 7517, OKP / Ed25519).
+  rpc GetJwks(GetJwksRequest) returns (GetJwksResponse);
+  // Starts signing with a new key. Operator only: never exposed at the edge.
+  rpc RotateSigningKey(RotateSigningKeyRequest) returns (RotateSigningKeyResponse);
+}
+
+message TokenPair {
+  string access_token = 1;
+  google.protobuf.Timestamp access_expires_at = 2;
+  string refresh_token = 3;
+  google.protobuf.Timestamp refresh_expires_at = 4;
+}
+
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+  string full_name = 3;
+}
+
+message RegisterResponse {
+  string customer_id = 1;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+  // Required when TOTP is enabled.
+  string totp_code = 3;
+}
+
+message LoginResponse {
+  string customer_id = 1;
+  TokenPair tokens = 2;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+message RefreshResponse {
+  TokenPair tokens = 1;
+}
+
+message LogoutRequest {
+  string refresh_token = 1;
+}
+
+message LogoutResponse {}
+
+message EnrollTotpRequest {
+  string customer_id = 1;
+}
+
+message EnrollTotpResponse {
+  // Base32 secret, for manual entry.
+  string secret = 1;
+  // otpauth:// URI, for a QR code.
+  string otpauth_uri = 2;
+}
+
+message ConfirmTotpRequest {
+  string customer_id = 1;
+  string code = 2;
+}
+
+message ConfirmTotpResponse {}
+
+message Jwk {
+  string kid = 1;
+  string kty = 2;
+  string crv = 3;
+  // Base64url public key.
+  string x = 4;
+  string alg = 5;
+  string use = 6;
+}
+
+message GetJwksRequest {}
+
+message GetJwksResponse {
+  repeated Jwk keys = 1;
+}
+
+message RotateSigningKeyRequest {}
+
+message RotateSigningKeyResponse {
+  string kid = 1;
+}

@@ -2,6 +2,9 @@ package httpapi
 
 import (
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -11,14 +14,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
+	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/api-gateway/internal/auth"
@@ -64,31 +70,61 @@ func (f *fakeTxs) CreateTransfer(_ context.Context, in *txv1.CreateTransferReque
 	}}, nil
 }
 
+// fakeIdentity answers Login like identity-service would.
+type fakeIdentity struct {
+	identityv1.IdentityServiceClient
+	sign func(sub string) string
+}
+
+func (f *fakeIdentity) Login(_ context.Context, in *identityv1.LoginRequest, _ ...grpc.CallOption) (*identityv1.LoginResponse, error) {
+	if in.GetPassword() != "correct horse battery" {
+		return nil, grpcserver.Error(codes.Unauthenticated, "INVALID_CREDENTIALS", "invalid email or password")
+	}
+	return &identityv1.LoginResponse{CustomerId: "ana", Tokens: &identityv1.TokenPair{
+		AccessToken: f.sign("ana"), AccessExpiresAt: timestamppb.Now(), RefreshToken: "r", RefreshExpiresAt: timestamppb.Now(),
+	}}, nil
+}
+
 type harness struct {
 	srv     *httptest.Server
-	authn   *auth.Authenticator
+	sign    func(sub string) string
 	txs     *fakeTxs
 	account string
 }
 
-func newHarness(t *testing.T) harness {
+func newHarness(t *testing.T, opts Options) harness {
 	t.Helper()
-	authn, _ := auth.New("0123456789abcdef0123456789abcdef", time.Minute)
+	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
+	jwk := auth.JWK{Kid: "test", Kty: "OKP", Crv: "Ed25519", X: base64.RawURLEncoding.EncodeToString(pub)}
+	verifier := auth.NewVerifier(func(context.Context) ([]auth.JWK, error) { return []auth.JWK{jwk}, nil })
+	sign := func(sub string) string {
+		tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.RegisteredClaims{
+			Subject: sub, Issuer: auth.Issuer, Audience: jwt.ClaimStrings{auth.Audience},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
+		})
+		tok.Header["kid"] = "test"
+		s, _ := tok.SignedString(priv)
+		return s
+	}
 	account := uuid.NewString()
 	txs := &fakeTxs{}
-	api := New(Clients{Accounts: &fakeAccounts{owners: map[string]string{account: "ana"}}, Txs: txs},
-		authn, slog.New(slog.NewTextHandler(io.Discard, nil)), Options{DevLogin: true, RateLimit: 1000})
+	if opts.RateLimit == 0 {
+		opts.RateLimit = 1000
+	}
+	api := New(Clients{
+		Identity: &fakeIdentity{sign: sign},
+		Accounts: &fakeAccounts{owners: map[string]string{account: "ana"}}, Txs: txs,
+	}, verifier, slog.New(slog.NewTextHandler(io.Discard, nil)), opts)
 	srv := httptest.NewServer(api.Handler())
 	t.Cleanup(srv.Close)
-	return harness{srv: srv, authn: authn, txs: txs, account: account}
+	return harness{srv: srv, sign: sign, txs: txs, account: account}
 }
 
 func (h harness) do(t *testing.T, method, path, customer, body string, headers map[string]string) (*http.Response, map[string]any) {
 	t.Helper()
 	req, _ := http.NewRequest(method, h.srv.URL+path, strings.NewReader(body))
 	if customer != "" {
-		tok, _, _ := h.authn.Issue(customer)
-		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("Authorization", "Bearer "+h.sign(customer))
 	}
 	for k, v := range headers {
 		req.Header.Set(k, v)
@@ -110,7 +146,7 @@ func errCode(body map[string]any) string {
 }
 
 func TestAuthAndOwnership(t *testing.T) {
-	h := newHarness(t)
+	h := newHarness(t, Options{})
 	path := "/v1/accounts/" + h.account + "/balance"
 
 	if resp, body := h.do(t, "GET", path, "", "", nil); resp.StatusCode != 401 || errCode(body) != "UNAUTHENTICATED" {
@@ -137,7 +173,7 @@ func TestAuthAndOwnership(t *testing.T) {
 }
 
 func TestTransferValidationAndIdempotency(t *testing.T) {
-	h := newHarness(t)
+	h := newHarness(t, Options{})
 	path := "/v1/accounts/" + h.account + "/transfers"
 	body := `{"to_account_id":"` + uuid.NewString() + `","amount":"12.34","description":"x"}`
 
@@ -170,19 +206,35 @@ func TestTransferValidationAndIdempotency(t *testing.T) {
 	}
 }
 
-func TestDevToken(t *testing.T) {
-	h := newHarness(t)
-	resp, body := h.do(t, "POST", "/v1/auth/token", "", `{"customer_id":"ana"}`, nil)
-	if resp.StatusCode != 200 || body["access_token"] == "" {
-		t.Fatalf("token: %d %v", resp.StatusCode, body)
+func TestLoginProxyAndAuthRateLimit(t *testing.T) {
+	h := newHarness(t, Options{AuthRateLimit: 1}) // burst of 5 per IP
+	resp, body := h.do(t, "POST", "/v1/auth/login", "", `{"email":"ana@example.com","password":"correct horse battery"}`, nil)
+	if resp.StatusCode != 200 || body["token_type"] != "Bearer" {
+		t.Fatalf("login: %d %v", resp.StatusCode, body)
 	}
-	if sub, err := h.authn.Verify(body["access_token"].(string)); err != nil || sub != "ana" {
-		t.Fatalf("issued token: %q %v", sub, err)
+	// The issued token works on protected routes.
+	req, _ := http.NewRequest("GET", h.srv.URL+"/v1/accounts/"+h.account+"/balance", nil)
+	req.Header.Set("Authorization", "Bearer "+body["access_token"].(string))
+	if r, err := http.DefaultClient.Do(req); err != nil || r.StatusCode != 200 {
+		t.Fatalf("using the token: %v %v", r.StatusCode, err)
+	}
+	if resp, body := h.do(t, "POST", "/v1/auth/login", "", `{"email":"ana@example.com","password":"nope"}`, nil); resp.StatusCode != 401 || errCode(body) != "INVALID_CREDENTIALS" {
+		t.Fatalf("bad password: %d %v", resp.StatusCode, body)
+	}
+	limited := false
+	for range 10 {
+		if resp, _ := h.do(t, "POST", "/v1/auth/login", "", `{"email":"x@example.com","password":"nope"}`, nil); resp.StatusCode == 429 {
+			limited = true
+			break
+		}
+	}
+	if !limited {
+		t.Fatal("login attempts must be rate limited per IP")
 	}
 }
 
 func TestRouteLabel(t *testing.T) {
-	h := newHarness(t)
+	h := newHarness(t, Options{})
 	before := testutilCount(t, "GET /v1/accounts/{id}/balance")
 	h.do(t, "GET", "/v1/accounts/"+h.account+"/balance", "ana", "", nil)
 	if testutilCount(t, "GET /v1/accounts/{id}/balance") != before+1 {

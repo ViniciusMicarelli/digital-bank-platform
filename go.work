@@ -6,6 +6,7 @@ use (
 	./packages/go-platform
 	./services/account-service
 	./services/api-gateway
+	./services/identity-service
 	./services/ledger-service
 	./services/pix-service
 	./services/statement-service

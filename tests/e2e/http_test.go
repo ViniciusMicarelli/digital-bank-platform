@@ -43,9 +43,18 @@ func (c *client) call(method, path string, body any, headers map[string]string) 
 	return resp.StatusCode, out
 }
 
-func login(t *testing.T, customer string) *client {
+const e2ePassword = "correct horse battery staple"
+
+// login signs up a new customer and logs in through the public API.
+func login(t *testing.T, name string) *client {
 	c := &client{t: t, base: addr("GATEWAY_URL", "http://127.0.0.1:8000")}
-	status, body := c.call("POST", "/v1/auth/token", map[string]string{"customer_id": customer}, nil)
+	email := name + "@example.com"
+	if status, body := c.call("POST", "/v1/auth/register", map[string]string{
+		"email": email, "password": e2ePassword, "full_name": name,
+	}, nil); status != 201 {
+		t.Fatalf("register: %d %v", status, body)
+	}
+	status, body := c.call("POST", "/v1/auth/login", map[string]string{"email": email, "password": e2ePassword}, nil)
 	if status != 200 {
 		t.Fatalf("login: %d %v", status, body)
 	}

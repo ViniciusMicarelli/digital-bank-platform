@@ -109,14 +109,28 @@ services:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
 
+  identity-service:
+    build: { context: ., args: { SERVICE: identity-service } }
+    environment:
+      DATABASE_URL: postgres://bank:bank@postgres:5432/identity?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      GRPC_ADDR: ":9006"
+      # Development key-encryption key. Production reads it from a KMS.
+      IDENTITY_KEK: 2Vn1NRQQasSBGXSwvKtdiUW0raXtu5vzeBrtLQ6uhd8=
+    ports: ["9006:9006"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+
   api-gateway:
     build: { context: ., args: { SERVICE: api-gateway } }
     environment:
       HTTP_ADDR: ":8080"
-      # Development only: never reuse this secret anywhere real.
-      JWT_SECRET: local-dev-secret-change-me-0123456789
-      AUTH_DEV_LOGIN: "true"
       SANDBOX: "true"
+      # Tests and the demo log in many times from one IP; the default is 2/s.
+      AUTH_RATE_LIMIT_RPS: "50"
+      IDENTITY_ADDR: identity-service:9006
       ACCOUNT_ADDR: account-service:9002
       TRANSACTION_ADDR: transaction-service:9003
       PIX_ADDR: pix-service:9004
@@ -124,6 +138,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     ports: ["8000:8080"]
     depends_on:
+      identity-service: { condition: service_started }
       account-service: { condition: service_started }
       transaction-service: { condition: service_started }
       pix-service: { condition: service_started }

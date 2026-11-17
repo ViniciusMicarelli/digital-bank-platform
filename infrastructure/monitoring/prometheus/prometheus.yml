@@ -14,3 +14,4 @@ scrape_configs:
           - transaction-service:9103
           - pix-service:9104
           - statement-service:9105
+          - identity-service:9106

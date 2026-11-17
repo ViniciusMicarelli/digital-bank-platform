@@ -10,6 +10,7 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
+	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
@@ -17,25 +18,100 @@ import (
 
 // ---- auth ----
 
-func (a *API) devToken(w http.ResponseWriter, r *http.Request) {
+func tokensJSON(t *identityv1.TokenPair) map[string]any {
+	return map[string]any{
+		"access_token": t.GetAccessToken(), "token_type": "Bearer",
+		"expires_at":    ts(t.GetAccessExpiresAt()),
+		"refresh_token": t.GetRefreshToken(), "refresh_expires_at": ts(t.GetRefreshExpiresAt()),
+	}
+}
+
+func (a *API) register(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		CustomerID string `json:"customer_id"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		FullName string `json:"full_name"`
 	}
 	if !decode(w, r, &req) {
 		return
 	}
-	if req.CustomerID == "" || len(req.CustomerID) > 64 {
-		writeError(w, r.Context(), http.StatusBadRequest, "INVALID_ARGUMENT", "customer_id is required (max 64 characters)")
-		return
-	}
-	token, exp, err := a.auth.Issue(req.CustomerID)
+	resp, err := a.c.Identity.Register(r.Context(), &identityv1.RegisterRequest{Email: req.Email, Password: req.Password, FullName: req.FullName})
 	if err != nil {
-		writeError(w, r.Context(), http.StatusInternalServerError, "INTERNAL", "could not issue token")
+		writeGRPCError(w, r.Context(), err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"access_token": token, "token_type": "Bearer", "expires_at": exp.UTC().Format(time.RFC3339),
-	})
+	writeJSON(w, http.StatusCreated, map[string]string{"customer_id": resp.GetCustomerId()})
+}
+
+func (a *API) login(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		TOTPCode string `json:"totp_code"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	resp, err := a.c.Identity.Login(r.Context(), &identityv1.LoginRequest{Email: req.Email, Password: req.Password, TotpCode: req.TOTPCode})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	body := tokensJSON(resp.GetTokens())
+	body["customer_id"] = resp.GetCustomerId()
+	writeJSON(w, http.StatusOK, body)
+}
+
+func (a *API) refresh(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	resp, err := a.c.Identity.Refresh(r.Context(), &identityv1.RefreshRequest{RefreshToken: req.RefreshToken})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, tokensJSON(resp.GetTokens()))
+}
+
+func (a *API) logout(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	if _, err := a.c.Identity.Logout(r.Context(), &identityv1.LogoutRequest{RefreshToken: req.RefreshToken}); err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *API) enrollTOTP(w http.ResponseWriter, r *http.Request) {
+	resp, err := a.c.Identity.EnrollTotp(r.Context(), &identityv1.EnrollTotpRequest{CustomerId: customerID(r.Context())})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"secret": resp.GetSecret(), "otpauth_uri": resp.GetOtpauthUri()})
+}
+
+func (a *API) confirmTOTP(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Code string `json:"code"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	if _, err := a.c.Identity.ConfirmTotp(r.Context(), &identityv1.ConfirmTotpRequest{CustomerId: customerID(r.Context()), Code: req.Code}); err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // ---- accounts ----

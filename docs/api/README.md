@@ -18,7 +18,7 @@
 | HTTP | When | Example codes |
 |---|---|---|
 | 400 | Malformed request | `INVALID_JSON`, `INVALID_AMOUNT`, `IDEMPOTENCY_KEY_REQUIRED` |
-| 401 | Missing or invalid token | `UNAUTHENTICATED` |
+| 401 | Missing or invalid token / credentials | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `MFA_REQUIRED`, `ACCOUNT_LOCKED`, `REFRESH_TOKEN_REUSED` |
 | 404 | Not found, or not yours | `NOT_FOUND` |
 | 409 | Same key, different request; or still processing | `IDEMPOTENCY_CONFLICT`, `IN_PROGRESS` |
 | 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS` |
@@ -32,7 +32,12 @@
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/v1/auth/token` | *(dev only)* Token for a `customer_id` |
+| `POST` | `/v1/auth/register` | Sign up `{email, password, full_name}` |
+| `POST` | `/v1/auth/login` | `{email, password, totp_code?}` → access + refresh tokens |
+| `POST` | `/v1/auth/refresh` | `{refresh_token}` → new pair (the old token stops working) |
+| `POST` | `/v1/auth/logout` | `{refresh_token}` → ends the session |
+| `POST` | `/v1/auth/mfa/totp` | Start TOTP enrollment → `{secret, otpauth_uri}` |
+| `POST` | `/v1/auth/mfa/totp/confirm` | `{code}` → enables TOTP |
 | `POST` | `/v1/accounts` | Open an account `{holder_name, document}` · Idempotency-Key |
 | `GET` | `/v1/accounts` | My accounts |
 | `GET` | `/v1/accounts/{id}` | Account details |
@@ -52,7 +57,8 @@
 ## Example
 
 ```bash
-TOKEN=$(curl -s -X POST localhost:8000/v1/auth/token -d '{"customer_id":"ana"}' | jq -r .access_token)
+curl -s -X POST localhost:8000/v1/auth/register -d '{"email":"ana@example.com","password":"correct horse battery staple","full_name":"Ana Souza"}'
+TOKEN=$(curl -s -X POST localhost:8000/v1/auth/login -d '{"email":"ana@example.com","password":"correct horse battery staple"}' | jq -r .access_token)
 
 curl -s -X POST localhost:8000/v1/accounts/$ACCOUNT/transfers \
   -H "Authorization: Bearer $TOKEN" -H "Idempotency-Key: 6f0c7a52-rent-nov" \

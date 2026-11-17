@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"log/slog"
+	"net"
 	"net/http"
 	"regexp"
 	"runtime/debug"
@@ -95,7 +96,7 @@ func (a *API) authenticated(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, r.Context(), http.StatusUnauthorized, "UNAUTHENTICATED", "missing bearer token")
 			return
 		}
-		customer, err := a.auth.Verify(token)
+		customer, err := a.auth.Verify(r.Context(), token)
 		if err != nil {
 			writeError(w, r.Context(), http.StatusUnauthorized, "UNAUTHENTICATED", err.Error())
 			return
@@ -106,6 +107,22 @@ func (a *API) authenticated(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), customerKey{}, customer)))
+	}
+}
+
+// perIP rate-limits unauthenticated routes by client address.
+func (a *API) perIP(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			ip = r.RemoteAddr
+		}
+		if !a.authLimiter.allow(ip) {
+			w.Header().Set("Retry-After", "1")
+			writeError(w, r.Context(), http.StatusTooManyRequests, "RATE_LIMITED", "too many requests")
+			return
+		}
+		next(w, r)
 	}
 }
 

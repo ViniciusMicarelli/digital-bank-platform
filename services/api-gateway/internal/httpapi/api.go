@@ -16,6 +16,7 @@ import (
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
+	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
@@ -27,6 +28,7 @@ import (
 
 // Clients are the internal services behind the gateway.
 type Clients struct {
+	Identity  identityv1.IdentityServiceClient
 	Accounts  accountv1.AccountServiceClient
 	Txs       txv1.TransactionServiceClient
 	Pix       pixv1.PixServiceClient
@@ -34,37 +36,46 @@ type Clients struct {
 }
 
 type Options struct {
-	// DevLogin enables POST /v1/auth/token, which issues a token for any
-	// customer id. Development only: identity-service will replace it.
-	DevLogin bool
 	// Sandbox enables POST /v1/sandbox/pix-in to fund accounts in demos.
 	Sandbox bool
 	// RateLimit is requests per second per customer (burst = 2x).
 	RateLimit float64
+	// AuthRateLimit is requests per second per client IP on the public
+	// /v1/auth routes (burst = 2x), against credential stuffing.
+	AuthRateLimit float64
 }
 
 type API struct {
-	c       Clients
-	auth    *auth.Authenticator
-	log     *slog.Logger
-	opts    Options
-	limiter *limiter
+	c           Clients
+	auth        *auth.Verifier
+	log         *slog.Logger
+	opts        Options
+	limiter     *limiter
+	authLimiter *limiter
 }
 
-func New(c Clients, a *auth.Authenticator, log *slog.Logger, opts Options) *API {
+func New(c Clients, v *auth.Verifier, log *slog.Logger, opts Options) *API {
 	if opts.RateLimit <= 0 {
 		opts.RateLimit = 20
 	}
-	return &API{c: c, auth: a, log: log, opts: opts, limiter: newLimiter(opts.RateLimit, int(opts.RateLimit*2))}
+	if opts.AuthRateLimit <= 0 {
+		opts.AuthRateLimit = 2
+	}
+	return &API{c: c, auth: v, log: log, opts: opts,
+		limiter:     newLimiter(opts.RateLimit, int(opts.RateLimit*2)),
+		authLimiter: newLimiter(opts.AuthRateLimit, int(opts.AuthRateLimit*5))}
 }
 
 // Handler returns the routed, observed HTTP handler.
 func (a *API) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
-	if a.opts.DevLogin {
-		mux.HandleFunc("POST /v1/auth/token", a.devToken)
-	}
+	mux.HandleFunc("POST /v1/auth/register", a.perIP(a.register))
+	mux.HandleFunc("POST /v1/auth/login", a.perIP(a.login))
+	mux.HandleFunc("POST /v1/auth/refresh", a.perIP(a.refresh))
+	mux.HandleFunc("POST /v1/auth/logout", a.perIP(a.logout))
+	mux.HandleFunc("POST /v1/auth/mfa/totp", a.authenticated(a.enrollTOTP))
+	mux.HandleFunc("POST /v1/auth/mfa/totp/confirm", a.authenticated(a.confirmTOTP))
 	if a.opts.Sandbox {
 		mux.HandleFunc("POST /v1/sandbox/pix-in", a.authenticated(a.sandboxPixIn))
 	}

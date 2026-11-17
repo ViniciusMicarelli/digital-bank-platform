@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc"
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
+	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
@@ -31,12 +32,6 @@ func main() {
 	defer stop()
 	defer telemetry.SetupTracing(ctx, "api-gateway", log)()
 
-	authn, err := auth.New(config.String("JWT_SECRET", ""), config.Duration("JWT_TTL", 15*time.Minute))
-	if err != nil {
-		log.Error("auth", "error", err)
-		os.Exit(1)
-	}
-
 	dial := func(env, def string) *grpc.ClientConn {
 		conn, err := grpcserver.Dial(config.String(env, def))
 		if err != nil {
@@ -45,20 +40,35 @@ func main() {
 		}
 		return conn
 	}
+	identity := dial("IDENTITY_ADDR", "127.0.0.1:9006")
 	accounts := dial("ACCOUNT_ADDR", "127.0.0.1:9002")
 	txs := dial("TRANSACTION_ADDR", "127.0.0.1:9003")
 	pix := dial("PIX_ADDR", "127.0.0.1:9004")
 	statement := dial("STATEMENT_ADDR", "127.0.0.1:9005")
 
+	identityClient := identityv1.NewIdentityServiceClient(identity)
+	verifier := auth.NewVerifier(func(ctx context.Context) ([]auth.JWK, error) {
+		resp, err := identityClient.GetJwks(ctx, &identityv1.GetJwksRequest{})
+		if err != nil {
+			return nil, err
+		}
+		keys := make([]auth.JWK, len(resp.GetKeys()))
+		for i, k := range resp.GetKeys() {
+			keys[i] = auth.JWK{Kid: k.GetKid(), Kty: k.GetKty(), Crv: k.GetCrv(), X: k.GetX()}
+		}
+		return keys, nil
+	})
+
 	api := httpapi.New(httpapi.Clients{
+		Identity:  identityClient,
 		Accounts:  accountv1.NewAccountServiceClient(accounts),
 		Txs:       txv1.NewTransactionServiceClient(txs),
 		Pix:       pixv1.NewPixServiceClient(pix),
 		Statement: statementv1.NewStatementServiceClient(statement),
-	}, authn, log, httpapi.Options{
-		DevLogin:  config.String("AUTH_DEV_LOGIN", "false") == "true",
-		Sandbox:   config.String("SANDBOX", "false") == "true",
-		RateLimit: float64(config.Int("RATE_LIMIT_RPS", 20)),
+	}, verifier, log, httpapi.Options{
+		Sandbox:       config.String("SANDBOX", "false") == "true",
+		RateLimit:     float64(config.Int("RATE_LIMIT_RPS", 20)),
+		AuthRateLimit: float64(config.Int("AUTH_RATE_LIMIT_RPS", 2)),
 	})
 
 	mux := http.NewServeMux()

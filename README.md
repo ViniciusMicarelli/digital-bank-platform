@@ -6,7 +6,7 @@ A digital bank built in **Go** as event-driven microservices: checking accounts,
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ```bash
-make up     # Postgres, Kafka, 6 services, Jaeger, Prometheus
+make up     # Postgres, Kafka, 7 services, Jaeger, Prometheus
 make demo   # a customer journey through the REST API
 make e2e    # end-to-end tests against the running stack
 ```
@@ -16,6 +16,7 @@ make e2e    # end-to-end tests against the running stack
 ```mermaid
 flowchart LR
     C([Client]) -->|REST + JWT| GW[api-gateway]
+    GW -->|gRPC: login, JWKS| IDN[identity-service]
     GW -->|gRPC| ACC[account-service]
     GW -->|gRPC| TRX[transaction-service]
     GW -->|gRPC| PIX[pix-service]
@@ -41,7 +42,8 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 | [transaction-service](docs/services/transaction-service.md) | Orchestrated sagas: transfers, two-phase Pix out, Pix in, recovery worker |
 | [pix-service](docs/services/pix-service.md) | Pix keys, lookup, same-bank and cross-bank Pix, incoming Pix |
 | [statement-service](docs/services/statement-service.md) | CQRS read side: customer feed projected from Kafka |
-| [api-gateway](docs/services/api-gateway.md) | Public REST API: JWT, ownership checks, idempotency keys, rate limits |
+| [identity-service](docs/services/identity-service.md) | Sign-up, login with argon2id + TOTP MFA, Ed25519 tokens via JWKS, rotating refresh tokens |
+| [api-gateway](docs/services/api-gateway.md) | Public REST API: token verification, ownership checks, idempotency keys, rate limits |
 
 ## What Is Interesting Here
 
@@ -56,6 +58,8 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 **Events without dual writes.** State and its event commit in one transaction (outbox). A relay publishes to Kafka with `FOR UPDATE SKIP LOCKED`. Consumers deduplicate with an inbox table in the same transaction as their effects, retry with backoff and dead-letter poison messages. → [events](docs/events/README.md)
 
 **Pix, end to end.** Keys with real validation (CPF check digits, E.164 phones), lookup with masked documents, E2E IDs, cross-bank payments that reserve funds, record the SPI intent before calling it, then capture or release. The Central Bank systems are simulated behind ports.
+
+**Authentication done properly.** Passwords hashed with argon2id, lockout, TOTP MFA with replay protection. Access tokens are Ed25519 JWTs: the gateway verifies them from a JWKS and cannot mint them. Refresh tokens rotate, and replaying an old one revokes the whole session. Signing keys and TOTP seeds are encrypted at rest. → [identity](docs/services/identity-service.md)
 
 **Observable.** One request is one trace across all services (OpenTelemetry → Jaeger). Correlation IDs travel through gRPC metadata and Kafka events. Prometheus metrics with low-cardinality labels, business counters, alert rules and a Grafana dashboard. → [observability](docs/architecture/observability.md)
 
@@ -82,7 +86,7 @@ make demo    # walk through the public API
 | http://127.0.0.1:9090 | Prometheus (metrics, alerts) |
 | http://127.0.0.1:3000 | Grafana (`make up-obs`) |
 
-Internal gRPC services listen on `:9001`–`:9005` with reflection enabled (`grpcurl -plaintext 127.0.0.1:9001 list`).
+Internal gRPC services listen on `:9001`–`:9006` with reflection enabled (`grpcurl -plaintext 127.0.0.1:9001 list`).
 
 ## Tests
 

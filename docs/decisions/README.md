@@ -18,7 +18,7 @@ Each ADR records one significant decision: the context, the decision, the altern
 | [0012](0012-caching-strategy.md) | Caching strategy | Accepted (not implemented yet) |
 | [0013](0013-observability.md) | Observability: logs, metrics, traces | Accepted |
 | [0014](0014-zero-trust-security.md) | Zero-trust security | Accepted (mTLS not implemented yet) |
-| [0015](0015-encryption.md) | Encryption strategy | Accepted (not implemented yet) |
+| [0015](0015-encryption.md) | Encryption strategy | Accepted (secrets at rest done; field-level encryption pending) |
 | [0016](0016-idempotency.md) | Idempotency keys with request fingerprints | Accepted |
 
 ## Lifecycle

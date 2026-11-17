@@ -1,64 +1,102 @@
-// Package auth issues and verifies the short-lived access tokens (JWT, HS256)
-// that identify a customer at the edge. The subject is the customer id.
-//
-// identity-service (login, MFA, refresh tokens, key rotation) is not built
-// yet; until then the gateway can issue tokens itself in development mode.
+// Package auth verifies access tokens issued by identity-service. The gateway
+// holds no signing secret: it only fetches public keys (JWKS) and checks
+// Ed25519 signatures, issuer, audience and expiry.
 package auth
 
 import (
+	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-const issuer = "digital-bank"
+// Must match identity-service's domain.Issuer / domain.Audience.
+const (
+	Issuer   = "digital-bank-identity"
+	Audience = "digital-bank-api"
+)
 
 var ErrInvalidToken = errors.New("invalid or expired token")
 
-type Authenticator struct {
-	secret []byte
-	ttl    time.Duration
-	now    func() time.Time
+// JWK is a public key as published by identity-service.
+type JWK struct{ Kid, Kty, Crv, X string }
+
+// KeySource fetches the current JWKS.
+type KeySource func(ctx context.Context) ([]JWK, error)
+
+// Verifier checks tokens against a cached JWKS. An unknown kid (e.g. right
+// after a key rotation) triggers a refetch, at most once per minRefetch.
+type Verifier struct {
+	source     KeySource
+	maxAge     time.Duration
+	minRefetch time.Duration
+	now        func() time.Time
+
+	mu        sync.Mutex
+	keys      map[string]ed25519.PublicKey
+	fetchedAt time.Time
 }
 
-// New requires a secret of at least 32 bytes.
-func New(secret string, ttl time.Duration) (*Authenticator, error) {
-	if len(secret) < 32 {
-		return nil, errors.New("auth: JWT secret must be at least 32 bytes")
+func NewVerifier(source KeySource) *Verifier {
+	return &Verifier{source: source, maxAge: 5 * time.Minute, minRefetch: 10 * time.Second, now: time.Now}
+}
+
+func (v *Verifier) key(ctx context.Context, kid string) (ed25519.PublicKey, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	k, ok := v.keys[kid]
+	age := v.now().Sub(v.fetchedAt)
+	if ok && age < v.maxAge {
+		return k, nil
 	}
-	return &Authenticator{secret: []byte(secret), ttl: ttl, now: time.Now}, nil
-}
-
-// Issue returns a signed token for a customer and its expiry.
-func (a *Authenticator) Issue(customerID string) (string, time.Time, error) {
-	if customerID == "" {
-		return "", time.Time{}, errors.New("auth: customer id is required")
+	if !ok && v.keys != nil && age < v.minRefetch {
+		return nil, fmt.Errorf("unknown key %q", kid)
 	}
-	now := a.now()
-	exp := now.Add(a.ttl)
-	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Subject:   customerID,
-		Issuer:    issuer,
-		IssuedAt:  jwt.NewNumericDate(now),
-		ExpiresAt: jwt.NewNumericDate(exp),
-	})
-	signed, err := tok.SignedString(a.secret)
-	return signed, exp, err
+	jwks, err := v.source(ctx)
+	if err != nil {
+		if ok { // identity is down: keep using the cached key
+			return k, nil
+		}
+		return nil, fmt.Errorf("fetch jwks: %w", err)
+	}
+	keys := make(map[string]ed25519.PublicKey, len(jwks))
+	for _, j := range jwks {
+		if j.Kty != "OKP" || j.Crv != "Ed25519" {
+			continue
+		}
+		x, err := base64.RawURLEncoding.DecodeString(j.X)
+		if err != nil || len(x) != ed25519.PublicKeySize {
+			continue
+		}
+		keys[j.Kid] = ed25519.PublicKey(x)
+	}
+	v.keys, v.fetchedAt = keys, v.now()
+	if k, ok = keys[kid]; !ok {
+		return nil, fmt.Errorf("unknown key %q", kid)
+	}
+	return k, nil
 }
 
-// Verify checks signature, algorithm, issuer and expiry, and returns the customer id.
-func (a *Authenticator) Verify(token string) (string, error) {
+// Verify returns the customer id (subject) of a valid access token.
+func (v *Verifier) Verify(ctx context.Context, token string) (string, error) {
 	claims := &jwt.RegisteredClaims{}
-	_, err := jwt.ParseWithClaims(token, claims, func(*jwt.Token) (any, error) { return a.secret, nil },
-		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
-		jwt.WithIssuer(issuer),
+	_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
+		kid, _ := t.Header["kid"].(string)
+		return v.key(ctx, kid)
+	},
+		jwt.WithValidMethods([]string{jwt.SigningMethodEdDSA.Alg()}),
+		jwt.WithIssuer(Issuer),
+		jwt.WithAudience(Audience),
 		jwt.WithExpirationRequired(),
-		jwt.WithTimeFunc(a.now),
+		jwt.WithTimeFunc(v.now),
 	)
 	if err != nil || claims.Subject == "" {
-		return "", fmt.Errorf("%w", ErrInvalidToken)
+		return "", ErrInvalidToken
 	}
 	return claims.Subject, nil
 }
