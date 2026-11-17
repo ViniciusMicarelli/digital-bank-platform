@@ -1,17 +1,23 @@
 # Run the local stack
 
-Starts all services in development mode.
+Builds and starts everything with Docker Compose: Postgres, Kafka, the six services, Jaeger and Prometheus.
 
 ## Usage
 
 ```bash
-make run
+make up        # stack
+make up-obs    # stack + Grafana on http://127.0.0.1:3000
+make demo      # walk through the public API (needs jq)
 ```
 
-## Services
+A single service can run on the host against the compose infrastructure:
 
-Deploys all services defined in services/ with local configuration.
+```bash
+make run-ledger    # go run ./services/ledger-service/cmd/server
+```
 
-## Environment
+## Endpoints
 
-By default, runs with Docker Compose using the local infrastructure.
+- REST API: http://127.0.0.1:8000
+- gRPC: 127.0.0.1:9001 (ledger) … 9005 (statement)
+- Jaeger: http://127.0.0.1:16686 · Prometheus: http://127.0.0.1:9090
