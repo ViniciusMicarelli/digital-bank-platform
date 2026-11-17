@@ -21,10 +21,12 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/transaction-service/internal/adapters/grpcapi"
 	pgstore "github.com/ViniciusMicarelli/digital-bank-platform/services/transaction-service/internal/adapters/postgres"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/transaction-service/internal/application"
+	"github.com/ViniciusMicarelli/digital-bank-platform/services/transaction-service/internal/domain"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/transaction-service/migrations"
 )
 
 func main() {
+	grpcserver.HealthcheckIfAsked(":9003")
 	log := config.Logger("transaction-service")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -64,7 +66,10 @@ func main() {
 	go app.RunRecovery(ctx,
 		config.Duration("RECOVERY_INTERVAL", 5*time.Second),
 		config.Duration("RECOVERY_STALE_AFTER", 10*time.Second),
-		config.Duration("RESERVATION_TIMEOUT", 15*time.Minute))
+		application.ReservationTimeouts{
+			domain.TypePixOut:    config.Duration("PIX_RESERVATION_TIMEOUT", 15*time.Minute),
+			domain.TypeDebitCard: config.Duration("CARD_AUTHORIZATION_TIMEOUT", 7*24*time.Hour),
+		})
 
 	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
 

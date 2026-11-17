@@ -26,6 +26,7 @@ import (
 )
 
 func main() {
+	grpcserver.HealthcheckIfAsked(":9004")
 	log := config.Logger("pix-service")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

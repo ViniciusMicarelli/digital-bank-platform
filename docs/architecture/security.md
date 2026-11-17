@@ -19,6 +19,7 @@ This document describes the security architecture of the Digital Bank Platform. 
 | Idempotency keys scoped per customer | api-gateway, [ADR-0016](../decisions/0016-idempotency.md) |
 | No PII in events (ids only); documents masked in Pix lookups | all services |
 | Ledger integrity in the database: balanced entries, append-only journal | ledger-service |
+| Card numbers only in an encrypted vault with a blind index; CVVs derived from an issuer key, never stored | card-service |
 
 Not yet: a KMS for the key-encryption keys, TLS for Postgres and Kafka, certificate rotation (dev certificates last 90 days), audit log shipping. See the [roadmap](../ROADMAP.md).
 
@@ -27,11 +28,11 @@ Not yet: a KMS for the key-encryption keys, TLS for Postgres and Kafka, certific
 | Service | Allowed callers |
 |---|---|
 | ledger-service | account-service, transaction-service |
-| account-service | api-gateway, transaction-service, pix-service |
-| transaction-service | api-gateway, pix-service |
-| pix-service, statement-service, identity-service | api-gateway |
+| account-service | api-gateway, transaction-service, pix-service, card-service |
+| transaction-service | api-gateway, pix-service, card-service |
+| pix-service, statement-service, identity-service, card-service | api-gateway |
 
-`dev-client` (the e2e tests, `grpcurl`) is added to every list in docker compose only. Run `make certs` to (re)generate the development CA; production would use SPIRE, cert-manager or a cloud CA with short-lived certificates.
+`dev-client` (the e2e tests, `grpcurl`) is added to every list in docker compose only. `make certs` creates the development CA once and then only issues certificates for new workloads (`go run ./packages/go-platform/cmd/devcerts -force` starts over); production would use SPIRE, cert-manager or a cloud CA with short-lived certificates.
 
 ---
 

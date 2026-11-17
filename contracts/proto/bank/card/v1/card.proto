@@ -1,0 +1,196 @@
+syntax = "proto3";
+
+package bank.card.v1;
+
+import "bank/common/v1/money.proto";
+import "google/protobuf/timestamp.proto";
+
+// CardService issues debit cards and authorizes purchases in real time. The
+// card network is simulated: Authorize / Clear / Reverse are what a network
+// (or the sandbox) calls.
+service CardService {
+  // Issues a card for an active account. Idempotent on idempotency_key.
+  rpc IssueCard(IssueCardRequest) returns (IssueCardResponse);
+  rpc GetCard(GetCardRequest) returns (GetCardResponse);
+  rpc ListCards(ListCardsRequest) returns (ListCardsResponse);
+  rpc BlockCard(BlockCardRequest) returns (BlockCardResponse);
+  rpc UnblockCard(UnblockCardRequest) returns (UnblockCardResponse);
+  rpc UpdateControls(UpdateControlsRequest) returns (UpdateControlsResponse);
+  // Returns the full card number, expiry and CVV to the card holder.
+  rpc RevealCardDetails(RevealCardDetailsRequest) returns (RevealCardDetailsResponse);
+
+  // Real-time authorization. Idempotent on network_reference. Declines are
+  // normal responses (status DECLINED with an ISO 8583-style response code).
+  rpc Authorize(AuthorizeRequest) returns (AuthorizeResponse);
+  // Settles an approved authorization, for its amount or less.
+  rpc Clear(ClearRequest) returns (ClearResponse);
+  // Cancels an approved authorization (merchant void); the money is released.
+  rpc Reverse(ReverseRequest) returns (ReverseResponse);
+}
+
+enum CardKind {
+  CARD_KIND_UNSPECIFIED = 0;
+  CARD_KIND_PHYSICAL = 1;
+  CARD_KIND_VIRTUAL = 2;
+}
+
+enum CardStatus {
+  CARD_STATUS_UNSPECIFIED = 0;
+  CARD_STATUS_ACTIVE = 1;
+  CARD_STATUS_BLOCKED = 2;
+  CARD_STATUS_CANCELLED = 3;
+}
+
+message Controls {
+  bool online = 1;
+  bool international = 2;
+  bool contactless = 3;
+}
+
+message Card {
+  string id = 1;
+  string account_id = 2;
+  CardKind kind = 3;
+  CardStatus status = 4;
+  string status_reason = 5;
+  string last4 = 6;
+  int32 expiry_month = 7;
+  int32 expiry_year = 8;
+  string holder_name = 9;
+  Controls controls = 10;
+  google.protobuf.Timestamp created_at = 11;
+}
+
+message IssueCardRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  CardKind kind = 3;
+}
+
+message IssueCardResponse {
+  Card card = 1;
+}
+
+message GetCardRequest {
+  string id = 1;
+}
+
+message GetCardResponse {
+  Card card = 1;
+}
+
+message ListCardsRequest {
+  string account_id = 1;
+}
+
+message ListCardsResponse {
+  repeated Card cards = 1;
+}
+
+message BlockCardRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message BlockCardResponse {
+  Card card = 1;
+}
+
+message UnblockCardRequest {
+  string id = 1;
+}
+
+message UnblockCardResponse {
+  Card card = 1;
+}
+
+message UpdateControlsRequest {
+  string id = 1;
+  Controls controls = 2;
+}
+
+message UpdateControlsResponse {
+  Card card = 1;
+}
+
+message RevealCardDetailsRequest {
+  string id = 1;
+}
+
+message RevealCardDetailsResponse {
+  string pan = 1;
+  int32 expiry_month = 2;
+  int32 expiry_year = 3;
+  string cvv = 4;
+}
+
+enum Channel {
+  CHANNEL_UNSPECIFIED = 0;
+  // Card not present: CVV required.
+  CHANNEL_ONLINE = 1;
+  CHANNEL_CHIP = 2;
+  CHANNEL_CONTACTLESS = 3;
+}
+
+enum AuthorizationStatus {
+  AUTHORIZATION_STATUS_UNSPECIFIED = 0;
+  AUTHORIZATION_STATUS_APPROVED = 1;
+  AUTHORIZATION_STATUS_DECLINED = 2;
+  AUTHORIZATION_STATUS_CLEARED = 3;
+  AUTHORIZATION_STATUS_REVERSED = 4;
+}
+
+message Authorization {
+  string id = 1;
+  string network_reference = 2;
+  string card_id = 3;
+  AuthorizationStatus status = 4;
+  // "00" approved; otherwise ISO 8583-style: 05, 14, 51, 54, 57, 61, 62, 82, 91.
+  string response_code = 5;
+  string reason = 6;
+  bank.common.v1.Money amount = 7;
+  bank.common.v1.Money cleared_amount = 8;
+  string merchant_name = 9;
+  string mcc = 10;
+  string country = 11;
+  Channel channel = 12;
+  google.protobuf.Timestamp created_at = 13;
+}
+
+message AuthorizeRequest {
+  // Unique id from the network; retries reuse it.
+  string network_reference = 1;
+  string pan = 2;
+  int32 expiry_month = 3;
+  int32 expiry_year = 4;
+  string cvv = 5;
+  bank.common.v1.Money amount = 6;
+  string merchant_name = 7;
+  // Merchant category code (ISO 18245).
+  string mcc = 8;
+  // ISO 3166 alpha-2.
+  string country = 9;
+  Channel channel = 10;
+}
+
+message AuthorizeResponse {
+  Authorization authorization = 1;
+}
+
+message ClearRequest {
+  string authorization_id = 1;
+  // Optional: clear less than was authorized.
+  bank.common.v1.Money amount = 2;
+}
+
+message ClearResponse {
+  Authorization authorization = 1;
+}
+
+message ReverseRequest {
+  string authorization_id = 1;
+}
+
+message ReverseResponse {
+  Authorization authorization = 1;
+}

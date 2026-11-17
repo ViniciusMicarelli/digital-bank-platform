@@ -1,0 +1,307 @@
+// Package domain holds the card rules: card numbers, CVV derivation, card
+// lifecycle and the authorization decision. It does no I/O.
+package domain
+
+import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/binary"
+	"errors"
+	"fmt"
+	"math/big"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
+)
+
+var (
+	ErrInvalidArgument   = errors.New("invalid argument")
+	ErrNotFound          = errors.New("not found")
+	ErrInvalidTransition = errors.New("invalid status transition")
+	ErrAccountNotActive  = errors.New("account is not active")
+	ErrInvalidState      = errors.New("invalid authorization state")
+)
+
+// BIN is this issuer's 6-digit bank identification number. "999999" is not
+// assigned to any real issuer.
+const BIN = "999999"
+
+// NewPAN returns a random 16-digit card number under BIN with a valid Luhn
+// check digit.
+func NewPAN() string {
+	digits := []byte(BIN)
+	for len(digits) < 15 {
+		n, _ := rand.Int(rand.Reader, big.NewInt(10))
+		digits = append(digits, byte('0'+n.Int64()))
+	}
+	return string(digits) + string(byte('0'+luhnDigit(string(digits))))
+}
+
+// luhnDigit computes the check digit for a number without it.
+func luhnDigit(s string) int {
+	sum := 0
+	for i := len(s) - 1; i >= 0; i-- {
+		d := int(s[i] - '0')
+		if (len(s)-1-i)%2 == 0 {
+			d *= 2
+			if d > 9 {
+				d -= 9
+			}
+		}
+		sum += d
+	}
+	return (10 - sum%10) % 10
+}
+
+// ValidPAN checks length, digits and the Luhn checksum.
+func ValidPAN(pan string) bool {
+	if len(pan) < 13 || len(pan) > 19 {
+		return false
+	}
+	for _, r := range pan {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return luhnDigit(pan[:len(pan)-1]) == int(pan[len(pan)-1]-'0')
+}
+
+// DeriveCVV computes the card verification value from the issuer's key, the
+// card number and expiry, the way an HSM does with its CVK. Nothing needs to
+// be stored, and the value cannot be recomputed without the key.
+func DeriveCVV(cvk []byte, pan string, month, year int) string {
+	m := hmac.New(sha256.New, cvk)
+	fmt.Fprintf(m, "%s|%02d%04d", pan, month, year)
+	n := binary.BigEndian.Uint32(m.Sum(nil)[:4]) % 1000
+	return fmt.Sprintf("%03d", n)
+}
+
+type Kind string
+
+const (
+	Physical Kind = "PHYSICAL"
+	Virtual  Kind = "VIRTUAL"
+)
+
+type Status string
+
+const (
+	Active    Status = "ACTIVE"
+	Blocked   Status = "BLOCKED"
+	Cancelled Status = "CANCELLED"
+)
+
+// Reasons used when blocking because of the account.
+const ReasonAccountBlocked = "ACCOUNT_BLOCKED"
+
+// Controls are the customer's switches for where the card may be used.
+type Controls struct {
+	Online, International, Contactless bool
+}
+
+// DefaultControls: international purchases must be enabled explicitly.
+var DefaultControls = Controls{Online: true, International: false, Contactless: true}
+
+// Card is everything about a card except its number, which lives in the vault.
+type Card struct {
+	ID             uuid.UUID
+	IdempotencyKey string
+	AccountID      uuid.UUID
+	Kind           Kind
+	Status         Status
+	StatusReason   string
+	Last4          string
+	ExpiryMonth    int
+	ExpiryYear     int
+	HolderName     string
+	Controls       Controls
+	CreatedAt      time.Time
+}
+
+// NewCard issues a card for an account: physical cards last 5 years,
+// virtual ones 1 year. It returns the card and its number (for the vault).
+func NewCard(key string, account uuid.UUID, kind Kind, holder string, now time.Time) (Card, string, error) {
+	switch {
+	case key == "":
+		return Card{}, "", fmt.Errorf("%w: idempotency key is required", ErrInvalidArgument)
+	case kind != Physical && kind != Virtual:
+		return Card{}, "", fmt.Errorf("%w: kind must be PHYSICAL or VIRTUAL", ErrInvalidArgument)
+	}
+	years := 5
+	if kind == Virtual {
+		years = 1
+	}
+	exp := now.AddDate(years, 0, 0)
+	pan := NewPAN()
+	return Card{
+		ID: uuid.Must(uuid.NewV7()), IdempotencyKey: key, AccountID: account, Kind: kind, Status: Active,
+		Last4: pan[len(pan)-4:], ExpiryMonth: int(exp.Month()), ExpiryYear: exp.Year(),
+		HolderName: holder, Controls: DefaultControls,
+	}, pan, nil
+}
+
+// Expired reports whether the card is past the last day of its expiry month.
+func (c Card) Expired(now time.Time) bool {
+	end := time.Date(c.ExpiryYear, time.Month(c.ExpiryMonth)+1, 1, 0, 0, 0, 0, time.UTC)
+	return !now.Before(end)
+}
+
+func (c *Card) Block(reason string) error {
+	if c.Status != Active {
+		return fmt.Errorf("%w: card is %s", ErrInvalidTransition, c.Status)
+	}
+	c.Status, c.StatusReason = Blocked, reason
+	return nil
+}
+
+func (c *Card) Unblock() error {
+	if c.Status != Blocked {
+		return fmt.Errorf("%w: card is %s", ErrInvalidTransition, c.Status)
+	}
+	c.Status, c.StatusReason = Active, ""
+	return nil
+}
+
+// Cancel is final (account closed, card lost).
+func (c *Card) Cancel(reason string) {
+	c.Status, c.StatusReason = Cancelled, reason
+}
+
+type Channel string
+
+const (
+	Online      Channel = "ONLINE"
+	Chip        Channel = "CHIP"
+	Contactless Channel = "CONTACTLESS"
+)
+
+// ISO 8583-style response codes returned to the network.
+const (
+	CodeApproved           = "00"
+	CodeDoNotHonor         = "05"
+	CodeInvalidCard        = "14"
+	CodeInsufficientFunds  = "51"
+	CodeExpiredCard        = "54"
+	CodeNotPermitted       = "57"
+	CodeExceedsLimit       = "61"
+	CodeRestrictedCard     = "62"
+	CodeWrongCVV           = "82"
+	CodeIssuerUnavailable  = "91"
+	MaxSingleAuthorization = 10_000_00 // R$ 10.000,00: above it, decline (simple fraud rule)
+)
+
+// Blocked merchant categories (gambling).
+var blockedMCC = map[string]bool{"7995": true, "7801": true, "7802": true}
+
+// Purchase is what the network asks to authorize.
+type Purchase struct {
+	NetworkReference string
+	ExpiryMonth      int
+	ExpiryYear       int
+	CVV              string
+	Amount           money.Money
+	MerchantName     string
+	MCC              string
+	Country          string
+	Channel          Channel
+}
+
+// Validate checks the request is well formed.
+func (p Purchase) Validate() error {
+	switch {
+	case p.NetworkReference == "" || len(p.NetworkReference) > 64:
+		return fmt.Errorf("%w: network reference is required", ErrInvalidArgument)
+	case !p.Amount.IsPositive() || p.Amount.Currency() != money.BRL:
+		return fmt.Errorf("%w: amount must be positive BRL", ErrInvalidArgument)
+	case p.MerchantName == "" || len(p.MCC) != 4 || len(p.Country) != 2:
+		return fmt.Errorf("%w: merchant name, 4-digit MCC and 2-letter country are required", ErrInvalidArgument)
+	case p.Channel != Online && p.Channel != Chip && p.Channel != Contactless:
+		return fmt.Errorf("%w: unknown channel", ErrInvalidArgument)
+	}
+	return nil
+}
+
+// Decision is the card-level verdict, before funds are reserved.
+type Decision struct {
+	Approve bool
+	Code    string
+	Reason  string
+}
+
+func decline(code, reason string) Decision { return Decision{Code: code, Reason: reason} }
+
+// Decide applies the card checks in the order a network expects. The CVV is
+// compared with the derived value (constant time); it is required online.
+func (c Card) Decide(p Purchase, expectedCVV string, now time.Time) Decision {
+	switch {
+	case c.Status == Cancelled:
+		return decline(CodeRestrictedCard, "card cancelled")
+	case c.Status == Blocked:
+		return decline(CodeRestrictedCard, "card blocked")
+	case p.ExpiryMonth != c.ExpiryMonth || p.ExpiryYear != c.ExpiryYear:
+		return decline(CodeExpiredCard, "expiry date does not match")
+	case c.Expired(now):
+		return decline(CodeExpiredCard, "card expired")
+	case p.Channel == Online && p.CVV == "":
+		return decline(CodeWrongCVV, "CVV required for card-not-present purchases")
+	case p.CVV != "" && !hmac.Equal([]byte(p.CVV), []byte(expectedCVV)):
+		return decline(CodeWrongCVV, "wrong CVV")
+	case p.Channel == Online && !c.Controls.Online:
+		return decline(CodeNotPermitted, "online purchases disabled")
+	case p.Channel == Contactless && !c.Controls.Contactless:
+		return decline(CodeNotPermitted, "contactless disabled")
+	case p.Country != "BR" && !c.Controls.International:
+		return decline(CodeNotPermitted, "international purchases disabled")
+	case blockedMCC[p.MCC]:
+		return decline(CodeNotPermitted, "merchant category not allowed")
+	case p.Amount.Minor() > MaxSingleAuthorization:
+		return decline(CodeExceedsLimit, "amount above the single purchase limit")
+	}
+	return Decision{Approve: true, Code: CodeApproved}
+}
+
+// DeclineCodeFor maps a refusal reason from transaction-service to a code.
+func DeclineCodeFor(reason string) string {
+	switch reason {
+	case "INSUFFICIENT_FUNDS":
+		return CodeInsufficientFunds
+	case "LIMIT_EXCEEDED":
+		return CodeExceedsLimit
+	case "ACCOUNT_NOT_ACTIVE":
+		return CodeRestrictedCard
+	}
+	return CodeDoNotHonor
+}
+
+type AuthStatus string
+
+const (
+	Approved AuthStatus = "APPROVED"
+	Declined AuthStatus = "DECLINED"
+	Cleared  AuthStatus = "CLEARED"
+	Reversed AuthStatus = "REVERSED"
+	// PendingReversal: we declined to the network after a technical error,
+	// but a reservation may exist downstream; a worker cancels it.
+	PendingReversal AuthStatus = "PENDING_REVERSAL"
+)
+
+// Authorization is the record of one network request.
+type Authorization struct {
+	ID               uuid.UUID
+	NetworkReference string
+	CardID           uuid.UUID
+	AccountID        uuid.UUID // not stored; filled from the card when needed
+	Status           AuthStatus
+	Code             string
+	Reason           string
+	Purchase         Purchase
+	Cleared          int64
+	TransactionID    uuid.UUID
+	CreatedAt        time.Time
+}
+
+// TransactionKey is the idempotency key of the reservation in transaction-service.
+func (a Authorization) TransactionKey() string { return "card:" + a.ID.String() }

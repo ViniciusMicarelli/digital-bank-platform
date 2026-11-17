@@ -26,9 +26,10 @@ type Server struct {
 func NewServer(app *application.Service) *Server { return &Server{app: app} }
 
 var types = map[txv1.TransactionType]domain.Type{
-	txv1.TransactionType_TRANSACTION_TYPE_INTERNAL_TRANSFER: domain.TypeInternalTransfer,
-	txv1.TransactionType_TRANSACTION_TYPE_PIX_OUT:           domain.TypePixOut,
-	txv1.TransactionType_TRANSACTION_TYPE_PIX_IN:            domain.TypePixIn,
+	txv1.TransactionType_TRANSACTION_TYPE_INTERNAL_TRANSFER:   domain.TypeInternalTransfer,
+	txv1.TransactionType_TRANSACTION_TYPE_PIX_OUT:             domain.TypePixOut,
+	txv1.TransactionType_TRANSACTION_TYPE_PIX_IN:              domain.TypePixIn,
+	txv1.TransactionType_TRANSACTION_TYPE_DEBIT_CARD_PURCHASE: domain.TypeDebitCard,
 }
 
 func (s *Server) CreateTransfer(ctx context.Context, req *txv1.CreateTransferRequest) (*txv1.CreateTransferResponse, error) {
@@ -58,7 +59,15 @@ func (s *Server) CompleteTransaction(ctx context.Context, req *txv1.CompleteTran
 	if err != nil {
 		return nil, err
 	}
-	t, err := s.app.Complete(ctx, id)
+	var amount *money.Money
+	if req.GetAmount() != nil {
+		m, err := money.New(req.GetAmount().GetMinorUnits(), money.Currency(req.GetAmount().GetCurrency()))
+		if err != nil {
+			return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", err.Error())
+		}
+		amount = &m
+	}
+	t, err := s.app.Complete(ctx, id, amount)
 	return respond(t, err, func(p *txv1.Transaction) *txv1.CompleteTransactionResponse {
 		return &txv1.CompleteTransactionResponse{Transaction: p}
 	})

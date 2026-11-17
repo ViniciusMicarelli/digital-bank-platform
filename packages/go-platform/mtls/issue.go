@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net"
 	"net/url"
@@ -49,6 +50,37 @@ func NewAuthority(validFor time.Duration) (*Authority, error) {
 	}
 	cert, _ := x509.ParseCertificate(der)
 	return &Authority{Cert: cert, Key: key, PEM: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})}, nil
+}
+
+// KeyPEM encodes the authority's private key (development only).
+func (a *Authority) KeyPEM() ([]byte, error) {
+	der, err := x509.MarshalPKCS8PrivateKey(a.Key)
+	if err != nil {
+		return nil, err
+	}
+	return pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), nil
+}
+
+// LoadAuthority reads an authority written by KeyPEM and its certificate.
+func LoadAuthority(certPEM, keyPEM []byte) (*Authority, error) {
+	cb, _ := pem.Decode(certPEM)
+	kb, _ := pem.Decode(keyPEM)
+	if cb == nil || kb == nil {
+		return nil, errors.New("mtls: bad CA PEM")
+	}
+	cert, err := x509.ParseCertificate(cb.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	k, err := x509.ParsePKCS8PrivateKey(kb.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	key, ok := k.(*ecdsa.PrivateKey)
+	if !ok {
+		return nil, errors.New("mtls: CA key is not ECDSA")
+	}
+	return &Authority{Cert: cert, Key: key, PEM: certPEM}, nil
 }
 
 // Issue returns PEM certificate and key for workload name. The certificate

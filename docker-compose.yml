@@ -50,6 +50,11 @@ services:
 
   ledger-service:
     build: { context: ., args: { SERVICE: ledger-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
@@ -68,6 +73,11 @@ services:
 
   account-service:
     build: { context: ., args: { SERVICE: account-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
@@ -76,7 +86,7 @@ services:
       TLS_KEY: /certs/account-service-key.pem
       # Development key-encryption key for CPFs. Production reads it from a KMS.
       ACCOUNT_KEK: 8vw7TApbgElf6gJ33aCaHpoEXgwCXx1jwX/pW83osDo=
-      ALLOWED_CALLERS: api-gateway,transaction-service,pix-service,dev-client
+      ALLOWED_CALLERS: api-gateway,transaction-service,pix-service,card-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/account?sslmode=disable
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -86,17 +96,22 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
-      ledger-service: { condition: service_started }
+      ledger-service: { condition: service_healthy }
 
   transaction-service:
     build: { context: ., args: { SERVICE: transaction-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/transaction-service.pem
       TLS_KEY: /certs/transaction-service-key.pem
-      ALLOWED_CALLERS: api-gateway,pix-service,dev-client
+      ALLOWED_CALLERS: api-gateway,pix-service,card-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/transaction?sslmode=disable
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -107,11 +122,16 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
-      ledger-service: { condition: service_started }
-      account-service: { condition: service_started }
+      ledger-service: { condition: service_healthy }
+      account-service: { condition: service_healthy }
 
   pix-service:
     build: { context: ., args: { SERVICE: pix-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
@@ -129,11 +149,16 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
-      account-service: { condition: service_started }
-      transaction-service: { condition: service_started }
+      account-service: { condition: service_healthy }
+      transaction-service: { condition: service_healthy }
 
   statement-service:
     build: { context: ., args: { SERVICE: statement-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
@@ -152,6 +177,11 @@ services:
 
   identity-service:
     build: { context: ., args: { SERVICE: identity-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
@@ -170,8 +200,42 @@ services:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
 
+  card-service:
+    build: { context: ., args: { SERVICE: card-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./infrastructure/certs:/certs:ro
+    environment:
+      TLS_CA: /certs/ca.pem
+      TLS_CERT: /certs/card-service.pem
+      TLS_KEY: /certs/card-service-key.pem
+      ALLOWED_CALLERS: api-gateway,dev-client
+      DATABASE_URL: postgres://bank:bank@postgres:5432/card?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      GRPC_ADDR: ":9007"
+      ACCOUNT_ADDR: account-service:9002
+      TRANSACTION_ADDR: transaction-service:9003
+      # Development vault key. Production keeps it in an HSM / KMS.
+      CARD_VAULT_KEK: arnm02dJX/XmjAE3DduObXTOQQ4+MUTZ5ToF+G3vFK8=
+    ports: ["9007:9007"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      account-service: { condition: service_healthy }
+      transaction-service: { condition: service_healthy }
+
   api-gateway:
     build: { context: ., args: { SERVICE: api-gateway } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
@@ -188,15 +252,17 @@ services:
       TRANSACTION_ADDR: transaction-service:9003
       PIX_ADDR: pix-service:9004
       STATEMENT_ADDR: statement-service:9005
+      CARD_ADDR: card-service:9007
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     ports: ["8000:8080"]
     depends_on:
       redis: { condition: service_healthy }
-      identity-service: { condition: service_started }
-      account-service: { condition: service_started }
-      transaction-service: { condition: service_started }
-      pix-service: { condition: service_started }
-      statement-service: { condition: service_started }
+      identity-service: { condition: service_healthy }
+      account-service: { condition: service_healthy }
+      transaction-service: { condition: service_healthy }
+      pix-service: { condition: service_healthy }
+      statement-service: { condition: service_healthy }
+      card-service: { condition: service_healthy }
 
   jaeger:
     image: jaegertracing/jaeger:2.11.0

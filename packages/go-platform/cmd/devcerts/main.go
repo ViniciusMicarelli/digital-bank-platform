@@ -17,29 +17,65 @@ import (
 
 func main() {
 	out := flag.String("out", "infrastructure/certs", "output directory")
-	names := flag.String("names", "api-gateway,identity-service,account-service,ledger-service,transaction-service,pix-service,statement-service,dev-client",
+	names := flag.String("names", "api-gateway,identity-service,account-service,ledger-service,transaction-service,pix-service,statement-service,card-service,dev-client",
 		"comma-separated workload identities")
+	force := flag.Bool("force", false, "create a new CA and reissue every certificate")
 	flag.Parse()
 
 	if err := os.MkdirAll(*out, 0o755); err != nil {
 		fail(err)
 	}
-	ca, err := mtls.NewAuthority(365 * 24 * time.Hour)
-	if err != nil {
-		fail(err)
+	caPath, caKeyPath := filepath.Join(*out, "ca.pem"), filepath.Join(*out, "ca-key.pem")
+	ca, reused := loadCA(caPath, caKeyPath)
+	if *force || !reused {
+		var err error
+		if ca, err = mtls.NewAuthority(365 * 24 * time.Hour); err != nil {
+			fail(err)
+		}
+		key, err := ca.KeyPEM()
+		if err != nil {
+			fail(err)
+		}
+		write(caPath, ca.PEM)
+		write(caKeyPath, key)
+		reused = false
 	}
-	write(filepath.Join(*out, "ca.pem"), ca.PEM)
+	issued := 0
 	for _, n := range strings.Split(*names, ",") {
+		certPath := filepath.Join(*out, n+".pem")
+		// With an existing CA, keep existing certificates: running services
+		// keep working and only new workloads get one.
+		if _, err := os.Stat(certPath); err == nil && reused {
+			continue
+		}
 		cert, key, err := ca.Issue(n, 90*24*time.Hour)
 		if err != nil {
 			fail(err)
 		}
-		write(filepath.Join(*out, n+".pem"), cert)
+		write(certPath, cert)
 		// World-readable on purpose: containers run as an unprivileged user
 		// and mount these files. Never do this with real keys.
 		write(filepath.Join(*out, n+"-key.pem"), key)
+		issued++
 	}
-	fmt.Printf("wrote CA and %d certificates to %s\n", len(strings.Split(*names, ",")), *out)
+	if reused {
+		fmt.Printf("reused the CA in %s, issued %d new certificate(s)\n", *out, issued)
+	} else {
+		fmt.Printf("created a new CA and %d certificates in %s (restart running services)\n", issued, *out)
+	}
+}
+
+func loadCA(certPath, keyPath string) (*mtls.Authority, bool) {
+	certPEM, err1 := os.ReadFile(certPath)
+	keyPEM, err2 := os.ReadFile(keyPath)
+	if err1 != nil || err2 != nil {
+		return nil, false
+	}
+	ca, err := mtls.LoadAuthority(certPEM, keyPEM)
+	if err != nil {
+		return nil, false
+	}
+	return ca, true
 }
 
 func write(path string, data []byte) {

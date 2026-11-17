@@ -24,6 +24,7 @@ import (
 )
 
 func main() {
+	grpcserver.HealthcheckIfAsked(":9002")
 	log := config.Logger("account-service")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

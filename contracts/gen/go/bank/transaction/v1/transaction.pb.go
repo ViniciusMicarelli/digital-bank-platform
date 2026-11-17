@@ -26,10 +26,11 @@ const (
 type TransactionType int32
 
 const (
-	TransactionType_TRANSACTION_TYPE_UNSPECIFIED       TransactionType = 0
-	TransactionType_TRANSACTION_TYPE_INTERNAL_TRANSFER TransactionType = 1
-	TransactionType_TRANSACTION_TYPE_PIX_OUT           TransactionType = 2
-	TransactionType_TRANSACTION_TYPE_PIX_IN            TransactionType = 3
+	TransactionType_TRANSACTION_TYPE_UNSPECIFIED         TransactionType = 0
+	TransactionType_TRANSACTION_TYPE_INTERNAL_TRANSFER   TransactionType = 1
+	TransactionType_TRANSACTION_TYPE_PIX_OUT             TransactionType = 2
+	TransactionType_TRANSACTION_TYPE_PIX_IN              TransactionType = 3
+	TransactionType_TRANSACTION_TYPE_DEBIT_CARD_PURCHASE TransactionType = 4
 )
 
 // Enum value maps for TransactionType.
@@ -39,12 +40,14 @@ var (
 		1: "TRANSACTION_TYPE_INTERNAL_TRANSFER",
 		2: "TRANSACTION_TYPE_PIX_OUT",
 		3: "TRANSACTION_TYPE_PIX_IN",
+		4: "TRANSACTION_TYPE_DEBIT_CARD_PURCHASE",
 	}
 	TransactionType_value = map[string]int32{
-		"TRANSACTION_TYPE_UNSPECIFIED":       0,
-		"TRANSACTION_TYPE_INTERNAL_TRANSFER": 1,
-		"TRANSACTION_TYPE_PIX_OUT":           2,
-		"TRANSACTION_TYPE_PIX_IN":            3,
+		"TRANSACTION_TYPE_UNSPECIFIED":         0,
+		"TRANSACTION_TYPE_INTERNAL_TRANSFER":   1,
+		"TRANSACTION_TYPE_PIX_OUT":             2,
+		"TRANSACTION_TYPE_PIX_IN":              3,
+		"TRANSACTION_TYPE_DEBIT_CARD_PURCHASE": 4,
 	}
 )
 
@@ -540,8 +543,10 @@ func (x *ReserveOutgoingResponse) GetTransaction() *Transaction {
 }
 
 type CompleteTransactionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Optional partial capture (e.g. card clearing below the authorized amount).
+	Amount        *v1.Money `protobuf:"bytes,2,opt,name=amount,proto3" json:"amount,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -581,6 +586,13 @@ func (x *CompleteTransactionRequest) GetId() string {
 		return x.Id
 	}
 	return ""
+}
+
+func (x *CompleteTransactionRequest) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
 }
 
 type CompleteTransactionResponse struct {
@@ -997,9 +1009,10 @@ const file_bank_transaction_v1_transaction_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"]\n" +
 	"\x17ReserveOutgoingResponse\x12B\n" +
-	"\vtransaction\x18\x01 \x01(\v2 .bank.transaction.v1.TransactionR\vtransaction\",\n" +
+	"\vtransaction\x18\x01 \x01(\v2 .bank.transaction.v1.TransactionR\vtransaction\"[\n" +
 	"\x1aCompleteTransactionRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"a\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12-\n" +
+	"\x06amount\x18\x02 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\"a\n" +
 	"\x1bCompleteTransactionResponse\x12B\n" +
 	"\vtransaction\x18\x01 \x01(\v2 .bank.transaction.v1.TransactionR\vtransaction\"F\n" +
 	"\x1cCompensateTransactionRequest\x12\x0e\n" +
@@ -1023,12 +1036,13 @@ const file_bank_transaction_v1_transaction_proto_rawDesc = "" +
 	"\x15GetTransactionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\\\n" +
 	"\x16GetTransactionResponse\x12B\n" +
-	"\vtransaction\x18\x01 \x01(\v2 .bank.transaction.v1.TransactionR\vtransaction*\x96\x01\n" +
+	"\vtransaction\x18\x01 \x01(\v2 .bank.transaction.v1.TransactionR\vtransaction*\xc0\x01\n" +
 	"\x0fTransactionType\x12 \n" +
 	"\x1cTRANSACTION_TYPE_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"TRANSACTION_TYPE_INTERNAL_TRANSFER\x10\x01\x12\x1c\n" +
 	"\x18TRANSACTION_TYPE_PIX_OUT\x10\x02\x12\x1b\n" +
-	"\x17TRANSACTION_TYPE_PIX_IN\x10\x03*\xde\x01\n" +
+	"\x17TRANSACTION_TYPE_PIX_IN\x10\x03\x12(\n" +
+	"$TRANSACTION_TYPE_DEBIT_CARD_PURCHASE\x10\x04*\xde\x01\n" +
 	"\x11TransactionStatus\x12\"\n" +
 	"\x1eTRANSACTION_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aTRANSACTION_STATUS_PENDING\x10\x01\x12\x1f\n" +
@@ -1096,30 +1110,31 @@ var file_bank_transaction_v1_transaction_proto_depIdxs = []int32{
 	19, // 10: bank.transaction.v1.ReserveOutgoingRequest.amount:type_name -> bank.common.v1.Money
 	17, // 11: bank.transaction.v1.ReserveOutgoingRequest.metadata:type_name -> bank.transaction.v1.ReserveOutgoingRequest.MetadataEntry
 	2,  // 12: bank.transaction.v1.ReserveOutgoingResponse.transaction:type_name -> bank.transaction.v1.Transaction
-	2,  // 13: bank.transaction.v1.CompleteTransactionResponse.transaction:type_name -> bank.transaction.v1.Transaction
-	2,  // 14: bank.transaction.v1.CompensateTransactionResponse.transaction:type_name -> bank.transaction.v1.Transaction
-	0,  // 15: bank.transaction.v1.CreditIncomingRequest.type:type_name -> bank.transaction.v1.TransactionType
-	19, // 16: bank.transaction.v1.CreditIncomingRequest.amount:type_name -> bank.common.v1.Money
-	18, // 17: bank.transaction.v1.CreditIncomingRequest.metadata:type_name -> bank.transaction.v1.CreditIncomingRequest.MetadataEntry
-	2,  // 18: bank.transaction.v1.CreditIncomingResponse.transaction:type_name -> bank.transaction.v1.Transaction
-	2,  // 19: bank.transaction.v1.GetTransactionResponse.transaction:type_name -> bank.transaction.v1.Transaction
-	3,  // 20: bank.transaction.v1.TransactionService.CreateTransfer:input_type -> bank.transaction.v1.CreateTransferRequest
-	5,  // 21: bank.transaction.v1.TransactionService.ReserveOutgoing:input_type -> bank.transaction.v1.ReserveOutgoingRequest
-	7,  // 22: bank.transaction.v1.TransactionService.CompleteTransaction:input_type -> bank.transaction.v1.CompleteTransactionRequest
-	9,  // 23: bank.transaction.v1.TransactionService.CompensateTransaction:input_type -> bank.transaction.v1.CompensateTransactionRequest
-	11, // 24: bank.transaction.v1.TransactionService.CreditIncoming:input_type -> bank.transaction.v1.CreditIncomingRequest
-	13, // 25: bank.transaction.v1.TransactionService.GetTransaction:input_type -> bank.transaction.v1.GetTransactionRequest
-	4,  // 26: bank.transaction.v1.TransactionService.CreateTransfer:output_type -> bank.transaction.v1.CreateTransferResponse
-	6,  // 27: bank.transaction.v1.TransactionService.ReserveOutgoing:output_type -> bank.transaction.v1.ReserveOutgoingResponse
-	8,  // 28: bank.transaction.v1.TransactionService.CompleteTransaction:output_type -> bank.transaction.v1.CompleteTransactionResponse
-	10, // 29: bank.transaction.v1.TransactionService.CompensateTransaction:output_type -> bank.transaction.v1.CompensateTransactionResponse
-	12, // 30: bank.transaction.v1.TransactionService.CreditIncoming:output_type -> bank.transaction.v1.CreditIncomingResponse
-	14, // 31: bank.transaction.v1.TransactionService.GetTransaction:output_type -> bank.transaction.v1.GetTransactionResponse
-	26, // [26:32] is the sub-list for method output_type
-	20, // [20:26] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	19, // 13: bank.transaction.v1.CompleteTransactionRequest.amount:type_name -> bank.common.v1.Money
+	2,  // 14: bank.transaction.v1.CompleteTransactionResponse.transaction:type_name -> bank.transaction.v1.Transaction
+	2,  // 15: bank.transaction.v1.CompensateTransactionResponse.transaction:type_name -> bank.transaction.v1.Transaction
+	0,  // 16: bank.transaction.v1.CreditIncomingRequest.type:type_name -> bank.transaction.v1.TransactionType
+	19, // 17: bank.transaction.v1.CreditIncomingRequest.amount:type_name -> bank.common.v1.Money
+	18, // 18: bank.transaction.v1.CreditIncomingRequest.metadata:type_name -> bank.transaction.v1.CreditIncomingRequest.MetadataEntry
+	2,  // 19: bank.transaction.v1.CreditIncomingResponse.transaction:type_name -> bank.transaction.v1.Transaction
+	2,  // 20: bank.transaction.v1.GetTransactionResponse.transaction:type_name -> bank.transaction.v1.Transaction
+	3,  // 21: bank.transaction.v1.TransactionService.CreateTransfer:input_type -> bank.transaction.v1.CreateTransferRequest
+	5,  // 22: bank.transaction.v1.TransactionService.ReserveOutgoing:input_type -> bank.transaction.v1.ReserveOutgoingRequest
+	7,  // 23: bank.transaction.v1.TransactionService.CompleteTransaction:input_type -> bank.transaction.v1.CompleteTransactionRequest
+	9,  // 24: bank.transaction.v1.TransactionService.CompensateTransaction:input_type -> bank.transaction.v1.CompensateTransactionRequest
+	11, // 25: bank.transaction.v1.TransactionService.CreditIncoming:input_type -> bank.transaction.v1.CreditIncomingRequest
+	13, // 26: bank.transaction.v1.TransactionService.GetTransaction:input_type -> bank.transaction.v1.GetTransactionRequest
+	4,  // 27: bank.transaction.v1.TransactionService.CreateTransfer:output_type -> bank.transaction.v1.CreateTransferResponse
+	6,  // 28: bank.transaction.v1.TransactionService.ReserveOutgoing:output_type -> bank.transaction.v1.ReserveOutgoingResponse
+	8,  // 29: bank.transaction.v1.TransactionService.CompleteTransaction:output_type -> bank.transaction.v1.CompleteTransactionResponse
+	10, // 30: bank.transaction.v1.TransactionService.CompensateTransaction:output_type -> bank.transaction.v1.CompensateTransactionResponse
+	12, // 31: bank.transaction.v1.TransactionService.CreditIncoming:output_type -> bank.transaction.v1.CreditIncomingResponse
+	14, // 32: bank.transaction.v1.TransactionService.GetTransaction:output_type -> bank.transaction.v1.GetTransactionResponse
+	27, // [27:33] is the sub-list for method output_type
+	21, // [21:27] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_bank_transaction_v1_transaction_proto_init() }

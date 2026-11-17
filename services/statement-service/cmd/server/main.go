@@ -20,6 +20,7 @@ import (
 )
 
 func main() {
+	grpcserver.HealthcheckIfAsked(":9005")
 	log := config.Logger("statement-service")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

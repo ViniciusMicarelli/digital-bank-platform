@@ -50,6 +50,7 @@ const (
 	TypeInternalTransfer Type = "INTERNAL_TRANSFER"
 	TypePixOut           Type = "PIX_OUT"
 	TypePixIn            Type = "PIX_IN"
+	TypeDebitCard        Type = "DEBIT_CARD_PURCHASE"
 )
 
 type Status string
@@ -88,7 +89,7 @@ func New(key string, typ Type, from, to uuid.UUID, amount money.Money, descripti
 	switch {
 	case key == "":
 		return Transaction{}, fmt.Errorf("%w: idempotency key is required", ErrInvalidArgument)
-	case typ != TypeInternalTransfer && typ != TypePixOut && typ != TypePixIn:
+	case typ != TypeInternalTransfer && typ != TypePixOut && typ != TypePixIn && typ != TypeDebitCard:
 		return Transaction{}, fmt.Errorf("%w: unknown type %q", ErrInvalidArgument, typ)
 	case from == uuid.Nil || to == uuid.Nil:
 		return Transaction{}, fmt.Errorf("%w: from and to accounts are required", ErrInvalidArgument)
@@ -118,8 +119,15 @@ func New(key string, typ Type, from, to uuid.UUID, amount money.Money, descripti
 // ConsumesLimit reports whether the debited account's limits apply.
 func (t Transaction) ConsumesLimit() bool { return t.Type != TypePixIn }
 
+// CreditsCustomer reports whether the receiving side is a customer account
+// (which must exist and be active), rather than a bank-internal account such
+// as Pix settlement or card clearing.
+func (t Transaction) CreditsCustomer() bool {
+	return t.Type == TypeInternalTransfer || t.Type == TypePixIn
+}
+
 // TwoPhase reports whether the money is held before an external confirmation.
-func (t Transaction) TwoPhase() bool { return t.Type == TypePixOut }
+func (t Transaction) TwoPhase() bool { return t.Type == TypePixOut || t.Type == TypeDebitCard }
 
 // Idempotency keys for downstream calls, derived from the transaction id so
 // that replaying a step never moves money twice.

@@ -77,8 +77,12 @@ func (l *Ledger) Hold(ctx context.Context, key string, from, to uuid.UUID, amoun
 	return uuid.Parse(resp.GetHold().GetId())
 }
 
-func (l *Ledger) Capture(ctx context.Context, holdID uuid.UUID) (uuid.UUID, error) {
-	resp, err := l.c.Capture(ctx, &ledgerv1.CaptureRequest{HoldId: holdID.String()})
+func (l *Ledger) Capture(ctx context.Context, holdID uuid.UUID, amount *money.Money) (uuid.UUID, error) {
+	req := &ledgerv1.CaptureRequest{HoldId: holdID.String()}
+	if amount != nil {
+		req.Amount = moneyPB(*amount)
+	}
+	resp, err := l.c.Capture(ctx, req)
 	if err != nil {
 		return uuid.Nil, classify(err)
 	}

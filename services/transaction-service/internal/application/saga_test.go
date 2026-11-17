@@ -81,7 +81,7 @@ func (l *fakeLedger) Hold(_ context.Context, key string, from, _ uuid.UUID, amou
 	return id, nil
 }
 
-func (l *fakeLedger) Capture(_ context.Context, id uuid.UUID) (uuid.UUID, error) {
+func (l *fakeLedger) Capture(_ context.Context, id uuid.UUID, _ *money.Money) (uuid.UUID, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.down {
@@ -283,7 +283,7 @@ func TestTechnicalFailureIsRecovered(t *testing.T) {
 	}
 
 	// The recovery worker replays the step; the ledger returns the same entry.
-	if n, err := e.svc.RecoverOnce(ctx, 0, time.Hour); err != nil || n != 1 {
+	if n, err := e.svc.RecoverOnce(ctx, 0, application.ReservationTimeouts{domain.TypePixOut: time.Hour}); err != nil || n != 1 {
 		t.Fatalf("recover = %d, %v", n, err)
 	}
 	got, _ := e.svc.Get(ctx, tx.ID)
@@ -316,11 +316,11 @@ func TestPixOutReserveComplete(t *testing.T) {
 	if err != nil || tx.Status != domain.StatusReserved || tx.HoldID == uuid.Nil {
 		t.Fatalf("reserve = %+v, %v", tx, err)
 	}
-	done, err := e.svc.Complete(ctx, tx.ID)
+	done, err := e.svc.Complete(ctx, tx.ID, nil)
 	if err != nil || done.Status != domain.StatusCompleted || done.EntryID == uuid.Nil {
 		t.Fatalf("complete = %+v, %v", done, err)
 	}
-	if again, err := e.svc.Complete(ctx, tx.ID); err != nil || again.Status != domain.StatusCompleted {
+	if again, err := e.svc.Complete(ctx, tx.ID, nil); err != nil || again.Status != domain.StatusCompleted {
 		t.Fatalf("complete retry = %+v, %v", again, err)
 	}
 	if _, err := e.svc.Compensate(ctx, tx.ID, ""); !errors.Is(err, domain.ErrInvalidState) {
@@ -342,7 +342,7 @@ func TestPixOutCompensate(t *testing.T) {
 	if e.ledger.holds[tx.HoldID] != "RELEASED" || len(e.accounts.usage) != 0 {
 		t.Fatalf("hold=%s usage=%v", e.ledger.holds[tx.HoldID], e.accounts.usage)
 	}
-	if _, err := e.svc.Complete(ctx, tx.ID); !errors.Is(err, domain.ErrInvalidState) {
+	if _, err := e.svc.Complete(ctx, tx.ID, nil); !errors.Is(err, domain.ErrInvalidState) {
 		t.Fatalf("complete after compensate err = %v", err)
 	}
 }
@@ -351,7 +351,7 @@ func TestReservationTimeout(t *testing.T) {
 	e := setup(t)
 	ctx := context.Background()
 	tx, _ := e.svc.ReserveOutgoing(ctx, "pix-1", domain.TypePixOut, e.alice, e.pix, brl("30"), "", nil)
-	if _, err := e.svc.RecoverOnce(ctx, time.Hour, 0); err != nil {
+	if _, err := e.svc.RecoverOnce(ctx, time.Hour, application.ReservationTimeouts{domain.TypePixOut: time.Nanosecond}); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := e.svc.Get(ctx, tx.ID)
@@ -402,5 +402,34 @@ func TestConcurrentRunsAreSerialized(t *testing.T) {
 	got, _ := e.svc.Get(ctx, tx.ID)
 	if got.Status != domain.StatusCompleted || len(e.ledger.entries) != 1 {
 		t.Fatalf("status=%s entries=%d", got.Status, len(e.ledger.entries))
+	}
+}
+
+func TestDebitCardPartialCaptureAndLongReservation(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	// The card clearing account is internal: it must not be checked as a customer.
+	e.accounts.inactive[e.pix] = true
+	card, err := e.svc.ReserveOutgoing(ctx, "auth-1", domain.TypeDebitCard, e.alice, e.pix, brl("80"), "Padaria", map[string]string{"counterparty_name": "PADARIA SAO JOSE"})
+	if err != nil || card.Status != domain.StatusReserved {
+		t.Fatalf("authorize = %+v, %v", card, err)
+	}
+	// A Pix-length timeout must not cancel a card authorization.
+	timeouts := application.ReservationTimeouts{domain.TypePixOut: time.Nanosecond, domain.TypeDebitCard: time.Hour}
+	if _, err := e.svc.RecoverOnce(ctx, time.Hour, timeouts); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := e.svc.Get(ctx, card.ID); got.Status != domain.StatusReserved {
+		t.Fatalf("card authorization compensated by the Pix timeout: %s", got.Status)
+	}
+
+	over := brl("80.01")
+	if _, err := e.svc.Complete(ctx, card.ID, &over); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatalf("capturing more than authorized err = %v", err)
+	}
+	partial := brl("72.50")
+	done, err := e.svc.Complete(ctx, card.ID, &partial)
+	if err != nil || done.Status != domain.StatusCompleted || done.Amount != partial {
+		t.Fatalf("partial capture = %+v, %v", done, err)
 	}
 }

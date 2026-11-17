@@ -22,6 +22,7 @@ import (
 )
 
 func main() {
+	grpcserver.HealthcheckIfAsked(":9006")
 	log := config.Logger("identity-service")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

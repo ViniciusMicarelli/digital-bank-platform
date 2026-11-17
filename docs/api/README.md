@@ -54,6 +54,12 @@
 | `POST` | `/v1/pix/qr-codes/decode` | `{payload}` → receiver, amount, txid |
 | `POST` | `/v1/accounts/{id}/pix/qr-payments` | Pay a BR Code `{payload, amount?}` · Idempotency-Key |
 | `POST` | `/v1/accounts/{id}/pix/transfers/{transferID}/refunds` | Refund a received Pix `{amount, reason}` · Idempotency-Key |
+| `POST` / `GET` | `/v1/accounts/{id}/cards` | Issue a debit card `{kind: PHYSICAL\|VIRTUAL}` (Idempotency-Key) / list cards |
+| `POST` | `/v1/accounts/{id}/cards/{cardID}/block` · `/unblock` | Block (`{reason}`) / unblock |
+| `PUT` | `/v1/accounts/{id}/cards/{cardID}/controls` | `{online, international, contactless}` |
+| `POST` | `/v1/accounts/{id}/cards/{cardID}/reveal` | Card number, expiry, CVV |
+| `POST` | `/v1/sandbox/card-network/authorizations` | *(sandbox)* Network authorization `{pan, expiry_month, expiry_year, cvv, amount, merchant_name, mcc, country, channel}` |
+| `POST` | `/v1/sandbox/card-network/authorizations/{id}/clear` · `/reverse` | *(sandbox)* Clearing `{amount?}` / merchant reversal |
 | `POST` | `/v1/sandbox/pix-in` | *(sandbox only)* Simulate an incoming Pix `{key, amount, payer_name}` |
 | `GET` | `/healthz`, `/metrics` | Health and Prometheus metrics |
 

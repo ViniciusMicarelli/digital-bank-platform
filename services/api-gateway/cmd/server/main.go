@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
+	cardv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/card/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
@@ -48,6 +49,7 @@ func limiters(log *slog.Logger) httpapi.Options {
 }
 
 func main() {
+	grpcserver.HTTPHealthcheckIfAsked(":8080")
 	log := config.Logger("api-gateway")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -66,6 +68,7 @@ func main() {
 	txs := dial("TRANSACTION_ADDR", "127.0.0.1:9003")
 	pix := dial("PIX_ADDR", "127.0.0.1:9004")
 	statement := dial("STATEMENT_ADDR", "127.0.0.1:9005")
+	cards := dial("CARD_ADDR", "127.0.0.1:9007")
 
 	identityClient := identityv1.NewIdentityServiceClient(identity)
 	verifier := auth.NewVerifier(func(ctx context.Context) ([]auth.JWK, error) {
@@ -86,6 +89,7 @@ func main() {
 		Txs:       txv1.NewTransactionServiceClient(txs),
 		Pix:       pixv1.NewPixServiceClient(pix),
 		Statement: statementv1.NewStatementServiceClient(statement),
+		Cards:     cardv1.NewCardServiceClient(cards),
 	}, verifier, log, limiters(log))
 
 	mux := http.NewServeMux()

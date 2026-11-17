@@ -51,7 +51,7 @@ func (s *Service) Transfer(ctx context.Context, key string, from, to uuid.UUID, 
 // ReserveOutgoing consumes the limit and holds the funds; the transaction
 // stays RESERVED until Complete or Compensate.
 func (s *Service) ReserveOutgoing(ctx context.Context, key string, typ domain.Type, from, to uuid.UUID, amount money.Money, description string, metadata map[string]string) (domain.Transaction, error) {
-	if typ != domain.TypePixOut {
+	if typ != domain.TypePixOut && typ != domain.TypeDebitCard {
 		return domain.Transaction{}, fmt.Errorf("%w: %s is not a two-phase type", domain.ErrInvalidArgument, typ)
 	}
 	return s.start(ctx, key, typ, from, to, amount, description, metadata)
@@ -90,8 +90,9 @@ func (s *Service) start(ctx context.Context, key string, typ domain.Type, from, 
 	return s.Resume(ctx, t.ID)
 }
 
-// Complete captures the hold of a RESERVED transaction.
-func (s *Service) Complete(ctx context.Context, id uuid.UUID) (domain.Transaction, error) {
+// Complete captures the hold of a RESERVED transaction. amount (optional)
+// captures less than was reserved; the rest goes back to the customer.
+func (s *Service) Complete(ctx context.Context, id uuid.UUID, amount *money.Money) (domain.Transaction, error) {
 	return s.withLease(ctx, id, func(t *domain.Transaction) error {
 		switch t.Status {
 		case domain.StatusCompleted:
@@ -100,9 +101,17 @@ func (s *Service) Complete(ctx context.Context, id uuid.UUID) (domain.Transactio
 		default:
 			return fmt.Errorf("%w: cannot complete a %s transaction", domain.ErrInvalidState, t.Status)
 		}
-		entryID, err := s.ledger.Capture(ctx, t.HoldID)
+		if amount != nil {
+			if amount.Currency() != t.Amount.Currency() || !amount.IsPositive() || amount.Minor() > t.Amount.Minor() {
+				return fmt.Errorf("%w: capture must be positive and at most %s", domain.ErrInvalidArgument, t.Amount.Decimal())
+			}
+		}
+		entryID, err := s.ledger.Capture(ctx, t.HoldID, amount)
 		if err != nil {
 			return s.stepFailed(ctx, t, "capture", err)
+		}
+		if amount != nil {
+			t.Amount = *amount // what was actually charged
 		}
 		t.EntryID, t.Status = entryID, domain.StatusCompleted
 		return s.save(ctx, *t, ports.Step{Name: "capture", Outcome: "OK"}, "transaction.completed")
@@ -191,7 +200,7 @@ func (s *Service) run(ctx context.Context, t *domain.Transaction) error {
 // forward runs the next step of a PENDING saga.
 func (s *Service) forward(ctx context.Context, t *domain.Transaction) error {
 	// 1. The receiving customer account must be able to receive money.
-	if t.Type != domain.TypePixOut && !t.LimitConsumed && t.HoldID == uuid.Nil && t.EntryID == uuid.Nil {
+	if t.CreditsCustomer() && !t.LimitConsumed && t.HoldID == uuid.Nil && t.EntryID == uuid.Nil {
 		if err := s.accounts.EnsureActive(ctx, t.To); err != nil {
 			return s.stepFailed(ctx, t, "check_destination", err)
 		}
@@ -301,33 +310,46 @@ func (s *Service) save(ctx context.Context, t domain.Transaction, step ports.Ste
 	return nil
 }
 
+// ReservationTimeouts says how long each two-phase type may stay RESERVED
+// before it is compensated: a Pix waits minutes for SPI, a card
+// authorization days for clearing.
+type ReservationTimeouts map[domain.Type]time.Duration
+
 // RecoverOnce resumes stale sagas and compensates reservations that waited
 // too long for their external confirmation. It returns how many it touched.
-func (s *Service) RecoverOnce(ctx context.Context, staleAfter, reservationTimeout time.Duration) (int, error) {
+func (s *Service) RecoverOnce(ctx context.Context, staleAfter time.Duration, timeouts ReservationTimeouts) (int, error) {
 	now := time.Now()
-	ids, err := s.store.Unfinished(ctx, now.Add(-staleAfter), now.Add(-reservationTimeout), 100)
+	shortest := time.Duration(0)
+	for _, d := range timeouts {
+		if shortest == 0 || d < shortest {
+			shortest = d
+		}
+	}
+	candidates, err := s.store.Unfinished(ctx, now.Add(-staleAfter), now.Add(-shortest), 100)
 	if err != nil {
 		return 0, err
 	}
-	for _, id := range ids {
-		t, err := s.store.Get(ctx, id)
-		if err != nil {
-			continue
-		}
-		if t.Status == domain.StatusReserved {
-			_, err = s.Compensate(ctx, id, "RESERVATION_TIMEOUT")
+	n := 0
+	for _, c := range candidates {
+		if c.Status == domain.StatusReserved {
+			timeout, ok := timeouts[c.Type]
+			if !ok || now.Sub(c.UpdatedAt) < timeout {
+				continue
+			}
+			_, err = s.Compensate(ctx, c.ID, "RESERVATION_TIMEOUT")
 		} else {
-			_, err = s.Resume(ctx, id)
+			_, err = s.Resume(ctx, c.ID)
 		}
+		n++
 		if err != nil && !errors.Is(err, domain.ErrBusy) {
-			s.log.WarnContext(ctx, "recovery attempt failed", "transaction_id", id, "error", err)
+			s.log.WarnContext(ctx, "recovery attempt failed", "transaction_id", c.ID, "error", err)
 		}
 	}
-	return len(ids), nil
+	return n, nil
 }
 
 // RunRecovery calls RecoverOnce every interval until ctx is cancelled.
-func (s *Service) RunRecovery(ctx context.Context, interval, staleAfter, reservationTimeout time.Duration) {
+func (s *Service) RunRecovery(ctx context.Context, interval, staleAfter time.Duration, timeouts ReservationTimeouts) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -335,7 +357,7 @@ func (s *Service) RunRecovery(ctx context.Context, interval, staleAfter, reserva
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if n, err := s.RecoverOnce(ctx, staleAfter, reservationTimeout); err != nil {
+			if n, err := s.RecoverOnce(ctx, staleAfter, timeouts); err != nil {
 				s.log.ErrorContext(ctx, "recovery scan", "error", err)
 			} else if n > 0 {
 				s.log.InfoContext(ctx, "recovery scan", "resumed", n)

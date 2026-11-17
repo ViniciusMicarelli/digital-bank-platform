@@ -23,9 +23,17 @@ type Store interface {
 	Release(ctx context.Context, id uuid.UUID) error
 	// Save stores the new state, logs the step and writes events, in one transaction.
 	Save(ctx context.Context, t domain.Transaction, step Step, events ...outbox.Message) error
-	// Unfinished lists sagas that need the recovery worker: PENDING or
+	// Unfinished lists sagas that may need the recovery worker: PENDING or
 	// COMPENSATING untouched since staleBefore, RESERVED since reservedBefore.
-	Unfinished(ctx context.Context, staleBefore, reservedBefore time.Time, limit int) ([]uuid.UUID, error)
+	Unfinished(ctx context.Context, staleBefore, reservedBefore time.Time, limit int) ([]Unfinished, error)
+}
+
+// Unfinished identifies a saga the recovery worker may act on.
+type Unfinished struct {
+	ID        uuid.UUID
+	Type      domain.Type
+	Status    domain.Status
+	UpdatedAt time.Time
 }
 
 // Step is an audit record of what a saga step did.
@@ -40,7 +48,8 @@ type Step struct {
 type Ledger interface {
 	Transfer(ctx context.Context, key string, from, to uuid.UUID, amount money.Money, description string, metadata map[string]string) (entryID uuid.UUID, err error)
 	Hold(ctx context.Context, key string, from, to uuid.UUID, amount money.Money, description string) (holdID uuid.UUID, err error)
-	Capture(ctx context.Context, holdID uuid.UUID) (entryID uuid.UUID, err error)
+	// Capture posts the hold; amount (optional) captures less than was held.
+	Capture(ctx context.Context, holdID uuid.UUID, amount *money.Money) (entryID uuid.UUID, err error)
 	Release(ctx context.Context, holdID uuid.UUID) error
 }
 

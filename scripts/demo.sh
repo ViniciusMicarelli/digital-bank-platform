@@ -61,6 +61,16 @@ call POST "/v1/accounts/$ANA_ACC/pix/qr-payments" "$ANA" "{\"payload\":\"$PAYLOA
 step "Ana refunds R\$ 20,00 of the Pix she received from Empresa X"
 call POST "/v1/accounts/$ANA_ACC/pix/transfers/$PIXIN_ID/refunds" "$ANA" '{"amount":"20.00","reason":"Cobrado a mais"}' "$(uuid)" | jq -c '{status, amount, refund_of, to: .counterparty.name}'
 
+step "Ana gets a virtual debit card and buys at a bakery (simulated card network)"
+CARD=$(call POST "/v1/accounts/$ANA_ACC/cards" "$ANA" '{"kind":"VIRTUAL"}' "$(uuid)")
+echo "$CARD" | jq -c '{last4, holder_name, expiry: "\(.expiry_month)/\(.expiry_year)", controls}'
+CARD_ID=$(echo "$CARD" | jq -r .id)
+DETAILS=$(call POST "/v1/accounts/$ANA_ACC/cards/$CARD_ID/reveal" "$ANA")
+AUTH=$(call POST /v1/sandbox/card-network/authorizations "$ANA" "$(echo "$DETAILS" | jq -c '{pan, expiry_month, expiry_year, cvv, amount: "42.00", merchant_name: "PADARIA SAO JOSE", mcc: "5462", country: "BR", channel: "ONLINE"}')")
+echo "$AUTH" | jq -c '{status, response_code, amount}'
+call POST "/v1/sandbox/card-network/authorizations/$(echo "$AUTH" | jq -r .id)/clear" "$ANA" '{"amount":"40.00"}' | jq -c '{status, cleared_amount}'
+call POST /v1/sandbox/card-network/authorizations "$ANA" "$(echo "$DETAILS" | jq -c '{pan, expiry_month, expiry_year, cvv, amount: "10.00", merchant_name: "NYC STORE", mcc: "5311", country: "US", channel: "ONLINE"}')" | jq -c '{international_purchase: .status, response_code, reason}'
+
 step "A Pix the receiving bank rejects: the money comes back"
 call POST "/v1/accounts/$ANA_ACC/pix/transfers" "$ANA" '{"key":"recusa@outrobanco.com.br","amount":"10.00"}' "$(uuid)" | jq -c .
 

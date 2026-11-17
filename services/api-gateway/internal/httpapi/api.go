@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
+	cardv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/card/v1"
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
@@ -34,6 +35,7 @@ type Clients struct {
 	Txs       txv1.TransactionServiceClient
 	Pix       pixv1.PixServiceClient
 	Statement statementv1.StatementServiceClient
+	Cards     cardv1.CardServiceClient
 }
 
 type Options struct {
@@ -77,7 +79,16 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/auth/mfa/totp/confirm", a.authenticated(a.confirmTOTP))
 	if a.opts.Sandbox {
 		mux.HandleFunc("POST /v1/sandbox/pix-in", a.authenticated(a.sandboxPixIn))
+		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations", a.authenticated(a.networkAuthorize))
+		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations/{authID}/clear", a.authenticated(a.networkClear))
+		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations/{authID}/reverse", a.authenticated(a.networkReverse))
 	}
+	mux.HandleFunc("POST /v1/accounts/{id}/cards", a.authenticated(a.owned(a.issueCard)))
+	mux.HandleFunc("GET /v1/accounts/{id}/cards", a.authenticated(a.owned(a.listCards)))
+	mux.HandleFunc("POST /v1/accounts/{id}/cards/{cardID}/block", a.authenticated(a.owned(a.ownedCard(a.blockCard))))
+	mux.HandleFunc("POST /v1/accounts/{id}/cards/{cardID}/unblock", a.authenticated(a.owned(a.ownedCard(a.unblockCard))))
+	mux.HandleFunc("PUT /v1/accounts/{id}/cards/{cardID}/controls", a.authenticated(a.owned(a.ownedCard(a.cardControls))))
+	mux.HandleFunc("POST /v1/accounts/{id}/cards/{cardID}/reveal", a.authenticated(a.owned(a.ownedCard(a.revealCard))))
 	mux.HandleFunc("POST /v1/accounts", a.authenticated(a.openAccount))
 	mux.HandleFunc("GET /v1/accounts", a.authenticated(a.listAccounts))
 	mux.HandleFunc("GET /v1/accounts/{id}", a.authenticated(a.owned(a.getAccount)))

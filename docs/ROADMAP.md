@@ -96,11 +96,18 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Paying QR codes; one-time charges claimed before money moves and released if the payment fails.
 - Partial and full refunds of received Pix within 90 days; concurrent refunds bounded by a row lock and a `CHECK` constraint.
 
+## Phase 11 — Debit cards ✅
+
+- card-service: issuing, controls, a vault with encrypted PANs and derived CVVs, real-time authorization (p99 9 ms locally), clearing (partial) and reversal.
+- transaction-service: `DEBIT_CARD_PURCHASE`, partial capture and reservation timeouts per type (Pix 15 min, cards 7 days).
+- Same-bank Pix can be refunded (the receiver gets an incoming record).
+- Every service has a container healthcheck (`/server healthcheck`); dependencies start in order and `make up` waits until all are serving.
+
 ## Next
 
 Ordered by value for the platform:
 
-1. **card-service**: debit card authorization using ledger holds (< 200 ms), clearing via capture.
-2. **Operations**: Kubernetes manifests / Helm, Terraform, a KMS for key-encryption keys, certificate rotation, idempotency-key retention jobs, ledger reconciliation job, dropping the plaintext `accounts.document` column (contract step).
-3. **Pix**: dynamic QR codes served by URL, scheduled Pix, Pix Automático.
+1. **Operations**: Kubernetes manifests / Helm, Terraform, a KMS for key-encryption keys, certificate rotation, idempotency-key retention jobs, ledger reconciliation job, dropping the plaintext `accounts.document` column (contract step).
+2. **Pix**: dynamic QR codes served by URL, scheduled Pix, Pix Automático.
+3. **Cards**: credit function, step-up MFA to reveal card data, tokenization.
 4. **credit-service**, **payment-service** (boleto), **notification-service**, **user-service** (KYC). Each reuses the ledger holds, sagas and outbox built above.

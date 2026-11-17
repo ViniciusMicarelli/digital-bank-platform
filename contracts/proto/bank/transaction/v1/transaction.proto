@@ -30,6 +30,7 @@ enum TransactionType {
   TRANSACTION_TYPE_INTERNAL_TRANSFER = 1;
   TRANSACTION_TYPE_PIX_OUT = 2;
   TRANSACTION_TYPE_PIX_IN = 3;
+  TRANSACTION_TYPE_DEBIT_CARD_PURCHASE = 4;
 }
 
 enum TransactionStatus {
@@ -88,6 +89,8 @@ message ReserveOutgoingResponse {
 
 message CompleteTransactionRequest {
   string id = 1;
+  // Optional partial capture (e.g. card clearing below the authorized amount).
+  bank.common.v1.Money amount = 2;
 }
 
 message CompleteTransactionResponse {

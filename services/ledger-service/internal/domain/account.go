@@ -23,6 +23,7 @@ const (
 var (
 	BankFundingAccountID   = uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	PixSettlementAccountID = uuid.MustParse("00000000-0000-0000-0000-000000000002")
+	CardClearingAccountID  = uuid.MustParse("00000000-0000-0000-0000-000000000003")
 )
 
 // Account is a bucket of value in the ledger.

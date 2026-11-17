@@ -109,10 +109,10 @@ func (s *Store) Save(ctx context.Context, t domain.Transaction, step ports.Step,
 		}
 		_, err := tx.Exec(ctx, `
 			UPDATE transactions
-			   SET status = $2, limit_consumed = $3, hold_id = $4, entry_id = $5, failure_reason = $6,
+			   SET status = $2, limit_consumed = $3, hold_id = $4, entry_id = $5, failure_reason = $6, amount = $7,
 			       updated_at = now()
 			 WHERE id = $1`,
-			t.ID, t.Status, t.LimitConsumed, holdID, entryID, t.FailureReason)
+			t.ID, t.Status, t.LimitConsumed, holdID, entryID, t.FailureReason, t.Amount.Minor())
 		if err != nil {
 			return err
 		}
@@ -131,9 +131,9 @@ func (s *Store) Save(ctx context.Context, t domain.Transaction, step ports.Step,
 	})
 }
 
-func (s *Store) Unfinished(ctx context.Context, staleBefore, reservedBefore time.Time, limit int) ([]uuid.UUID, error) {
+func (s *Store) Unfinished(ctx context.Context, staleBefore, reservedBefore time.Time, limit int) ([]ports.Unfinished, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT id FROM transactions
+		SELECT id, type, status, updated_at FROM transactions
 		 WHERE ((status IN ('PENDING', 'COMPENSATING') AND updated_at < $1)
 		     OR (status = 'RESERVED' AND updated_at < $2))
 		   AND (locked_until IS NULL OR locked_until < now())
@@ -142,5 +142,11 @@ func (s *Store) Unfinished(ctx context.Context, staleBefore, reservedBefore time
 	if err != nil {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (ports.Unfinished, error) {
+		var u ports.Unfinished
+		var typ, status string
+		err := r.Scan(&u.ID, &typ, &status, &u.UpdatedAt)
+		u.Type, u.Status = domain.Type(typ), domain.Status(status)
+		return u, err
+	})
 }

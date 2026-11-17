@@ -6,7 +6,7 @@ A digital bank built in **Go** as event-driven microservices: checking accounts,
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ```bash
-make up     # dev certificates, Postgres, Kafka, Redis, 7 services, Jaeger, Prometheus
+make up     # dev certificates, Postgres, Kafka, Redis, 8 services, Jaeger, Prometheus
 make demo   # a customer journey through the REST API
 make e2e    # end-to-end tests against the running stack
 ```
@@ -21,6 +21,9 @@ flowchart LR
     GW -->|gRPC| TRX[transaction-service]
     GW -->|gRPC| PIX[pix-service]
     GW -->|gRPC| STM[statement-service]
+    GW -->|gRPC| CRD[card-service]
+    CRD -->|gRPC| TRX
+    CRD -->|gRPC| ACC
     PIX -->|gRPC| TRX
     PIX -->|gRPC| ACC
     PIX -.->|DICT / SPI| BCB[(Central Bank<br/>simulated)]
@@ -31,6 +34,7 @@ flowchart LR
     LED & ACC & TRX & PIX -.->|outbox relay| K[(Kafka)]
     K -.->|account.*, transaction.*| STM
     K -.->|account.closed| PIX
+    K -.->|account.*| CRD
 ```
 
 Each service owns its PostgreSQL database and follows a hexagonal layout (`domain` → `application` → `ports` → `adapters`).
@@ -41,6 +45,7 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 | [account-service](docs/services/account-service.md) | Account lifecycle, CPF validation, per-transaction/daily/nightly limits |
 | [transaction-service](docs/services/transaction-service.md) | Orchestrated sagas: transfers, two-phase Pix out, Pix in, recovery worker |
 | [pix-service](docs/services/pix-service.md) | Pix keys, lookup, same-bank and cross-bank Pix, incoming Pix, BR Code QR codes, refunds |
+| [card-service](docs/services/card-service.md) | Debit cards: vault with encrypted PANs, derived CVVs, real-time authorization, clearing, reversal |
 | [statement-service](docs/services/statement-service.md) | CQRS read side: customer feed projected from Kafka |
 | [identity-service](docs/services/identity-service.md) | Sign-up, login with argon2id + TOTP MFA, Ed25519 tokens via JWKS, rotating refresh tokens |
 | [api-gateway](docs/services/api-gateway.md) | Public REST API: token verification, ownership checks, idempotency keys, rate limits |
@@ -58,6 +63,8 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 **Events without dual writes.** State and its event commit in one transaction (outbox). A relay publishes to Kafka with `FOR UPDATE SKIP LOCKED`. Consumers deduplicate with an inbox table in the same transaction as their effects, retry with backoff and dead-letter poison messages. → [events](docs/events/README.md)
 
 **Pix, end to end.** Keys with real validation (CPF check digits, E.164 phones), lookup with masked documents, E2E IDs, cross-bank payments that reserve funds, record the SPI intent before calling it, then capture or release. BR Code QR codes ("copia e cola", EMV + CRC16) where a one-time charge can only be paid once, and partial refunds that can never exceed what was received, even concurrently. The Central Bank systems are simulated behind ports.
+
+**Card authorization in milliseconds, safely.** A purchase is checked (status, expiry, CVV derived with an issuer key instead of stored, controls, MCC) and the money reserved through the same saga as Pix, in single-digit milliseconds at p99 locally. The authorization is recorded as "to be reversed" before any money moves, so a timeout answers `91` and a worker releases whatever was reserved. Card numbers live only in an encrypted vault. → [cards](docs/services/card-service.md)
 
 **Authentication done properly.** Passwords hashed with argon2id, lockout, TOTP MFA with replay protection. Access tokens are Ed25519 JWTs: the gateway verifies them from a JWKS and cannot mint them. Refresh tokens rotate, and replaying an old one revokes the whole session. Signing keys and TOTP seeds are encrypted at rest. → [identity](docs/services/identity-service.md)
 
@@ -88,7 +95,7 @@ make demo    # walk through the public API
 | http://127.0.0.1:9090 | Prometheus (metrics, alerts) |
 | http://127.0.0.1:3000 | Grafana (`make up-obs`) |
 
-Internal gRPC services listen on `:9001`–`:9006` over mTLS, with reflection enabled:
+Internal gRPC services listen on `:9001`–`:9007` over mTLS, with reflection enabled:
 
 ```bash
 grpcurl -cacert infrastructure/certs/ca.pem -cert infrastructure/certs/dev-client.pem \
