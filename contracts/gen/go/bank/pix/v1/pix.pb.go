@@ -353,6 +353,12 @@ type Transfer struct {
 	FailureReason string                 `protobuf:"bytes,11,opt,name=failure_reason,json=failureReason,proto3" json:"failure_reason,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// Set on a refund: the incoming transfer it returns money for.
+	RefundOf string `protobuf:"bytes,14,opt,name=refund_of,json=refundOf,proto3" json:"refund_of,omitempty"`
+	// On an incoming transfer: amount already refunded (or being refunded).
+	Refunded *v1.Money `protobuf:"bytes,15,opt,name=refunded,proto3" json:"refunded,omitempty"`
+	// Set when the transfer paid a QR code charge.
+	QrTxid        string `protobuf:"bytes,16,opt,name=qr_txid,json=qrTxid,proto3" json:"qr_txid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -476,6 +482,27 @@ func (x *Transfer) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *Transfer) GetRefundOf() string {
+	if x != nil {
+		return x.RefundOf
+	}
+	return ""
+}
+
+func (x *Transfer) GetRefunded() *v1.Money {
+	if x != nil {
+		return x.Refunded
+	}
+	return nil
+}
+
+func (x *Transfer) GetQrTxid() string {
+	if x != nil {
+		return x.QrTxid
+	}
+	return ""
 }
 
 type RegisterKeyRequest struct {
@@ -1185,6 +1212,534 @@ func (x *SimulateIncomingResponse) GetTransfer() *Transfer {
 	return nil
 }
 
+type CreateQrCodeRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	AccountId string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// One of the account's keys.
+	Key string `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	// Optional: without it the payer chooses the amount.
+	Amount      *v1.Money `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	Description string    `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	OneTime     bool      `protobuf:"varint,5,opt,name=one_time,json=oneTime,proto3" json:"one_time,omitempty"`
+	// 0 = no expiry.
+	ExpiresInSeconds int64 `protobuf:"varint,6,opt,name=expires_in_seconds,json=expiresInSeconds,proto3" json:"expires_in_seconds,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *CreateQrCodeRequest) Reset() {
+	*x = CreateQrCodeRequest{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateQrCodeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateQrCodeRequest) ProtoMessage() {}
+
+func (x *CreateQrCodeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateQrCodeRequest.ProtoReflect.Descriptor instead.
+func (*CreateQrCodeRequest) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *CreateQrCodeRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *CreateQrCodeRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *CreateQrCodeRequest) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *CreateQrCodeRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *CreateQrCodeRequest) GetOneTime() bool {
+	if x != nil {
+		return x.OneTime
+	}
+	return false
+}
+
+func (x *CreateQrCodeRequest) GetExpiresInSeconds() int64 {
+	if x != nil {
+		return x.ExpiresInSeconds
+	}
+	return 0
+}
+
+type CreateQrCodeResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Txid  string                 `protobuf:"bytes,1,opt,name=txid,proto3" json:"txid,omitempty"`
+	// The "Pix copia e cola" string; render it as a QR code.
+	Payload       string                 `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateQrCodeResponse) Reset() {
+	*x = CreateQrCodeResponse{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateQrCodeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateQrCodeResponse) ProtoMessage() {}
+
+func (x *CreateQrCodeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateQrCodeResponse.ProtoReflect.Descriptor instead.
+func (*CreateQrCodeResponse) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *CreateQrCodeResponse) GetTxid() string {
+	if x != nil {
+		return x.Txid
+	}
+	return ""
+}
+
+func (x *CreateQrCodeResponse) GetPayload() string {
+	if x != nil {
+		return x.Payload
+	}
+	return ""
+}
+
+func (x *CreateQrCodeResponse) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+type DecodeQrCodeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Payload       string                 `protobuf:"bytes,1,opt,name=payload,proto3" json:"payload,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DecodeQrCodeRequest) Reset() {
+	*x = DecodeQrCodeRequest{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DecodeQrCodeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DecodeQrCodeRequest) ProtoMessage() {}
+
+func (x *DecodeQrCodeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DecodeQrCodeRequest.ProtoReflect.Descriptor instead.
+func (*DecodeQrCodeRequest) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *DecodeQrCodeRequest) GetPayload() string {
+	if x != nil {
+		return x.Payload
+	}
+	return ""
+}
+
+type DecodeQrCodeResponse struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Key      string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Receiver *Party                 `protobuf:"bytes,2,opt,name=receiver,proto3" json:"receiver,omitempty"`
+	// Absent when the payer chooses the amount.
+	Amount      *v1.Money `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	Txid        string    `protobuf:"bytes,4,opt,name=txid,proto3" json:"txid,omitempty"`
+	Description string    `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	OneTime     bool      `protobuf:"varint,6,opt,name=one_time,json=oneTime,proto3" json:"one_time,omitempty"`
+	// True when the charge was issued by this bank.
+	IssuedHere    bool `protobuf:"varint,7,opt,name=issued_here,json=issuedHere,proto3" json:"issued_here,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DecodeQrCodeResponse) Reset() {
+	*x = DecodeQrCodeResponse{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DecodeQrCodeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DecodeQrCodeResponse) ProtoMessage() {}
+
+func (x *DecodeQrCodeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DecodeQrCodeResponse.ProtoReflect.Descriptor instead.
+func (*DecodeQrCodeResponse) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *DecodeQrCodeResponse) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *DecodeQrCodeResponse) GetReceiver() *Party {
+	if x != nil {
+		return x.Receiver
+	}
+	return nil
+}
+
+func (x *DecodeQrCodeResponse) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *DecodeQrCodeResponse) GetTxid() string {
+	if x != nil {
+		return x.Txid
+	}
+	return ""
+}
+
+func (x *DecodeQrCodeResponse) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *DecodeQrCodeResponse) GetOneTime() bool {
+	if x != nil {
+		return x.OneTime
+	}
+	return false
+}
+
+func (x *DecodeQrCodeResponse) GetIssuedHere() bool {
+	if x != nil {
+		return x.IssuedHere
+	}
+	return false
+}
+
+type PayQrCodeRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	IdempotencyKey string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	FromAccountId  string                 `protobuf:"bytes,2,opt,name=from_account_id,json=fromAccountId,proto3" json:"from_account_id,omitempty"`
+	Payload        string                 `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
+	// Required only when the code has no amount.
+	Amount        *v1.Money `protobuf:"bytes,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	Description   string    `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PayQrCodeRequest) Reset() {
+	*x = PayQrCodeRequest{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PayQrCodeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PayQrCodeRequest) ProtoMessage() {}
+
+func (x *PayQrCodeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PayQrCodeRequest.ProtoReflect.Descriptor instead.
+func (*PayQrCodeRequest) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *PayQrCodeRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *PayQrCodeRequest) GetFromAccountId() string {
+	if x != nil {
+		return x.FromAccountId
+	}
+	return ""
+}
+
+func (x *PayQrCodeRequest) GetPayload() string {
+	if x != nil {
+		return x.Payload
+	}
+	return ""
+}
+
+func (x *PayQrCodeRequest) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *PayQrCodeRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+type PayQrCodeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Transfer      *Transfer              `protobuf:"bytes,1,opt,name=transfer,proto3" json:"transfer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PayQrCodeResponse) Reset() {
+	*x = PayQrCodeResponse{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PayQrCodeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PayQrCodeResponse) ProtoMessage() {}
+
+func (x *PayQrCodeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PayQrCodeResponse.ProtoReflect.Descriptor instead.
+func (*PayQrCodeResponse) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *PayQrCodeResponse) GetTransfer() *Transfer {
+	if x != nil {
+		return x.Transfer
+	}
+	return nil
+}
+
+type RefundTransferRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	IdempotencyKey string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	// The account that received the original transfer.
+	AccountId     string    `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	TransferId    string    `protobuf:"bytes,3,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
+	Amount        *v1.Money `protobuf:"bytes,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	Reason        string    `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefundTransferRequest) Reset() {
+	*x = RefundTransferRequest{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefundTransferRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefundTransferRequest) ProtoMessage() {}
+
+func (x *RefundTransferRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefundTransferRequest.ProtoReflect.Descriptor instead.
+func (*RefundTransferRequest) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RefundTransferRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *RefundTransferRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *RefundTransferRequest) GetTransferId() string {
+	if x != nil {
+		return x.TransferId
+	}
+	return ""
+}
+
+func (x *RefundTransferRequest) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *RefundTransferRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type RefundTransferResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Transfer      *Transfer              `protobuf:"bytes,1,opt,name=transfer,proto3" json:"transfer,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefundTransferResponse) Reset() {
+	*x = RefundTransferResponse{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefundTransferResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefundTransferResponse) ProtoMessage() {}
+
+func (x *RefundTransferResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefundTransferResponse.ProtoReflect.Descriptor instead.
+func (*RefundTransferResponse) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *RefundTransferResponse) GetTransfer() *Transfer {
+	if x != nil {
+		return x.Transfer
+	}
+	return nil
+}
+
 var File_bank_pix_v1_pix_proto protoreflect.FileDescriptor
 
 const file_bank_pix_v1_pix_proto_rawDesc = "" +
@@ -1202,7 +1757,7 @@ const file_bank_pix_v1_pix_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12'\n" +
 	"\x0fdocument_masked\x18\x02 \x01(\tR\x0edocumentMasked\x12\x12\n" +
 	"\x04ispb\x18\x03 \x01(\tR\x04ispb\x12\x1b\n" +
-	"\tbank_name\x18\x04 \x01(\tR\bbankName\"\xae\x04\n" +
+	"\tbank_name\x18\x04 \x01(\tR\bbankName\"\x97\x05\n" +
 	"\bTransfer\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\rend_to_end_id\x18\x02 \x01(\tR\n" +
@@ -1221,7 +1776,10 @@ const file_bank_pix_v1_pix_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"s\n" +
+	"updated_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1b\n" +
+	"\trefund_of\x18\x0e \x01(\tR\brefundOf\x121\n" +
+	"\brefunded\x18\x0f \x01(\v2\x15.bank.common.v1.MoneyR\brefunded\x12\x17\n" +
+	"\aqr_txid\x18\x10 \x01(\tR\x06qrTxid\"s\n" +
 	"\x12RegisterKeyRequest\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12(\n" +
@@ -1264,6 +1822,48 @@ const file_bank_pix_v1_pix_proto_rawDesc = "" +
 	"\x05payer\x18\x04 \x01(\v2\x12.bank.pix.v1.PartyR\x05payer\x12 \n" +
 	"\vdescription\x18\x05 \x01(\tR\vdescription\"M\n" +
 	"\x18SimulateIncomingResponse\x121\n" +
+	"\btransfer\x18\x01 \x01(\v2\x15.bank.pix.v1.TransferR\btransfer\"\xe0\x01\n" +
+	"\x13CreateQrCodeRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\x12-\n" +
+	"\x06amount\x18\x03 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12\x19\n" +
+	"\bone_time\x18\x05 \x01(\bR\aoneTime\x12,\n" +
+	"\x12expires_in_seconds\x18\x06 \x01(\x03R\x10expiresInSeconds\"\x7f\n" +
+	"\x14CreateQrCodeResponse\x12\x12\n" +
+	"\x04txid\x18\x01 \x01(\tR\x04txid\x12\x18\n" +
+	"\apayload\x18\x02 \x01(\tR\apayload\x129\n" +
+	"\n" +
+	"expires_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"/\n" +
+	"\x13DecodeQrCodeRequest\x12\x18\n" +
+	"\apayload\x18\x01 \x01(\tR\apayload\"\xf9\x01\n" +
+	"\x14DecodeQrCodeResponse\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12.\n" +
+	"\breceiver\x18\x02 \x01(\v2\x12.bank.pix.v1.PartyR\breceiver\x12-\n" +
+	"\x06amount\x18\x03 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12\x12\n" +
+	"\x04txid\x18\x04 \x01(\tR\x04txid\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\x19\n" +
+	"\bone_time\x18\x06 \x01(\bR\aoneTime\x12\x1f\n" +
+	"\vissued_here\x18\a \x01(\bR\n" +
+	"issuedHere\"\xce\x01\n" +
+	"\x10PayQrCodeRequest\x12'\n" +
+	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12&\n" +
+	"\x0ffrom_account_id\x18\x02 \x01(\tR\rfromAccountId\x12\x18\n" +
+	"\apayload\x18\x03 \x01(\tR\apayload\x12-\n" +
+	"\x06amount\x18\x04 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\"F\n" +
+	"\x11PayQrCodeResponse\x121\n" +
+	"\btransfer\x18\x01 \x01(\v2\x15.bank.pix.v1.TransferR\btransfer\"\xc7\x01\n" +
+	"\x15RefundTransferRequest\x12'\n" +
+	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x1f\n" +
+	"\vtransfer_id\x18\x03 \x01(\tR\n" +
+	"transferId\x12-\n" +
+	"\x06amount\x18\x04 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"K\n" +
+	"\x16RefundTransferResponse\x121\n" +
 	"\btransfer\x18\x01 \x01(\v2\x15.bank.pix.v1.TransferR\btransfer*o\n" +
 	"\aKeyType\x12\x18\n" +
 	"\x14KEY_TYPE_UNSPECIFIED\x10\x00\x12\x10\n" +
@@ -1282,7 +1882,7 @@ const file_bank_pix_v1_pix_proto_rawDesc = "" +
 	"\x1bTRANSFER_STATUS_SENT_TO_SPI\x10\x03\x12\x1d\n" +
 	"\x19TRANSFER_STATUS_COMPLETED\x10\x04\x12\x1a\n" +
 	"\x16TRANSFER_STATUS_FAILED\x10\x05\x12\x1c\n" +
-	"\x18TRANSFER_STATUS_REJECTED\x10\x062\xcd\x04\n" +
+	"\x18TRANSFER_STATUS_REJECTED\x10\x062\x9e\a\n" +
 	"\n" +
 	"PixService\x12P\n" +
 	"\vRegisterKey\x12\x1f.bank.pix.v1.RegisterKeyRequest\x1a .bank.pix.v1.RegisterKeyResponse\x12J\n" +
@@ -1291,7 +1891,11 @@ const file_bank_pix_v1_pix_proto_rawDesc = "" +
 	"\tLookupKey\x12\x1d.bank.pix.v1.LookupKeyRequest\x1a\x1e.bank.pix.v1.LookupKeyResponse\x12Y\n" +
 	"\x0eCreateTransfer\x12\".bank.pix.v1.CreateTransferRequest\x1a#.bank.pix.v1.CreateTransferResponse\x12P\n" +
 	"\vGetTransfer\x12\x1f.bank.pix.v1.GetTransferRequest\x1a .bank.pix.v1.GetTransferResponse\x12_\n" +
-	"\x10SimulateIncoming\x12$.bank.pix.v1.SimulateIncomingRequest\x1a%.bank.pix.v1.SimulateIncomingResponseB\xc0\x01\n" +
+	"\x10SimulateIncoming\x12$.bank.pix.v1.SimulateIncomingRequest\x1a%.bank.pix.v1.SimulateIncomingResponse\x12S\n" +
+	"\fCreateQrCode\x12 .bank.pix.v1.CreateQrCodeRequest\x1a!.bank.pix.v1.CreateQrCodeResponse\x12S\n" +
+	"\fDecodeQrCode\x12 .bank.pix.v1.DecodeQrCodeRequest\x1a!.bank.pix.v1.DecodeQrCodeResponse\x12J\n" +
+	"\tPayQrCode\x12\x1d.bank.pix.v1.PayQrCodeRequest\x1a\x1e.bank.pix.v1.PayQrCodeResponse\x12Y\n" +
+	"\x0eRefundTransfer\x12\".bank.pix.v1.RefundTransferRequest\x1a#.bank.pix.v1.RefundTransferResponseB\xc0\x01\n" +
 	"\x0fcom.bank.pix.v1B\bPixProtoP\x01ZUgithub.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1;pixv1\xa2\x02\x03BPX\xaa\x02\vBank.Pix.V1\xca\x02\vBank\\Pix\\V1\xe2\x02\x17Bank\\Pix\\V1\\GPBMetadata\xea\x02\rBank::Pix::V1b\x06proto3"
 
 var (
@@ -1307,7 +1911,7 @@ func file_bank_pix_v1_pix_proto_rawDescGZIP() []byte {
 }
 
 var file_bank_pix_v1_pix_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_bank_pix_v1_pix_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_bank_pix_v1_pix_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_bank_pix_v1_pix_proto_goTypes = []any{
 	(KeyType)(0),                     // 0: bank.pix.v1.KeyType
 	(TransferDirection)(0),           // 1: bank.pix.v1.TransferDirection
@@ -1329,48 +1933,73 @@ var file_bank_pix_v1_pix_proto_goTypes = []any{
 	(*GetTransferResponse)(nil),      // 17: bank.pix.v1.GetTransferResponse
 	(*SimulateIncomingRequest)(nil),  // 18: bank.pix.v1.SimulateIncomingRequest
 	(*SimulateIncomingResponse)(nil), // 19: bank.pix.v1.SimulateIncomingResponse
-	(*timestamppb.Timestamp)(nil),    // 20: google.protobuf.Timestamp
-	(*v1.Money)(nil),                 // 21: bank.common.v1.Money
+	(*CreateQrCodeRequest)(nil),      // 20: bank.pix.v1.CreateQrCodeRequest
+	(*CreateQrCodeResponse)(nil),     // 21: bank.pix.v1.CreateQrCodeResponse
+	(*DecodeQrCodeRequest)(nil),      // 22: bank.pix.v1.DecodeQrCodeRequest
+	(*DecodeQrCodeResponse)(nil),     // 23: bank.pix.v1.DecodeQrCodeResponse
+	(*PayQrCodeRequest)(nil),         // 24: bank.pix.v1.PayQrCodeRequest
+	(*PayQrCodeResponse)(nil),        // 25: bank.pix.v1.PayQrCodeResponse
+	(*RefundTransferRequest)(nil),    // 26: bank.pix.v1.RefundTransferRequest
+	(*RefundTransferResponse)(nil),   // 27: bank.pix.v1.RefundTransferResponse
+	(*timestamppb.Timestamp)(nil),    // 28: google.protobuf.Timestamp
+	(*v1.Money)(nil),                 // 29: bank.common.v1.Money
 }
 var file_bank_pix_v1_pix_proto_depIdxs = []int32{
 	0,  // 0: bank.pix.v1.PixKey.type:type_name -> bank.pix.v1.KeyType
-	20, // 1: bank.pix.v1.PixKey.created_at:type_name -> google.protobuf.Timestamp
+	28, // 1: bank.pix.v1.PixKey.created_at:type_name -> google.protobuf.Timestamp
 	1,  // 2: bank.pix.v1.Transfer.direction:type_name -> bank.pix.v1.TransferDirection
 	2,  // 3: bank.pix.v1.Transfer.status:type_name -> bank.pix.v1.TransferStatus
 	4,  // 4: bank.pix.v1.Transfer.counterparty:type_name -> bank.pix.v1.Party
-	21, // 5: bank.pix.v1.Transfer.amount:type_name -> bank.common.v1.Money
-	20, // 6: bank.pix.v1.Transfer.created_at:type_name -> google.protobuf.Timestamp
-	20, // 7: bank.pix.v1.Transfer.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 8: bank.pix.v1.RegisterKeyRequest.type:type_name -> bank.pix.v1.KeyType
-	3,  // 9: bank.pix.v1.RegisterKeyResponse.key:type_name -> bank.pix.v1.PixKey
-	3,  // 10: bank.pix.v1.ListKeysResponse.keys:type_name -> bank.pix.v1.PixKey
-	0,  // 11: bank.pix.v1.LookupKeyResponse.type:type_name -> bank.pix.v1.KeyType
-	4,  // 12: bank.pix.v1.LookupKeyResponse.owner:type_name -> bank.pix.v1.Party
-	21, // 13: bank.pix.v1.CreateTransferRequest.amount:type_name -> bank.common.v1.Money
-	5,  // 14: bank.pix.v1.CreateTransferResponse.transfer:type_name -> bank.pix.v1.Transfer
-	5,  // 15: bank.pix.v1.GetTransferResponse.transfer:type_name -> bank.pix.v1.Transfer
-	21, // 16: bank.pix.v1.SimulateIncomingRequest.amount:type_name -> bank.common.v1.Money
-	4,  // 17: bank.pix.v1.SimulateIncomingRequest.payer:type_name -> bank.pix.v1.Party
-	5,  // 18: bank.pix.v1.SimulateIncomingResponse.transfer:type_name -> bank.pix.v1.Transfer
-	6,  // 19: bank.pix.v1.PixService.RegisterKey:input_type -> bank.pix.v1.RegisterKeyRequest
-	8,  // 20: bank.pix.v1.PixService.DeleteKey:input_type -> bank.pix.v1.DeleteKeyRequest
-	10, // 21: bank.pix.v1.PixService.ListKeys:input_type -> bank.pix.v1.ListKeysRequest
-	12, // 22: bank.pix.v1.PixService.LookupKey:input_type -> bank.pix.v1.LookupKeyRequest
-	14, // 23: bank.pix.v1.PixService.CreateTransfer:input_type -> bank.pix.v1.CreateTransferRequest
-	16, // 24: bank.pix.v1.PixService.GetTransfer:input_type -> bank.pix.v1.GetTransferRequest
-	18, // 25: bank.pix.v1.PixService.SimulateIncoming:input_type -> bank.pix.v1.SimulateIncomingRequest
-	7,  // 26: bank.pix.v1.PixService.RegisterKey:output_type -> bank.pix.v1.RegisterKeyResponse
-	9,  // 27: bank.pix.v1.PixService.DeleteKey:output_type -> bank.pix.v1.DeleteKeyResponse
-	11, // 28: bank.pix.v1.PixService.ListKeys:output_type -> bank.pix.v1.ListKeysResponse
-	13, // 29: bank.pix.v1.PixService.LookupKey:output_type -> bank.pix.v1.LookupKeyResponse
-	15, // 30: bank.pix.v1.PixService.CreateTransfer:output_type -> bank.pix.v1.CreateTransferResponse
-	17, // 31: bank.pix.v1.PixService.GetTransfer:output_type -> bank.pix.v1.GetTransferResponse
-	19, // 32: bank.pix.v1.PixService.SimulateIncoming:output_type -> bank.pix.v1.SimulateIncomingResponse
-	26, // [26:33] is the sub-list for method output_type
-	19, // [19:26] is the sub-list for method input_type
-	19, // [19:19] is the sub-list for extension type_name
-	19, // [19:19] is the sub-list for extension extendee
-	0,  // [0:19] is the sub-list for field type_name
+	29, // 5: bank.pix.v1.Transfer.amount:type_name -> bank.common.v1.Money
+	28, // 6: bank.pix.v1.Transfer.created_at:type_name -> google.protobuf.Timestamp
+	28, // 7: bank.pix.v1.Transfer.updated_at:type_name -> google.protobuf.Timestamp
+	29, // 8: bank.pix.v1.Transfer.refunded:type_name -> bank.common.v1.Money
+	0,  // 9: bank.pix.v1.RegisterKeyRequest.type:type_name -> bank.pix.v1.KeyType
+	3,  // 10: bank.pix.v1.RegisterKeyResponse.key:type_name -> bank.pix.v1.PixKey
+	3,  // 11: bank.pix.v1.ListKeysResponse.keys:type_name -> bank.pix.v1.PixKey
+	0,  // 12: bank.pix.v1.LookupKeyResponse.type:type_name -> bank.pix.v1.KeyType
+	4,  // 13: bank.pix.v1.LookupKeyResponse.owner:type_name -> bank.pix.v1.Party
+	29, // 14: bank.pix.v1.CreateTransferRequest.amount:type_name -> bank.common.v1.Money
+	5,  // 15: bank.pix.v1.CreateTransferResponse.transfer:type_name -> bank.pix.v1.Transfer
+	5,  // 16: bank.pix.v1.GetTransferResponse.transfer:type_name -> bank.pix.v1.Transfer
+	29, // 17: bank.pix.v1.SimulateIncomingRequest.amount:type_name -> bank.common.v1.Money
+	4,  // 18: bank.pix.v1.SimulateIncomingRequest.payer:type_name -> bank.pix.v1.Party
+	5,  // 19: bank.pix.v1.SimulateIncomingResponse.transfer:type_name -> bank.pix.v1.Transfer
+	29, // 20: bank.pix.v1.CreateQrCodeRequest.amount:type_name -> bank.common.v1.Money
+	28, // 21: bank.pix.v1.CreateQrCodeResponse.expires_at:type_name -> google.protobuf.Timestamp
+	4,  // 22: bank.pix.v1.DecodeQrCodeResponse.receiver:type_name -> bank.pix.v1.Party
+	29, // 23: bank.pix.v1.DecodeQrCodeResponse.amount:type_name -> bank.common.v1.Money
+	29, // 24: bank.pix.v1.PayQrCodeRequest.amount:type_name -> bank.common.v1.Money
+	5,  // 25: bank.pix.v1.PayQrCodeResponse.transfer:type_name -> bank.pix.v1.Transfer
+	29, // 26: bank.pix.v1.RefundTransferRequest.amount:type_name -> bank.common.v1.Money
+	5,  // 27: bank.pix.v1.RefundTransferResponse.transfer:type_name -> bank.pix.v1.Transfer
+	6,  // 28: bank.pix.v1.PixService.RegisterKey:input_type -> bank.pix.v1.RegisterKeyRequest
+	8,  // 29: bank.pix.v1.PixService.DeleteKey:input_type -> bank.pix.v1.DeleteKeyRequest
+	10, // 30: bank.pix.v1.PixService.ListKeys:input_type -> bank.pix.v1.ListKeysRequest
+	12, // 31: bank.pix.v1.PixService.LookupKey:input_type -> bank.pix.v1.LookupKeyRequest
+	14, // 32: bank.pix.v1.PixService.CreateTransfer:input_type -> bank.pix.v1.CreateTransferRequest
+	16, // 33: bank.pix.v1.PixService.GetTransfer:input_type -> bank.pix.v1.GetTransferRequest
+	18, // 34: bank.pix.v1.PixService.SimulateIncoming:input_type -> bank.pix.v1.SimulateIncomingRequest
+	20, // 35: bank.pix.v1.PixService.CreateQrCode:input_type -> bank.pix.v1.CreateQrCodeRequest
+	22, // 36: bank.pix.v1.PixService.DecodeQrCode:input_type -> bank.pix.v1.DecodeQrCodeRequest
+	24, // 37: bank.pix.v1.PixService.PayQrCode:input_type -> bank.pix.v1.PayQrCodeRequest
+	26, // 38: bank.pix.v1.PixService.RefundTransfer:input_type -> bank.pix.v1.RefundTransferRequest
+	7,  // 39: bank.pix.v1.PixService.RegisterKey:output_type -> bank.pix.v1.RegisterKeyResponse
+	9,  // 40: bank.pix.v1.PixService.DeleteKey:output_type -> bank.pix.v1.DeleteKeyResponse
+	11, // 41: bank.pix.v1.PixService.ListKeys:output_type -> bank.pix.v1.ListKeysResponse
+	13, // 42: bank.pix.v1.PixService.LookupKey:output_type -> bank.pix.v1.LookupKeyResponse
+	15, // 43: bank.pix.v1.PixService.CreateTransfer:output_type -> bank.pix.v1.CreateTransferResponse
+	17, // 44: bank.pix.v1.PixService.GetTransfer:output_type -> bank.pix.v1.GetTransferResponse
+	19, // 45: bank.pix.v1.PixService.SimulateIncoming:output_type -> bank.pix.v1.SimulateIncomingResponse
+	21, // 46: bank.pix.v1.PixService.CreateQrCode:output_type -> bank.pix.v1.CreateQrCodeResponse
+	23, // 47: bank.pix.v1.PixService.DecodeQrCode:output_type -> bank.pix.v1.DecodeQrCodeResponse
+	25, // 48: bank.pix.v1.PixService.PayQrCode:output_type -> bank.pix.v1.PayQrCodeResponse
+	27, // 49: bank.pix.v1.PixService.RefundTransfer:output_type -> bank.pix.v1.RefundTransferResponse
+	39, // [39:50] is the sub-list for method output_type
+	28, // [28:39] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_bank_pix_v1_pix_proto_init() }
@@ -1384,7 +2013,7 @@ func file_bank_pix_v1_pix_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_pix_v1_pix_proto_rawDesc), len(file_bank_pix_v1_pix_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   17,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

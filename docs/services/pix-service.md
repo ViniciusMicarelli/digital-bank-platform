@@ -14,7 +14,10 @@ Pix, the Brazilian instant payment system. Integrations with the Central Bank (*
 | Transfer to another bank: reserve → SPI → capture / release | ✅ |
 | Incoming transfer from another bank (simulated SPI delivery) | ✅ |
 | Keys removed when an account closes (`account.closed` consumer, inbox) | ✅ |
-| QR codes (EMV BR Code), refunds, night-time Pix limits via `account-service` | planned |
+| QR codes: BR Code (EMV QRCPS-MPM + CRC16-CCITT) static or one-time, with amount or open amount, expiry and `txid` | ✅ |
+| Paying QR codes, with one-time charges reserved before money moves | ✅ |
+| Refunds ("devolução") of received Pix, partial or full, within 90 days | ✅ |
+| Dynamic QR codes served by URL (JWS payload), scheduled Pix, Pix Automático | planned |
 
 ## Outgoing Transfer Flow
 
@@ -32,6 +35,24 @@ stateDiagram-v2
 - Every downstream call is idempotent: transaction keys are `pix:<transfer id>` (outgoing) and `pix-in:<E2E id>` (incoming), and SPI is idempotent on the E2E ID.
 - A lease on the transfer row serializes processing; a recovery worker resumes transfers stuck in `CREATED`, `FUNDS_RESERVED` or `SENT_TO_SPI` (for example when transaction-service was down).
 - `SENT_TO_SPI` is saved **before** calling SPI, so after a crash the worker asks SPI again (same E2E ID) instead of guessing.
+
+## QR Codes (BR Code)
+
+`CreateQrCode` renders the "Pix copia e cola" string: TLV fields (`00` format, `01` initiation `11` static / `12` one-time, `26` merchant account with GUI `br.gov.bcb.pix` and the key, `52` MCC, `53` currency `986`, optional `54` amount, `58` country, `59` name, `60` city, `62.05` txid) closed by a CRC-16/CCITT-FALSE checksum in `63`. Names are uppercased ASCII without accents and truncated to the spec's limits.
+
+Paying a code:
+
+1. `DecodeQrCode` checks the checksum and structure, resolves the receiver, and for charges issued here checks the code still matches what was issued (key, amount), is not expired, and is not paid.
+2. `PayQrCode` creates the transfer, then **claims** the charge (`UPDATE … WHERE paid_transfer_id IS NULL`) before any money moves. A second payer of a one-time code is refused with `QR_CODE_UNAVAILABLE`.
+3. If the payment fails (no funds, refused), the claim is released in the same transaction that marks the transfer failed, so the charge can be paid again.
+
+## Refunds
+
+A completed incoming Pix can be refunded, fully or in parts, for 90 days. The refund is an outgoing transfer to the payer through the usual reserve → SPI → capture flow.
+
+- The original row is locked while the refund is created, and its `refunded_amount` is increased in the same transaction. Concurrent refunds can never add up to more than was received; a `CHECK (refunded_amount <= amount)` constraint backs this up in the database.
+- A refund that fails gives its reservation back, atomically with its status change, so retries never release twice.
+- Refunds appear in the statement as `PIX_REFUND`.
 
 ## Simulators
 
@@ -55,6 +76,8 @@ Defined in [`contracts/proto/bank/pix/v1/pix.proto`](../../contracts/proto/bank/
 | `CreateTransfer` | Send a Pix (idempotent on `idempotency_key`) |
 | `GetTransfer` | Transfer status |
 | `SimulateIncoming` | Simulated SPI delivery |
+| `CreateQrCode` / `DecodeQrCode` / `PayQrCode` | BR Code charges |
+| `RefundTransfer` | Refund a received Pix |
 
 ## Events
 
@@ -70,4 +93,4 @@ Defined in [`contracts/proto/bank/pix/v1/pix.proto`](../../contracts/proto/bank/
 
 ## Data
 
-`pix_keys`, `pix_transfers`, `outbox`, `inbox`. Every transfer stores its `end_to_end_id` (E2E ID), the unique identifier of a Pix payment.
+`pix_keys`, `pix_transfers` (with `qr_txid`, `refund_of`, `refunded_amount`), `qr_codes`, `outbox`, `inbox`. Every transfer stores its `end_to_end_id` (E2E ID), the unique identifier of a Pix payment.

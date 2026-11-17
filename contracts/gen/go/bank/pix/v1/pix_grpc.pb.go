@@ -26,6 +26,10 @@ const (
 	PixService_CreateTransfer_FullMethodName   = "/bank.pix.v1.PixService/CreateTransfer"
 	PixService_GetTransfer_FullMethodName      = "/bank.pix.v1.PixService/GetTransfer"
 	PixService_SimulateIncoming_FullMethodName = "/bank.pix.v1.PixService/SimulateIncoming"
+	PixService_CreateQrCode_FullMethodName     = "/bank.pix.v1.PixService/CreateQrCode"
+	PixService_DecodeQrCode_FullMethodName     = "/bank.pix.v1.PixService/DecodeQrCode"
+	PixService_PayQrCode_FullMethodName        = "/bank.pix.v1.PixService/PayQrCode"
+	PixService_RefundTransfer_FullMethodName   = "/bank.pix.v1.PixService/RefundTransfer"
 )
 
 // PixServiceClient is the client API for PixService service.
@@ -45,6 +49,14 @@ type PixServiceClient interface {
 	GetTransfer(ctx context.Context, in *GetTransferRequest, opts ...grpc.CallOption) (*GetTransferResponse, error)
 	// Simulates the SPI delivering a Pix sent by another bank to one of our keys.
 	SimulateIncoming(ctx context.Context, in *SimulateIncomingRequest, opts ...grpc.CallOption) (*SimulateIncomingResponse, error)
+	// Issues a BR Code ("Pix copia e cola") for one of the account's keys.
+	CreateQrCode(ctx context.Context, in *CreateQrCodeRequest, opts ...grpc.CallOption) (*CreateQrCodeResponse, error)
+	// Validates a BR Code and resolves its receiver, before paying.
+	DecodeQrCode(ctx context.Context, in *DecodeQrCodeRequest, opts ...grpc.CallOption) (*DecodeQrCodeResponse, error)
+	// Pays a BR Code. A one-time code of this bank can be paid only once.
+	PayQrCode(ctx context.Context, in *PayQrCodeRequest, opts ...grpc.CallOption) (*PayQrCodeResponse, error)
+	// Returns (part of) a received Pix to the payer, within 90 days.
+	RefundTransfer(ctx context.Context, in *RefundTransferRequest, opts ...grpc.CallOption) (*RefundTransferResponse, error)
 }
 
 type pixServiceClient struct {
@@ -125,6 +137,46 @@ func (c *pixServiceClient) SimulateIncoming(ctx context.Context, in *SimulateInc
 	return out, nil
 }
 
+func (c *pixServiceClient) CreateQrCode(ctx context.Context, in *CreateQrCodeRequest, opts ...grpc.CallOption) (*CreateQrCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateQrCodeResponse)
+	err := c.cc.Invoke(ctx, PixService_CreateQrCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) DecodeQrCode(ctx context.Context, in *DecodeQrCodeRequest, opts ...grpc.CallOption) (*DecodeQrCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DecodeQrCodeResponse)
+	err := c.cc.Invoke(ctx, PixService_DecodeQrCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) PayQrCode(ctx context.Context, in *PayQrCodeRequest, opts ...grpc.CallOption) (*PayQrCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PayQrCodeResponse)
+	err := c.cc.Invoke(ctx, PixService_PayQrCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) RefundTransfer(ctx context.Context, in *RefundTransferRequest, opts ...grpc.CallOption) (*RefundTransferResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RefundTransferResponse)
+	err := c.cc.Invoke(ctx, PixService_RefundTransfer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PixServiceServer is the server API for PixService service.
 // All implementations must embed UnimplementedPixServiceServer
 // for forward compatibility.
@@ -142,6 +194,14 @@ type PixServiceServer interface {
 	GetTransfer(context.Context, *GetTransferRequest) (*GetTransferResponse, error)
 	// Simulates the SPI delivering a Pix sent by another bank to one of our keys.
 	SimulateIncoming(context.Context, *SimulateIncomingRequest) (*SimulateIncomingResponse, error)
+	// Issues a BR Code ("Pix copia e cola") for one of the account's keys.
+	CreateQrCode(context.Context, *CreateQrCodeRequest) (*CreateQrCodeResponse, error)
+	// Validates a BR Code and resolves its receiver, before paying.
+	DecodeQrCode(context.Context, *DecodeQrCodeRequest) (*DecodeQrCodeResponse, error)
+	// Pays a BR Code. A one-time code of this bank can be paid only once.
+	PayQrCode(context.Context, *PayQrCodeRequest) (*PayQrCodeResponse, error)
+	// Returns (part of) a received Pix to the payer, within 90 days.
+	RefundTransfer(context.Context, *RefundTransferRequest) (*RefundTransferResponse, error)
 	mustEmbedUnimplementedPixServiceServer()
 }
 
@@ -172,6 +232,18 @@ func (UnimplementedPixServiceServer) GetTransfer(context.Context, *GetTransferRe
 }
 func (UnimplementedPixServiceServer) SimulateIncoming(context.Context, *SimulateIncomingRequest) (*SimulateIncomingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SimulateIncoming not implemented")
+}
+func (UnimplementedPixServiceServer) CreateQrCode(context.Context, *CreateQrCodeRequest) (*CreateQrCodeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateQrCode not implemented")
+}
+func (UnimplementedPixServiceServer) DecodeQrCode(context.Context, *DecodeQrCodeRequest) (*DecodeQrCodeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DecodeQrCode not implemented")
+}
+func (UnimplementedPixServiceServer) PayQrCode(context.Context, *PayQrCodeRequest) (*PayQrCodeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PayQrCode not implemented")
+}
+func (UnimplementedPixServiceServer) RefundTransfer(context.Context, *RefundTransferRequest) (*RefundTransferResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RefundTransfer not implemented")
 }
 func (UnimplementedPixServiceServer) mustEmbedUnimplementedPixServiceServer() {}
 func (UnimplementedPixServiceServer) testEmbeddedByValue()                    {}
@@ -320,6 +392,78 @@ func _PixService_SimulateIncoming_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PixService_CreateQrCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateQrCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).CreateQrCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_CreateQrCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).CreateQrCode(ctx, req.(*CreateQrCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_DecodeQrCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DecodeQrCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).DecodeQrCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_DecodeQrCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).DecodeQrCode(ctx, req.(*DecodeQrCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_PayQrCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PayQrCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).PayQrCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_PayQrCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).PayQrCode(ctx, req.(*PayQrCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_RefundTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefundTransferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).RefundTransfer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_RefundTransfer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).RefundTransfer(ctx, req.(*RefundTransferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PixService_ServiceDesc is the grpc.ServiceDesc for PixService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -354,6 +498,22 @@ var PixService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SimulateIncoming",
 			Handler:    _PixService_SimulateIncoming_Handler,
+		},
+		{
+			MethodName: "CreateQrCode",
+			Handler:    _PixService_CreateQrCode_Handler,
+		},
+		{
+			MethodName: "DecodeQrCode",
+			Handler:    _PixService_DecodeQrCode_Handler,
+		},
+		{
+			MethodName: "PayQrCode",
+			Handler:    _PixService_PayQrCode_Handler,
+		},
+		{
+			MethodName: "RefundTransfer",
+			Handler:    _PixService_RefundTransfer_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

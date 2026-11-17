@@ -4,6 +4,7 @@ package grpcapi
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
@@ -135,6 +136,89 @@ func (s *Server) SimulateIncoming(ctx context.Context, req *pixv1.SimulateIncomi
 	return &pixv1.SimulateIncomingResponse{Transfer: transferPB(t)}, nil
 }
 
+func optionalMoney(m *commonv1.Money) (*money.Money, error) {
+	if m == nil {
+		return nil, nil
+	}
+	v, err := moneyFromPB(m)
+	if err != nil {
+		return nil, err
+	}
+	return &v, nil
+}
+
+func (s *Server) CreateQrCode(ctx context.Context, req *pixv1.CreateQrCodeRequest) (*pixv1.CreateQrCodeResponse, error) {
+	account, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	amount, err := optionalMoney(req.GetAmount())
+	if err != nil {
+		return nil, err
+	}
+	q, payload, err := s.app.CreateQRCode(ctx, account, req.GetKey(), amount, req.GetDescription(), req.GetOneTime(),
+		time.Duration(req.GetExpiresInSeconds())*time.Second)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	resp := &pixv1.CreateQrCodeResponse{Txid: q.TxID, Payload: payload}
+	if q.ExpiresAt != nil {
+		resp.ExpiresAt = timestamppb.New(*q.ExpiresAt)
+	}
+	return resp, nil
+}
+
+func (s *Server) DecodeQrCode(ctx context.Context, req *pixv1.DecodeQrCodeRequest) (*pixv1.DecodeQrCodeResponse, error) {
+	d, err := s.app.DecodeQRCode(ctx, req.GetPayload())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	resp := &pixv1.DecodeQrCodeResponse{
+		Key: d.Code.Key, Receiver: partyPB(d.Receiver), Txid: d.Code.TxID,
+		Description: d.Code.Description, OneTime: d.Code.OneTime, IssuedHere: d.Charge != nil,
+	}
+	if d.Code.Amount != nil {
+		resp.Amount = &commonv1.Money{MinorUnits: d.Code.Amount.Minor(), Currency: string(d.Code.Amount.Currency())}
+	}
+	return resp, nil
+}
+
+func (s *Server) PayQrCode(ctx context.Context, req *pixv1.PayQrCodeRequest) (*pixv1.PayQrCodeResponse, error) {
+	from, err := parseID(req.GetFromAccountId())
+	if err != nil {
+		return nil, err
+	}
+	amount, err := optionalMoney(req.GetAmount())
+	if err != nil {
+		return nil, err
+	}
+	t, err := s.app.PayQRCode(ctx, req.GetIdempotencyKey(), from, req.GetPayload(), amount, req.GetDescription())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &pixv1.PayQrCodeResponse{Transfer: transferPB(t)}, nil
+}
+
+func (s *Server) RefundTransfer(ctx context.Context, req *pixv1.RefundTransferRequest) (*pixv1.RefundTransferResponse, error) {
+	account, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	original, err := parseID(req.GetTransferId())
+	if err != nil {
+		return nil, err
+	}
+	amount, err := moneyFromPB(req.GetAmount())
+	if err != nil {
+		return nil, err
+	}
+	t, err := s.app.Refund(ctx, req.GetIdempotencyKey(), account, original, amount, req.GetReason())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &pixv1.RefundTransferResponse{Transfer: transferPB(t)}, nil
+}
+
 func parseID(v string) (uuid.UUID, error) {
 	id, err := uuid.Parse(v)
 	if err != nil {
@@ -183,6 +267,13 @@ func transferPB(t domain.Transfer) *pixv1.Transfer {
 	if t.TransactionID != uuid.Nil {
 		out.TransactionId = t.TransactionID.String()
 	}
+	if t.RefundOf != uuid.Nil {
+		out.RefundOf = t.RefundOf.String()
+	}
+	if t.Direction == domain.Incoming {
+		out.Refunded = &commonv1.Money{MinorUnits: t.Refunded, Currency: string(t.Amount.Currency())}
+	}
+	out.QrTxid = t.QRTxID
 	return out
 }
 
@@ -200,6 +291,12 @@ func toStatus(err error) error {
 		return grpcserver.Error(codes.FailedPrecondition, "ACCOUNT_NOT_ACTIVE", err.Error())
 	case errors.Is(err, domain.ErrIdempotencyConflict):
 		return grpcserver.Error(codes.AlreadyExists, "IDEMPOTENCY_CONFLICT", err.Error())
+	case errors.Is(err, domain.ErrQRUnavailable):
+		return grpcserver.Error(codes.FailedPrecondition, "QR_CODE_UNAVAILABLE", err.Error())
+	case errors.Is(err, domain.ErrNotRefundable):
+		return grpcserver.Error(codes.FailedPrecondition, "NOT_REFUNDABLE", err.Error())
+	case errors.Is(err, domain.ErrRefundTooLarge):
+		return grpcserver.Error(codes.FailedPrecondition, "REFUND_TOO_LARGE", err.Error())
 	case errors.Is(err, domain.ErrBusy):
 		return grpcserver.Error(codes.Aborted, "IN_PROGRESS", err.Error())
 	}

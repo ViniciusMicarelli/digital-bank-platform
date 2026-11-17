@@ -21,7 +21,7 @@
 | 401 | Missing or invalid token / credentials | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `MFA_REQUIRED`, `ACCOUNT_LOCKED`, `REFRESH_TOKEN_REUSED` |
 | 404 | Not found, or not yours | `NOT_FOUND` |
 | 409 | Same key, different request; or still processing | `IDEMPOTENCY_CONFLICT`, `IN_PROGRESS` |
-| 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS` |
+| 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS`, `QR_CODE_UNAVAILABLE`, `REFUND_TOO_LARGE`, `NOT_REFUNDABLE` |
 | 429 | Rate limited | `RATE_LIMITED` |
 | 503 | A dependency is down; retry with the same key | `RETRY_LATER` |
 
@@ -49,6 +49,10 @@
 | `DELETE` | `/v1/accounts/{id}/pix/keys/{keyID}` | Delete a key |
 | `GET` | `/v1/pix/keys/{key}` | Look up a key before paying |
 | `POST` | `/v1/accounts/{id}/pix/transfers` | `{key, amount, description}` · Idempotency-Key |
+| `POST` | `/v1/accounts/{id}/pix/qr-codes` | Issue a BR Code `{key, amount?, description, one_time, expires_in_seconds}` → `{txid, payload}` |
+| `POST` | `/v1/pix/qr-codes/decode` | `{payload}` → receiver, amount, txid |
+| `POST` | `/v1/accounts/{id}/pix/qr-payments` | Pay a BR Code `{payload, amount?}` · Idempotency-Key |
+| `POST` | `/v1/accounts/{id}/pix/transfers/{transferID}/refunds` | Refund a received Pix `{amount, reason}` · Idempotency-Key |
 | `POST` | `/v1/sandbox/pix-in` | *(sandbox only)* Simulate an incoming Pix `{key, amount, payer_name}` |
 | `GET` | `/healthz`, `/metrics` | Health and Prometheus metrics |
 

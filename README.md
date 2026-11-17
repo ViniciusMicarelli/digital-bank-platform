@@ -40,7 +40,7 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 | [ledger-service](docs/services/ledger-service.md) | Source of truth for money: balanced journal entries, holds, reversals |
 | [account-service](docs/services/account-service.md) | Account lifecycle, CPF validation, per-transaction/daily/nightly limits |
 | [transaction-service](docs/services/transaction-service.md) | Orchestrated sagas: transfers, two-phase Pix out, Pix in, recovery worker |
-| [pix-service](docs/services/pix-service.md) | Pix keys, lookup, same-bank and cross-bank Pix, incoming Pix |
+| [pix-service](docs/services/pix-service.md) | Pix keys, lookup, same-bank and cross-bank Pix, incoming Pix, BR Code QR codes, refunds |
 | [statement-service](docs/services/statement-service.md) | CQRS read side: customer feed projected from Kafka |
 | [identity-service](docs/services/identity-service.md) | Sign-up, login with argon2id + TOTP MFA, Ed25519 tokens via JWKS, rotating refresh tokens |
 | [api-gateway](docs/services/api-gateway.md) | Public REST API: token verification, ownership checks, idempotency keys, rate limits |
@@ -57,7 +57,7 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 
 **Events without dual writes.** State and its event commit in one transaction (outbox). A relay publishes to Kafka with `FOR UPDATE SKIP LOCKED`. Consumers deduplicate with an inbox table in the same transaction as their effects, retry with backoff and dead-letter poison messages. → [events](docs/events/README.md)
 
-**Pix, end to end.** Keys with real validation (CPF check digits, E.164 phones), lookup with masked documents, E2E IDs, cross-bank payments that reserve funds, record the SPI intent before calling it, then capture or release. The Central Bank systems are simulated behind ports.
+**Pix, end to end.** Keys with real validation (CPF check digits, E.164 phones), lookup with masked documents, E2E IDs, cross-bank payments that reserve funds, record the SPI intent before calling it, then capture or release. BR Code QR codes ("copia e cola", EMV + CRC16) where a one-time charge can only be paid once, and partial refunds that can never exceed what was received, even concurrently. The Central Bank systems are simulated behind ports.
 
 **Authentication done properly.** Passwords hashed with argon2id, lockout, TOTP MFA with replay protection. Access tokens are Ed25519 JWTs: the gateway verifies them from a JWKS and cannot mint them. Refresh tokens rotate, and replaying an old one revokes the whole session. Signing keys and TOTP seeds are encrypted at rest. → [identity](docs/services/identity-service.md)
 

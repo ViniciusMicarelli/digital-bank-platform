@@ -10,6 +10,7 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
+	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
@@ -373,11 +374,147 @@ func (a *API) lookupKey(w http.ResponseWriter, r *http.Request) {
 }
 
 func pixTransferJSON(t *pixv1.Transfer) map[string]any {
-	return map[string]any{
+	out := map[string]any{
 		"id": t.GetId(), "end_to_end_id": t.GetEndToEndId(), "status": t.GetStatus().String()[len("TRANSFER_STATUS_"):],
 		"key": t.GetKey(), "counterparty": partyJSON(t.GetCounterparty()), "amount": moneyJSON(t.GetAmount()),
 		"description": t.GetDescription(), "created_at": ts(t.GetCreatedAt()),
 	}
+	if t.GetRefundOf() != "" {
+		out["refund_of"] = t.GetRefundOf()
+	}
+	if t.GetRefunded() != nil {
+		out["refunded"] = moneyJSON(t.GetRefunded())
+	}
+	if t.GetQrTxid() != "" {
+		out["qr_txid"] = t.GetQrTxid()
+	}
+	return out
+}
+
+// pixResult answers a Pix that moved money: 201 when done, 422 when refused,
+// 202 while still being processed (e.g. after an outage).
+func pixResult(w http.ResponseWriter, r *http.Request, t *pixv1.Transfer, refused string) {
+	switch t.GetStatus() {
+	case pixv1.TransferStatus_TRANSFER_STATUS_FAILED, pixv1.TransferStatus_TRANSFER_STATUS_REJECTED:
+		writeError(w, r.Context(), http.StatusUnprocessableEntity, t.GetFailureReason(), refused)
+	case pixv1.TransferStatus_TRANSFER_STATUS_COMPLETED:
+		writeJSON(w, http.StatusCreated, pixTransferJSON(t))
+	default:
+		writeJSON(w, http.StatusAccepted, pixTransferJSON(t))
+	}
+}
+
+// optionalBRL parses an optional amount; "" means none.
+func optionalBRL(w http.ResponseWriter, r *http.Request, s string) (*commonv1.Money, bool) {
+	if s == "" {
+		return nil, true
+	}
+	return parseBRL(w, r, s)
+}
+
+func (a *API) createQRCode(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	var req struct {
+		Key              string `json:"key"`
+		Amount           string `json:"amount"`
+		Description      string `json:"description"`
+		OneTime          bool   `json:"one_time"`
+		ExpiresInSeconds int64  `json:"expires_in_seconds"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	amount, ok := optionalBRL(w, r, req.Amount)
+	if !ok {
+		return
+	}
+	resp, err := a.c.Pix.CreateQrCode(r.Context(), &pixv1.CreateQrCodeRequest{
+		AccountId: acc.GetId(), Key: req.Key, Amount: amount, Description: req.Description,
+		OneTime: req.OneTime, ExpiresInSeconds: req.ExpiresInSeconds,
+	})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	body := map[string]any{"txid": resp.GetTxid(), "payload": resp.GetPayload()}
+	if resp.GetExpiresAt() != nil {
+		body["expires_at"] = ts(resp.GetExpiresAt())
+	}
+	writeJSON(w, http.StatusCreated, body)
+}
+
+func (a *API) decodeQRCode(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Payload string `json:"payload"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	resp, err := a.c.Pix.DecodeQrCode(r.Context(), &pixv1.DecodeQrCodeRequest{Payload: req.Payload})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	body := map[string]any{
+		"key": resp.GetKey(), "receiver": partyJSON(resp.GetReceiver()), "txid": resp.GetTxid(),
+		"description": resp.GetDescription(), "one_time": resp.GetOneTime(), "issued_here": resp.GetIssuedHere(),
+	}
+	if resp.GetAmount() != nil {
+		body["amount"] = moneyJSON(resp.GetAmount())
+	}
+	writeJSON(w, http.StatusOK, body)
+}
+
+func (a *API) payQRCode(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	key, ok := idempotencyKey(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Payload     string `json:"payload"`
+		Amount      string `json:"amount"`
+		Description string `json:"description"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	amount, ok := optionalBRL(w, r, req.Amount)
+	if !ok {
+		return
+	}
+	resp, err := a.c.Pix.PayQrCode(r.Context(), &pixv1.PayQrCodeRequest{
+		IdempotencyKey: key, FromAccountId: acc.GetId(), Payload: req.Payload, Amount: amount, Description: req.Description,
+	})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	pixResult(w, r, resp.GetTransfer(), "the QR code was not paid")
+}
+
+func (a *API) refundPix(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	key, ok := idempotencyKey(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Amount string `json:"amount"`
+		Reason string `json:"reason"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	amount, ok := parseBRL(w, r, req.Amount)
+	if !ok {
+		return
+	}
+	resp, err := a.c.Pix.RefundTransfer(r.Context(), &pixv1.RefundTransferRequest{
+		IdempotencyKey: key, AccountId: acc.GetId(), TransferId: r.PathValue("transferID"), Amount: amount, Reason: req.Reason,
+	})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	pixResult(w, r, resp.GetTransfer(), "the refund was not made")
 }
 
 func (a *API) sendPix(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {

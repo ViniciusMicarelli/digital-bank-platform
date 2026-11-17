@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
@@ -94,18 +95,20 @@ func (s *Store) KeyByValue(ctx context.Context, value string) (domain.Key, error
 
 const transferCols = `id, idempotency_key, end_to_end_id, direction, status, account_id, key,
 	counterparty_name, counterparty_doc, counterparty_ispb, counterparty_bank, internal_account_id,
-	amount, currency, description, transaction_id, failure_reason, created_at, updated_at`
+	amount, currency, description, transaction_id, failure_reason, COALESCE(qr_txid, ''), refund_of,
+	refunded_amount, created_at, updated_at`
 
 func scanTransfer(row pgx.Row) (domain.Transfer, error) {
 	var (
-		t                       domain.Transfer
-		dir, status, currency   string
-		amount                  int64
-		internal, transactionID *uuid.UUID
+		t                                 domain.Transfer
+		dir, status, currency             string
+		amount                            int64
+		internal, transactionID, refundOf *uuid.UUID
 	)
 	err := row.Scan(&t.ID, &t.IdempotencyKey, &t.EndToEndID, &dir, &status, &t.AccountID, &t.Key,
 		&t.Counterparty.Name, &t.Counterparty.DocumentMasked, &t.Counterparty.ISPB, &t.Counterparty.BankName, &internal,
-		&amount, &currency, &t.Description, &transactionID, &t.FailureReason, &t.CreatedAt, &t.UpdatedAt)
+		&amount, &currency, &t.Description, &transactionID, &t.FailureReason, &t.QRTxID, &refundOf,
+		&t.Refunded, &t.CreatedAt, &t.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, fmt.Errorf("%w: pix transfer", domain.ErrNotFound)
 	}
@@ -119,6 +122,9 @@ func scanTransfer(row pgx.Row) (domain.Transfer, error) {
 	if transactionID != nil {
 		t.TransactionID = *transactionID
 	}
+	if refundOf != nil {
+		t.RefundOf = *refundOf
+	}
 	t.Amount, err = money.New(amount, money.Currency(currency))
 	return t, err
 }
@@ -130,29 +136,128 @@ func nullable(id uuid.UUID) *uuid.UUID {
 	return &id
 }
 
-func (s *Store) CreateTransfer(ctx context.Context, t domain.Transfer) (*domain.Transfer, []byte, error) {
-	tag, err := s.pool.Exec(ctx, `
+func nullableText(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+// querier is a pool or a transaction.
+type querier interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func insertTransfer(ctx context.Context, q querier, t domain.Transfer) (*domain.Transfer, []byte, error) {
+	tag, err := q.Exec(ctx, `
 		INSERT INTO pix_transfers (id, idempotency_key, fingerprint, end_to_end_id, direction, status, account_id, key,
 		    counterparty_name, counterparty_doc, counterparty_ispb, counterparty_bank, internal_account_id,
-		    amount, currency, description)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		    amount, currency, description, qr_txid, refund_of)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		ON CONFLICT (idempotency_key) DO NOTHING`,
 		t.ID, t.IdempotencyKey, t.Fingerprint(), t.EndToEndID, t.Direction, t.Status, t.AccountID, t.Key,
 		t.Counterparty.Name, t.Counterparty.DocumentMasked, t.Counterparty.ISPB, t.Counterparty.BankName,
-		nullable(t.InternalAccountID), t.Amount.Minor(), string(t.Amount.Currency()), t.Description)
+		nullable(t.InternalAccountID), t.Amount.Minor(), string(t.Amount.Currency()), t.Description,
+		nullableText(t.QRTxID), nullable(t.RefundOf))
 	if err != nil || tag.RowsAffected() == 1 {
 		return nil, nil, err
 	}
 	var fp []byte
-	if err := s.pool.QueryRow(ctx, `SELECT fingerprint FROM pix_transfers WHERE idempotency_key = $1`, t.IdempotencyKey).Scan(&fp); err != nil {
+	if err := q.QueryRow(ctx, `SELECT fingerprint FROM pix_transfers WHERE idempotency_key = $1`, t.IdempotencyKey).Scan(&fp); err != nil {
 		return nil, nil, err
 	}
-	existing, err := scanTransfer(s.pool.QueryRow(ctx, `SELECT `+transferCols+` FROM pix_transfers WHERE idempotency_key = $1`, t.IdempotencyKey))
+	existing, err := scanTransfer(q.QueryRow(ctx, `SELECT `+transferCols+` FROM pix_transfers WHERE idempotency_key = $1`, t.IdempotencyKey))
 	return &existing, fp, err
+}
+
+func (s *Store) CreateTransfer(ctx context.Context, t domain.Transfer) (*domain.Transfer, []byte, error) {
+	return insertTransfer(ctx, s.pool, t)
+}
+
+// CreateRefund inserts a refund and reserves its amount on the original
+// transfer, in one transaction with the original row locked, so concurrent
+// refunds can never add up to more than was received.
+func (s *Store) CreateRefund(ctx context.Context, refund domain.Transfer, check func(original domain.Transfer) error) (*domain.Transfer, []byte, error) {
+	var (
+		existing *domain.Transfer
+		fp       []byte
+	)
+	err := pg.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		original, err := scanTransfer(tx.QueryRow(ctx, `SELECT `+transferCols+` FROM pix_transfers WHERE id = $1 FOR UPDATE`, refund.RefundOf))
+		if err != nil {
+			return err
+		}
+		if existing, fp, err = insertTransfer(ctx, tx, refund); err != nil || existing != nil {
+			return err // retry of the same refund: nothing more to reserve
+		}
+		if err := check(original); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, `UPDATE pix_transfers SET refunded_amount = refunded_amount + $2 WHERE id = $1`,
+			original.ID, refund.Amount.Minor())
+		return err
+	})
+	return existing, fp, err
+}
+
+func (s *Store) InsertQRCode(ctx context.Context, q domain.QRCode) error {
+	var amount *int64
+	if q.Amount != nil {
+		v := q.Amount.Minor()
+		amount = &v
+	}
+	_, err := s.pool.Exec(ctx, `INSERT INTO qr_codes (txid, account_id, key, amount, description, one_time, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`, q.TxID, q.AccountID, q.Key, amount, q.Description, q.OneTime, q.ExpiresAt)
+	return err
+}
+
+func (s *Store) QRCode(ctx context.Context, txid string) (domain.QRCode, error) {
+	var (
+		q      domain.QRCode
+		amount *int64
+		paid   *uuid.UUID
+	)
+	err := s.pool.QueryRow(ctx, `SELECT txid, account_id, key, amount, description, one_time, expires_at, paid_transfer_id, created_at
+		FROM qr_codes WHERE txid = $1`, txid).
+		Scan(&q.TxID, &q.AccountID, &q.Key, &amount, &q.Description, &q.OneTime, &q.ExpiresAt, &paid, &q.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return q, fmt.Errorf("%w: QR code", domain.ErrNotFound)
+	}
+	if err != nil {
+		return q, err
+	}
+	if amount != nil {
+		m, _ := money.New(*amount, money.BRL)
+		q.Amount = &m
+	}
+	if paid != nil {
+		q.PaidTransferID = *paid
+	}
+	return q, nil
+}
+
+// ClaimQRCode marks a one-time charge as being paid by transfer. Claiming
+// again with the same transfer succeeds (retries); with another one it fails.
+func (s *Store) ClaimQRCode(ctx context.Context, txid string, transfer uuid.UUID) error {
+	tag, err := s.pool.Exec(ctx, `UPDATE qr_codes SET paid_transfer_id = $2
+		WHERE txid = $1 AND (NOT one_time OR paid_transfer_id IS NULL OR paid_transfer_id = $2)
+		  AND (expires_at IS NULL OR expires_at > now())`, txid, transfer)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrQRUnavailable
+	}
+	return nil
 }
 
 func (s *Store) Transfer(ctx context.Context, id uuid.UUID) (domain.Transfer, error) {
 	return scanTransfer(s.pool.QueryRow(ctx, `SELECT `+transferCols+` FROM pix_transfers WHERE id = $1`, id))
+}
+
+func (s *Store) TransferByKey(ctx context.Context, key string) (domain.Transfer, error) {
+	return scanTransfer(s.pool.QueryRow(ctx, `SELECT `+transferCols+` FROM pix_transfers WHERE idempotency_key = $1`, key))
 }
 
 func (s *Store) Acquire(ctx context.Context, id uuid.UUID, d time.Duration) (domain.Transfer, bool, error) {
@@ -172,12 +277,33 @@ func (s *Store) Release(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+// SaveTransfer stores the new state. On the first move to a failed state it
+// also gives back what the transfer held: a refund's reserved amount and a
+// one-time QR code's claim. Doing it here, atomically with the status change,
+// means retries can never release twice.
 func (s *Store) SaveTransfer(ctx context.Context, t domain.Transfer, events ...outbox.Message) error {
 	return pg.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		var previous string
+		if err := tx.QueryRow(ctx, `SELECT status FROM pix_transfers WHERE id = $1 FOR UPDATE`, t.ID).Scan(&previous); err != nil {
+			return err
+		}
 		_, err := tx.Exec(ctx, `UPDATE pix_transfers SET status = $2, transaction_id = $3, failure_reason = $4, updated_at = now()
 		                         WHERE id = $1`, t.ID, t.Status, nullable(t.TransactionID), t.FailureReason)
 		if err != nil {
 			return err
+		}
+		failedNow := !domain.Status(previous).Terminal() && (t.Status == domain.StatusFailed || t.Status == domain.StatusRejected)
+		if failedNow && t.RefundOf != uuid.Nil {
+			if _, err := tx.Exec(ctx, `UPDATE pix_transfers SET refunded_amount = refunded_amount - $2 WHERE id = $1`,
+				t.RefundOf, t.Amount.Minor()); err != nil {
+				return err
+			}
+		}
+		if failedNow && t.QRTxID != "" {
+			if _, err := tx.Exec(ctx, `UPDATE qr_codes SET paid_transfer_id = NULL WHERE txid = $1 AND paid_transfer_id = $2`,
+				t.QRTxID, t.ID); err != nil {
+				return err
+			}
 		}
 		for _, ev := range events {
 			if err := outbox.Insert(ctx, tx, ev); err != nil {

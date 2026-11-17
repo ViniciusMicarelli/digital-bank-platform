@@ -91,6 +91,10 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("DELETE /v1/accounts/{id}/pix/keys/{keyID}", a.authenticated(a.owned(a.deleteKey)))
 	mux.HandleFunc("POST /v1/accounts/{id}/pix/transfers", a.authenticated(a.owned(a.sendPix)))
 	mux.HandleFunc("GET /v1/pix/keys/{key}", a.authenticated(a.lookupKey))
+	mux.HandleFunc("POST /v1/accounts/{id}/pix/qr-codes", a.authenticated(a.owned(a.createQRCode)))
+	mux.HandleFunc("POST /v1/pix/qr-codes/decode", a.authenticated(a.decodeQRCode))
+	mux.HandleFunc("POST /v1/accounts/{id}/pix/qr-payments", a.authenticated(a.owned(a.payQRCode)))
+	mux.HandleFunc("POST /v1/accounts/{id}/pix/transfers/{transferID}/refunds", a.authenticated(a.owned(a.refundPix)))
 	// MaxBytesHandler copies the request, so it wraps observe (which must see
 	// the request the mux routes, to read its Pattern).
 	return http.MaxBytesHandler(observe(a.log, mux), 64<<10)

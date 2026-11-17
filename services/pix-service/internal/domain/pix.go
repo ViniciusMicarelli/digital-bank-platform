@@ -185,8 +185,91 @@ type Transfer struct {
 	Description       string
 	TransactionID     uuid.UUID
 	FailureReason     string
+	QRTxID            string    // charge paid by this transfer, if any
+	RefundOf          uuid.UUID // incoming transfer this one refunds, if any
+	Refunded          int64     // incoming: minor units already refunded or reserved
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+}
+
+// Refund rules (Central Bank: a received Pix may be returned within 90 days).
+const RefundWindow = 90 * 24 * time.Hour
+
+var (
+	ErrNotRefundable  = errors.New("transfer cannot be refunded")
+	ErrRefundTooLarge = errors.New("refund exceeds what is left to refund")
+	ErrQRUnavailable  = errors.New("QR code expired or already paid")
+)
+
+// NewRefund builds the outgoing transfer that returns (part of) a received Pix
+// to the payer. It goes through the same reserve -> SPI -> capture flow.
+func NewRefund(idemKey string, original Transfer, amount money.Money, reason string, now time.Time) (Transfer, error) {
+	switch {
+	case idemKey == "":
+		return Transfer{}, fmt.Errorf("%w: idempotency key is required", ErrInvalidArgument)
+	case original.Direction != Incoming || original.Status != StatusCompleted:
+		return Transfer{}, fmt.Errorf("%w: only completed incoming transfers can be refunded", ErrNotRefundable)
+	case now.Sub(original.CreatedAt) > RefundWindow:
+		return Transfer{}, fmt.Errorf("%w: older than 90 days", ErrNotRefundable)
+	case !amount.IsPositive() || amount.Currency() != money.BRL:
+		return Transfer{}, fmt.Errorf("%w: refund amount must be positive BRL", ErrInvalidArgument)
+	case amount.Minor() > original.Amount.Minor()-original.Refunded:
+		return Transfer{}, fmt.Errorf("%w: %d left", ErrRefundTooLarge, original.Amount.Minor()-original.Refunded)
+	case len(reason) > 140:
+		return Transfer{}, fmt.Errorf("%w: reason longer than 140 characters", ErrInvalidArgument)
+	}
+	if reason == "" {
+		reason = "Devolução Pix"
+	}
+	return Transfer{
+		ID:             uuid.Must(uuid.NewV7()),
+		IdempotencyKey: idemKey,
+		EndToEndID:     NewEndToEndID(OurISPB, now),
+		Direction:      Outgoing,
+		Status:         StatusCreated,
+		AccountID:      original.AccountID,
+		Key:            "",
+		Counterparty:   original.Counterparty,
+		Amount:         amount,
+		Description:    reason,
+		RefundOf:       original.ID,
+	}, nil
+}
+
+// QRCode is a charge issued by one of our customers.
+type QRCode struct {
+	TxID           string
+	AccountID      uuid.UUID
+	Key            string
+	Amount         *money.Money
+	Description    string
+	OneTime        bool
+	ExpiresAt      *time.Time
+	PaidTransferID uuid.UUID
+	CreatedAt      time.Time
+}
+
+// NewQRTxID returns a random 25-character alphanumeric transaction id.
+func NewQRTxID() string {
+	const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 25)
+	_, _ = rand.Read(b)
+	for i := range b {
+		b[i] = alphabet[int(b[i])%len(alphabet)]
+	}
+	return string(b)
+}
+
+// Payable checks a charge can be paid now by transfer id (re-checks by the
+// same transfer are fine, so retries work).
+func (q QRCode) Payable(now time.Time, transfer uuid.UUID) error {
+	if q.ExpiresAt != nil && !now.Before(*q.ExpiresAt) {
+		return fmt.Errorf("%w: expired", ErrQRUnavailable)
+	}
+	if q.OneTime && q.PaidTransferID != uuid.Nil && q.PaidTransferID != transfer {
+		return fmt.Errorf("%w: already paid", ErrQRUnavailable)
+	}
+	return nil
 }
 
 // Internal reports whether both sides are accounts of this bank.
@@ -232,5 +315,11 @@ func (t Transfer) Fingerprint() []byte {
 	h.Write([]byte{0})
 	_ = binary.Write(h, binary.BigEndian, t.Amount.Minor())
 	h.Write([]byte(t.Description))
+	if t.QRTxID != "" {
+		h.Write([]byte("qr:" + t.QRTxID))
+	}
+	if t.RefundOf != uuid.Nil {
+		h.Write(append([]byte("refund:"), t.RefundOf[:]...))
+	}
 	return h.Sum(nil)
 }

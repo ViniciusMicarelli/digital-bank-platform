@@ -35,7 +35,9 @@ BRUNO_ACC=$(call POST /v1/accounts "$BRUNO" '{"holder_name":"Bruno Lima","docume
 step "Ana registers a Pix key and receives R\$ 500,00 from another bank (sandbox)"
 KEY="ana.$SUFFIX@example.com"
 call POST "/v1/accounts/$ANA_ACC/pix/keys" "$ANA" "{\"type\":\"EMAIL\",\"value\":\"$KEY\"}" | jq -c .
-call POST /v1/sandbox/pix-in "$ANA" "{\"key\":\"$KEY\",\"amount\":\"500.00\",\"payer_name\":\"Empresa X\"}" | jq -c '{status, amount, end_to_end_id}'
+PIXIN=$(call POST /v1/sandbox/pix-in "$ANA" "{\"key\":\"$KEY\",\"amount\":\"500.00\",\"payer_name\":\"Empresa X\"}")
+echo "$PIXIN" | jq -c '{status, amount, end_to_end_id}'
+PIXIN_ID=$(echo "$PIXIN" | jq -r .id)
 
 step "Ana transfers R\$ 120,00 to Bruno (sent twice with the same Idempotency-Key)"
 IDEM=$(uuid)
@@ -46,6 +48,18 @@ done
 step "Ana looks up a key at another bank and sends a Pix"
 call GET /v1/pix/keys/maria@outrobanco.com.br "$ANA" | jq -c .
 call POST "/v1/accounts/$ANA_ACC/pix/transfers" "$ANA" '{"key":"maria@outrobanco.com.br","amount":"80.00","description":"Presente"}' "$(uuid)" | jq -c '{status, end_to_end_id, counterparty}'
+
+step "Bruno issues a one-time QR code (BR Code) and Ana pays it"
+BKEY="bruno.$SUFFIX@example.com"
+call POST "/v1/accounts/$BRUNO_ACC/pix/keys" "$BRUNO" "{\"type\":\"EMAIL\",\"value\":\"$BKEY\"}" >/dev/null
+PAYLOAD=$(call POST "/v1/accounts/$BRUNO_ACC/pix/qr-codes" "$BRUNO" "{\"key\":\"$BKEY\",\"amount\":\"15.00\",\"description\":\"Cafe\",\"one_time\":true,\"expires_in_seconds\":600}" | jq -r .payload)
+echo "copia e cola: $PAYLOAD"
+call POST /v1/pix/qr-codes/decode "$ANA" "{\"payload\":\"$PAYLOAD\"}" | jq -c '{receiver: .receiver.name, amount, issued_here}'
+call POST "/v1/accounts/$ANA_ACC/pix/qr-payments" "$ANA" "{\"payload\":\"$PAYLOAD\"}" "$(uuid)" | jq -c '{status, amount, qr_txid}'
+call POST "/v1/accounts/$ANA_ACC/pix/qr-payments" "$ANA" "{\"payload\":\"$PAYLOAD\"}" "$(uuid)" | jq -c '{second_payment: .error.code}'
+
+step "Ana refunds R\$ 20,00 of the Pix she received from Empresa X"
+call POST "/v1/accounts/$ANA_ACC/pix/transfers/$PIXIN_ID/refunds" "$ANA" '{"amount":"20.00","reason":"Cobrado a mais"}' "$(uuid)" | jq -c '{status, amount, refund_of, to: .counterparty.name}'
 
 step "A Pix the receiving bank rejects: the money comes back"
 call POST "/v1/accounts/$ANA_ACC/pix/transfers" "$ANA" '{"key":"recusa@outrobanco.com.br","amount":"10.00"}' "$(uuid)" | jq -c .

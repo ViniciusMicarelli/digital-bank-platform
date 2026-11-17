@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"sync"
@@ -280,5 +281,151 @@ func TestAccountClosedRemovesKeys(t *testing.T) {
 	other, _ := outbox.NewEvent(e.ctx, "account-service", "account.blocked", json.RawMessage(`{}`))
 	if err := e.store.HandleAccountEvent(e.ctx, other); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestQRCodeOneTimeCharge(t *testing.T) {
+	e := setup(t)
+	_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
+	amount := brl("42.50")
+	q, payload, err := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", &amount, "Pedido 7", true, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := e.svc.DecodeQRCode(e.ctx, payload)
+	if err != nil || d.Receiver.Name != "Bruno Lima" || d.Charge == nil || d.Charge.TxID != q.TxID || *d.Code.Amount != amount {
+		t.Fatalf("decode = %+v, %v", d, err)
+	}
+
+	paid, err := e.svc.PayQRCode(e.ctx, "pay-1", e.ana, payload, nil, "")
+	if err != nil || paid.Status != domain.StatusCompleted || paid.QRTxID != q.TxID || e.txs.balance[e.bruno] != 42_50 {
+		t.Fatalf("pay = %+v, %v (bruno %d)", paid, err, e.txs.balance[e.bruno])
+	}
+	// A retry with the same key returns the same payment.
+	if again, err := e.svc.PayQRCode(e.ctx, "pay-1", e.ana, payload, nil, ""); err != nil || again.ID != paid.ID {
+		t.Fatalf("retry = %+v, %v", again, err)
+	}
+	// Anyone else paying the same one-time code is refused before money moves.
+	if _, err := e.svc.PayQRCode(e.ctx, "pay-2", e.ana, payload, nil, ""); !errors.Is(err, domain.ErrQRUnavailable) {
+		t.Fatalf("second payment err = %v", err)
+	}
+	if e.txs.balance[e.bruno] != 42_50 {
+		t.Fatal("a one-time code was paid twice")
+	}
+
+	other := brl("1.00")
+	if _, err := e.svc.PayQRCode(e.ctx, "pay-3", e.ana, payload, &other, ""); err == nil {
+		t.Fatal("paying a different amount than the code's must fail")
+	}
+}
+
+func TestQRCodeClaimReleasedWhenPaymentFails(t *testing.T) {
+	e := setup(t)
+	_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
+	amount := brl("500")
+	_, payload, _ := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", &amount, "", true, 0)
+
+	poor, err := e.svc.PayQRCode(e.ctx, "p1", e.ana, payload, nil, "") // Ana has R$ 100
+	if err != nil || poor.Status != domain.StatusRejected {
+		t.Fatalf("payment without funds = %+v, %v", poor, err)
+	}
+	e.txs.balance[e.ana] = 1_000_00
+	if ok, err := e.svc.PayQRCode(e.ctx, "p2", e.ana, payload, nil, ""); err != nil || ok.Status != domain.StatusCompleted {
+		t.Fatalf("the failed payment must release the code: %+v, %v", ok, err)
+	}
+}
+
+func TestQRCodeOpenAmountAndExpiry(t *testing.T) {
+	e := setup(t)
+	_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
+	_, payload, err := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", nil, "Doações", false, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.svc.PayQRCode(e.ctx, "d1", e.ana, payload, nil, ""); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatalf("open amount without amount err = %v", err)
+	}
+	for i, v := range []string{"5", "7"} { // reusable: several payers
+		m := brl(v)
+		if tr, err := e.svc.PayQRCode(e.ctx, fmt.Sprint("d-", i), e.ana, payload, &m, ""); err != nil || tr.Status != domain.StatusCompleted {
+			t.Fatalf("donation %d = %+v, %v", i, tr, err)
+		}
+	}
+
+	if _, _, err := e.svc.CreateQRCode(e.ctx, e.ana, "bruno@example.com", nil, "", false, 0); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatalf("someone else's key err = %v", err)
+	}
+	_, expiring, _ := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", nil, "", false, time.Minute)
+	e.svc.SetClock(func() time.Time { return time.Now().Add(2 * time.Minute) })
+	if _, err := e.svc.DecodeQRCode(e.ctx, expiring); !errors.Is(err, domain.ErrQRUnavailable) {
+		t.Fatalf("expired code err = %v", err)
+	}
+}
+
+func receive(t *testing.T, e env, key string, amount string) domain.Transfer {
+	t.Helper()
+	tr, err := e.svc.Receive(e.ctx, domain.NewEndToEndID("12345678", time.Now()), key, brl(amount),
+		domain.Party{Name: "Maria Oliveira", ISPB: "12345678", BankName: "Banco Exemplo"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tr
+}
+
+func TestRefunds(t *testing.T) {
+	e := setup(t)
+	_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
+	in := receive(t, e, "bruno@example.com", "100")
+
+	r1, err := e.svc.Refund(e.ctx, "r1", e.bruno, in.ID, brl("30"), "valor errado")
+	if err != nil || r1.Status != domain.StatusCompleted || r1.RefundOf != in.ID || r1.Counterparty.Name != "Maria Oliveira" {
+		t.Fatalf("partial refund = %+v, %v", r1, err)
+	}
+	if again, err := e.svc.Refund(e.ctx, "r1", e.bruno, in.ID, brl("30"), "valor errado"); err != nil || again.ID != r1.ID {
+		t.Fatalf("retry = %+v, %v", again, err)
+	}
+	if _, err := e.svc.Refund(e.ctx, "r2", e.bruno, in.ID, brl("70.01"), ""); !errors.Is(err, domain.ErrRefundTooLarge) {
+		t.Fatalf("over-refund err = %v", err)
+	}
+	if _, err := e.svc.Refund(e.ctx, "r3", e.ana, in.ID, brl("1"), ""); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("refunding someone else's Pix err = %v", err)
+	}
+	got, _ := e.svc.Transfer(e.ctx, in.ID)
+	if got.Refunded != 30_00 {
+		t.Fatalf("refunded = %d", got.Refunded)
+	}
+
+	// A refund that fails (no funds) gives its reservation back.
+	e.txs.balance[e.bruno] = 0
+	failed, err := e.svc.Refund(e.ctx, "r4", e.bruno, in.ID, brl("70"), "")
+	if err != nil || failed.Status != domain.StatusRejected {
+		t.Fatalf("refund without funds = %+v, %v", failed, err)
+	}
+	if got, _ := e.svc.Transfer(e.ctx, in.ID); got.Refunded != 30_00 {
+		t.Fatalf("failed refund kept its reservation: %d", got.Refunded)
+	}
+
+	sent, _ := e.svc.Send(e.ctx, "out", e.ana, "maria@outrobanco.com.br", brl("1"), "")
+	if _, err := e.svc.Refund(e.ctx, "r5", e.ana, sent.ID, brl("1"), ""); !errors.Is(err, domain.ErrNotRefundable) {
+		t.Fatalf("refunding an outgoing Pix err = %v", err)
+	}
+}
+
+func TestConcurrentRefundsNeverExceedTheAmount(t *testing.T) {
+	e := setup(t)
+	_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
+	in := receive(t, e, "bruno@example.com", "100")
+	e.txs.balance[e.bruno] = 1_000_00
+
+	var wg sync.WaitGroup
+	for i := range 10 {
+		wg.Go(func() { _, _ = e.svc.Refund(e.ctx, fmt.Sprint("c", i), e.bruno, in.ID, brl("30"), "") })
+	}
+	wg.Wait()
+	got, _ := e.svc.Transfer(e.ctx, in.ID)
+	var completed int64
+	_ = e.pool.QueryRow(e.ctx, `SELECT COALESCE(SUM(amount), 0) FROM pix_transfers WHERE refund_of = $1 AND status = 'COMPLETED'`, in.ID).Scan(&completed)
+	if completed != 90_00 || got.Refunded != 90_00 {
+		t.Fatalf("refunded %d (completed %d) of 100, want 90 (three refunds of 30)", got.Refunded, completed)
 	}
 }

@@ -90,11 +90,17 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - CPF encrypted at rest with a blind index, legacy rows encrypted by an expand/contract migration ([ADR-0015](decisions/0015-encryption.md)).
 - Rate limits shared across gateway replicas through Redis (GCRA, fail open).
 
+## Phase 10 — Pix QR codes and refunds ✅
+
+- BR Code (EMV) encoder/decoder with CRC16-CCITT; static and one-time charges with expiry.
+- Paying QR codes; one-time charges claimed before money moves and released if the payment fails.
+- Partial and full refunds of received Pix within 90 days; concurrent refunds bounded by a row lock and a `CHECK` constraint.
+
 ## Next
 
 Ordered by value for the platform:
 
-1. **Pix**: QR codes (EMV BR Code), refunds, scheduled Pix.
-2. **card-service**: debit card authorization using ledger holds (< 200 ms), clearing via capture.
-3. **Operations**: Kubernetes manifests / Helm, Terraform, a KMS for key-encryption keys, certificate rotation, idempotency-key retention jobs, ledger reconciliation job, dropping the plaintext `accounts.document` column (contract step).
+1. **card-service**: debit card authorization using ledger holds (< 200 ms), clearing via capture.
+2. **Operations**: Kubernetes manifests / Helm, Terraform, a KMS for key-encryption keys, certificate rotation, idempotency-key retention jobs, ledger reconciliation job, dropping the plaintext `accounts.document` column (contract step).
+3. **Pix**: dynamic QR codes served by URL, scheduled Pix, Pix Automático.
 4. **credit-service**, **payment-service** (boleto), **notification-service**, **user-service** (KYC). Each reuses the ledger holds, sagas and outbox built above.

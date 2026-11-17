@@ -37,6 +37,9 @@ type Service struct {
 	now      func() time.Time
 }
 
+// SetClock replaces the clock (tests).
+func (s *Service) SetClock(now func() time.Time) { s.now = now }
+
 func New(store ports.Store, accounts ports.Accounts, txs ports.Transactions, dict ports.Directory, spi ports.SPI, log *slog.Logger) *Service {
 	return &Service{store: store, accounts: accounts, txs: txs, dict: dict, spi: spi, log: log, now: time.Now}
 }
@@ -109,6 +112,10 @@ func (s *Service) Lookup(ctx context.Context, raw string) (domain.KeyType, strin
 
 // Send creates an outgoing Pix and drives it as far as it can go.
 func (s *Service) Send(ctx context.Context, idemKey string, from uuid.UUID, key string, amount money.Money, description string) (domain.Transfer, error) {
+	return s.send(ctx, idemKey, from, key, amount, description, "")
+}
+
+func (s *Service) send(ctx context.Context, idemKey string, from uuid.UUID, key string, amount money.Money, description, qrTxID string) (domain.Transfer, error) {
 	_, value, receiver, receiverAccount, err := s.Lookup(ctx, key)
 	if err != nil {
 		return domain.Transfer{}, err
@@ -117,6 +124,7 @@ func (s *Service) Send(ctx context.Context, idemKey string, from uuid.UUID, key 
 	if err != nil {
 		return domain.Transfer{}, err
 	}
+	t.QRTxID = qrTxID
 	existing, fp, err := s.store.CreateTransfer(ctx, t)
 	if err != nil {
 		return domain.Transfer{}, err
@@ -130,7 +138,183 @@ func (s *Service) Send(ctx context.Context, idemKey string, from uuid.UUID, key 
 		}
 		t = *existing
 	}
+	if qrTxID != "" {
+		// Reserve the charge before any money moves; a second payer of a
+		// one-time code is rejected here, not after paying.
+		if err := s.store.ClaimQRCode(ctx, qrTxID, t.ID); errors.Is(err, domain.ErrQRUnavailable) {
+			if err := s.finish(ctx, &t, domain.StatusRejected, "QR_CODE_UNAVAILABLE"); err != nil {
+				return domain.Transfer{}, err
+			}
+			return s.store.Transfer(ctx, t.ID)
+		} else if err != nil {
+			return domain.Transfer{}, err
+		}
+	}
 	return s.Process(ctx, t.ID)
+}
+
+// QRCity is printed on the QR codes this bank issues.
+const QRCity = "SAO PAULO"
+
+// CreateQRCode issues a charge for one of the account's keys. With oneTime it
+// can be paid once; ttl (0 = no expiry) bounds how long it is valid.
+func (s *Service) CreateQRCode(ctx context.Context, account uuid.UUID, key string, amount *money.Money, description string, oneTime bool, ttl time.Duration) (domain.QRCode, string, error) {
+	holder, err := s.accounts.Holder(ctx, account)
+	if err != nil {
+		return domain.QRCode{}, "", err
+	}
+	if !holder.Active {
+		return domain.QRCode{}, "", ErrAccountNotActive
+	}
+	_, value, err := domain.DetectKeyType(key)
+	if err != nil {
+		return domain.QRCode{}, "", err
+	}
+	k, err := s.store.KeyByValue(ctx, value)
+	if err != nil || k.AccountID != account {
+		return domain.QRCode{}, "", fmt.Errorf("%w: the key must belong to the account", domain.ErrInvalidArgument)
+	}
+	if ttl < 0 || ttl > 365*24*time.Hour {
+		return domain.QRCode{}, "", fmt.Errorf("%w: expiry must be between 0 and 365 days", domain.ErrInvalidArgument)
+	}
+	q := domain.QRCode{
+		TxID: domain.NewQRTxID(), AccountID: account, Key: value, Amount: amount,
+		Description: description, OneTime: oneTime, CreatedAt: s.now(),
+	}
+	if ttl > 0 {
+		exp := s.now().Add(ttl)
+		q.ExpiresAt = &exp
+	}
+	payload, err := domain.BRCode{
+		Key: value, Amount: amount, MerchantName: holder.Name, MerchantCity: QRCity,
+		TxID: q.TxID, Description: description, OneTime: oneTime,
+	}.Encode()
+	if err != nil {
+		return domain.QRCode{}, "", err
+	}
+	if err := s.store.InsertQRCode(ctx, q); err != nil {
+		return domain.QRCode{}, "", err
+	}
+	return q, payload, nil
+}
+
+// DecodedQR is what a payer sees before confirming.
+type DecodedQR struct {
+	Code     domain.BRCode
+	Receiver domain.Party
+	// Charge is set when the code was issued by this bank.
+	Charge *domain.QRCode
+}
+
+// DecodeQRCode validates a payload and resolves its receiver.
+func (s *Service) DecodeQRCode(ctx context.Context, payload string) (DecodedQR, error) {
+	code, err := domain.DecodeBRCode(payload)
+	if err != nil {
+		return DecodedQR{}, err
+	}
+	_, value, receiver, _, err := s.Lookup(ctx, code.Key)
+	if err != nil {
+		return DecodedQR{}, err
+	}
+	out := DecodedQR{Code: code, Receiver: receiver}
+	if code.HasTxID() {
+		if q, err := s.store.QRCode(ctx, code.TxID); err == nil {
+			// The checksum proves integrity, not origin: make sure the code
+			// still matches the charge we issued.
+			if q.Key != value || !sameAmount(q.Amount, code.Amount) {
+				return DecodedQR{}, fmt.Errorf("%w: QR code does not match the issued charge", domain.ErrInvalidArgument)
+			}
+			if err := q.Payable(s.now(), uuid.Nil); err != nil {
+				return DecodedQR{}, err
+			}
+			out.Charge = &q
+		} else if !errors.Is(err, domain.ErrNotFound) {
+			return DecodedQR{}, err
+		}
+	}
+	return out, nil
+}
+
+func sameAmount(a, b *money.Money) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
+}
+
+// PayQRCode pays a QR code. amount is required only when the code has none.
+func (s *Service) PayQRCode(ctx context.Context, idemKey string, from uuid.UUID, payload string, amount *money.Money, description string) (domain.Transfer, error) {
+	d, err := s.DecodeQRCode(ctx, payload)
+	if err != nil {
+		// A retry after a successful payment of a one-time code must still
+		// return that payment, so look the idempotency key up first.
+		if errors.Is(err, domain.ErrQRUnavailable) {
+			if t, ok := s.existingByKey(ctx, idemKey); ok {
+				return t, nil
+			}
+		}
+		return domain.Transfer{}, err
+	}
+	pay := d.Code.Amount
+	switch {
+	case pay == nil && amount == nil:
+		return domain.Transfer{}, fmt.Errorf("%w: this QR code has no amount, inform one", domain.ErrInvalidArgument)
+	case pay != nil && amount != nil && *amount != *pay:
+		return domain.Transfer{}, fmt.Errorf("%w: this QR code is for %s", domain.ErrInvalidArgument, pay.Decimal())
+	case pay == nil:
+		pay = amount
+	}
+	if description == "" {
+		description = d.Code.Description
+	}
+	txid := ""
+	if d.Charge != nil {
+		txid = d.Charge.TxID
+	}
+	return s.send(ctx, idemKey, from, d.Code.Key, *pay, description, txid)
+}
+
+func (s *Service) existingByKey(ctx context.Context, idemKey string) (domain.Transfer, bool) {
+	t, err := s.store.TransferByKey(ctx, idemKey)
+	return t, err == nil
+}
+
+// Refund returns (part of) a Pix the account received. Concurrent refunds
+// can never add up to more than the original amount.
+func (s *Service) Refund(ctx context.Context, idemKey string, account, originalID uuid.UUID, amount money.Money, reason string) (domain.Transfer, error) {
+	original, err := s.store.Transfer(ctx, originalID)
+	if err != nil {
+		return domain.Transfer{}, err
+	}
+	if original.AccountID != account {
+		return domain.Transfer{}, fmt.Errorf("%w: pix transfer", domain.ErrNotFound)
+	}
+	now := s.now()
+	refund, err := domain.NewRefund(idemKey, original, amount, reason, now)
+	if err != nil {
+		if t, ok := s.existingByKey(ctx, idemKey); ok && t.RefundOf == originalID {
+			return t, nil // retry after the refund already used up the balance
+		}
+		return domain.Transfer{}, err
+	}
+	existing, fp, err := s.store.CreateRefund(ctx, refund, func(locked domain.Transfer) error {
+		// Re-check under the row lock: another refund may have just run.
+		_, err := domain.NewRefund(idemKey, locked, amount, reason, now)
+		return err
+	})
+	if err != nil {
+		return domain.Transfer{}, err
+	}
+	if existing != nil {
+		if string(fp) != string(refund.Fingerprint()) {
+			return domain.Transfer{}, fmt.Errorf("%w: %q", domain.ErrIdempotencyConflict, idemKey)
+		}
+		if existing.Status.Terminal() {
+			return *existing, nil
+		}
+		refund = *existing
+	}
+	return s.Process(ctx, refund.ID)
 }
 
 // Receive handles a Pix sent to one of our keys by another bank (via SPI).
@@ -225,13 +409,20 @@ func (s *Service) run(ctx context.Context, t *domain.Transfer) error {
 }
 
 func (s *Service) metadata(t *domain.Transfer) map[string]string {
-	return map[string]string{
+	md := map[string]string{
 		"pix_transfer_id":   t.ID.String(),
 		"end_to_end_id":     t.EndToEndID,
 		"pix_key":           t.Key,
 		"counterparty_name": t.Counterparty.Name,
 		"counterparty_bank": t.Counterparty.BankName,
 	}
+	if t.RefundOf != uuid.Nil {
+		md["refund_of"] = t.RefundOf.String()
+	}
+	if t.QRTxID != "" {
+		md["qr_txid"] = t.QRTxID
+	}
+	return md
 }
 
 // sendInternal moves money between two of our accounts in one saga.
@@ -373,5 +564,13 @@ func transferPayload(t domain.Transfer) map[string]any {
 		"counterparty_name": t.Counterparty.Name, "counterparty_bank": t.Counterparty.BankName,
 		"amount_minor": t.Amount.Minor(), "currency": string(t.Amount.Currency()),
 		"transaction_id": t.TransactionID.String(), "failure_reason": t.FailureReason,
+		"refund_of": nullableID(t.RefundOf), "qr_txid": t.QRTxID,
 	}
+}
+
+func nullableID(id uuid.UUID) string {
+	if id == uuid.Nil {
+		return ""
+	}
+	return id.String()
 }

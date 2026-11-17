@@ -20,6 +20,15 @@ service PixService {
 
   // Simulates the SPI delivering a Pix sent by another bank to one of our keys.
   rpc SimulateIncoming(SimulateIncomingRequest) returns (SimulateIncomingResponse);
+
+  // Issues a BR Code ("Pix copia e cola") for one of the account's keys.
+  rpc CreateQrCode(CreateQrCodeRequest) returns (CreateQrCodeResponse);
+  // Validates a BR Code and resolves its receiver, before paying.
+  rpc DecodeQrCode(DecodeQrCodeRequest) returns (DecodeQrCodeResponse);
+  // Pays a BR Code. A one-time code of this bank can be paid only once.
+  rpc PayQrCode(PayQrCodeRequest) returns (PayQrCodeResponse);
+  // Returns (part of) a received Pix to the payer, within 90 days.
+  rpc RefundTransfer(RefundTransferRequest) returns (RefundTransferResponse);
 }
 
 enum KeyType {
@@ -81,6 +90,12 @@ message Transfer {
   string failure_reason = 11;
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp updated_at = 13;
+  // Set on a refund: the incoming transfer it returns money for.
+  string refund_of = 14;
+  // On an incoming transfer: amount already refunded (or being refunded).
+  bank.common.v1.Money refunded = 15;
+  // Set when the transfer paid a QR code charge.
+  string qr_txid = 16;
 }
 
 message RegisterKeyRequest {
@@ -149,5 +164,66 @@ message SimulateIncomingRequest {
 }
 
 message SimulateIncomingResponse {
+  Transfer transfer = 1;
+}
+
+message CreateQrCodeRequest {
+  string account_id = 1;
+  // One of the account's keys.
+  string key = 2;
+  // Optional: without it the payer chooses the amount.
+  bank.common.v1.Money amount = 3;
+  string description = 4;
+  bool one_time = 5;
+  // 0 = no expiry.
+  int64 expires_in_seconds = 6;
+}
+
+message CreateQrCodeResponse {
+  string txid = 1;
+  // The "Pix copia e cola" string; render it as a QR code.
+  string payload = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+message DecodeQrCodeRequest {
+  string payload = 1;
+}
+
+message DecodeQrCodeResponse {
+  string key = 1;
+  Party receiver = 2;
+  // Absent when the payer chooses the amount.
+  bank.common.v1.Money amount = 3;
+  string txid = 4;
+  string description = 5;
+  bool one_time = 6;
+  // True when the charge was issued by this bank.
+  bool issued_here = 7;
+}
+
+message PayQrCodeRequest {
+  string idempotency_key = 1;
+  string from_account_id = 2;
+  string payload = 3;
+  // Required only when the code has no amount.
+  bank.common.v1.Money amount = 4;
+  string description = 5;
+}
+
+message PayQrCodeResponse {
+  Transfer transfer = 1;
+}
+
+message RefundTransferRequest {
+  string idempotency_key = 1;
+  // The account that received the original transfer.
+  string account_id = 2;
+  string transfer_id = 3;
+  bank.common.v1.Money amount = 4;
+  string reason = 5;
+}
+
+message RefundTransferResponse {
   Transfer transfer = 1;
 }

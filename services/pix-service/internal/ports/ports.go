@@ -22,7 +22,16 @@ type Store interface {
 	// CreateTransfer inserts t unless its idempotency key (or E2E id) exists;
 	// then it returns the stored transfer and its fingerprint.
 	CreateTransfer(ctx context.Context, t domain.Transfer) (existing *domain.Transfer, fingerprint []byte, err error)
+	// CreateRefund locks the original transfer, runs check on it, inserts the
+	// refund and reserves its amount, atomically.
+	CreateRefund(ctx context.Context, refund domain.Transfer, check func(original domain.Transfer) error) (existing *domain.Transfer, fingerprint []byte, err error)
+
+	InsertQRCode(ctx context.Context, q domain.QRCode) error
+	QRCode(ctx context.Context, txid string) (domain.QRCode, error)
+	// ClaimQRCode reserves a charge for a transfer (domain.ErrQRUnavailable if taken or expired).
+	ClaimQRCode(ctx context.Context, txid string, transfer uuid.UUID) error
 	Transfer(ctx context.Context, id uuid.UUID) (domain.Transfer, error)
+	TransferByKey(ctx context.Context, idempotencyKey string) (domain.Transfer, error)
 	Acquire(ctx context.Context, id uuid.UUID, d time.Duration) (domain.Transfer, bool, error)
 	Release(ctx context.Context, id uuid.UUID) error
 	SaveTransfer(ctx context.Context, t domain.Transfer, events ...outbox.Message) error

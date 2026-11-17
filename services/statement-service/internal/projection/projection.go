@@ -119,7 +119,10 @@ func (p *Projector) transaction(ctx context.Context, ev outbox.Event) error {
 		t.OccurredAt = ev.OccurredAt
 	}
 	typ := t.Type
-	if t.Type == "INTERNAL_TRANSFER" && t.Metadata["end_to_end_id"] != "" {
+	switch {
+	case t.Metadata["refund_of"] != "":
+		typ = "PIX_REFUND"
+	case t.Type == "INTERNAL_TRANSFER" && t.Metadata["end_to_end_id"] != "":
 		typ = "PIX" // same-bank Pix
 	}
 	return inbox.Handle(ctx, p.pool, consumer, ev, func(tx pgx.Tx) error {
