@@ -32,7 +32,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - `CheckLimit` with daily usage tracking.
 - Events (`account.opened`, `account.blocked`, …) written to the outbox.
 
-## Phase 3 — Money movement (sagas)
+## Phase 3 — Money movement (sagas) ✅
 
 [transaction-service](services/transaction-service.md), [ADR-0008](decisions/0008-orchestrated-sagas.md)
 

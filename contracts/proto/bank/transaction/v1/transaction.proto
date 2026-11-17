@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package bank.transaction.v1;
+
+import "bank/common/v1/money.proto";
+import "google/protobuf/timestamp.proto";
+
+// TransactionService orchestrates money movements as sagas: limits in
+// account-service, entries and holds in ledger-service, with compensation.
+service TransactionService {
+  // One-step transfer between two customer accounts. Idempotent on idempotency_key.
+  rpc CreateTransfer(CreateTransferRequest) returns (CreateTransferResponse);
+
+  // Starts a two-phase outgoing payment (e.g. PIX_OUT): consumes the limit and
+  // places a hold. Ends RESERVED until CompleteTransaction or CompensateTransaction.
+  rpc ReserveOutgoing(ReserveOutgoingRequest) returns (ReserveOutgoingResponse);
+  // Captures the hold of a RESERVED transaction.
+  rpc CompleteTransaction(CompleteTransactionRequest) returns (CompleteTransactionResponse);
+  // Releases the hold and restores the limit of a RESERVED transaction.
+  rpc CompensateTransaction(CompensateTransactionRequest) returns (CompensateTransactionResponse);
+
+  // Credits money arriving from outside (e.g. PIX_IN) to a customer account.
+  rpc CreditIncoming(CreditIncomingRequest) returns (CreditIncomingResponse);
+
+  rpc GetTransaction(GetTransactionRequest) returns (GetTransactionResponse);
+}
+
+enum TransactionType {
+  TRANSACTION_TYPE_UNSPECIFIED = 0;
+  TRANSACTION_TYPE_INTERNAL_TRANSFER = 1;
+  TRANSACTION_TYPE_PIX_OUT = 2;
+  TRANSACTION_TYPE_PIX_IN = 3;
+}
+
+enum TransactionStatus {
+  TRANSACTION_STATUS_UNSPECIFIED = 0;
+  TRANSACTION_STATUS_PENDING = 1;
+  TRANSACTION_STATUS_RESERVED = 2;
+  TRANSACTION_STATUS_COMPLETED = 3;
+  TRANSACTION_STATUS_COMPENSATING = 4;
+  TRANSACTION_STATUS_FAILED = 5;
+}
+
+message Transaction {
+  string id = 1;
+  string idempotency_key = 2;
+  TransactionType type = 3;
+  TransactionStatus status = 4;
+  string from_account_id = 5;
+  string to_account_id = 6;
+  bank.common.v1.Money amount = 7;
+  string description = 8;
+  map<string, string> metadata = 9;
+  // Machine-readable failure reason, e.g. INSUFFICIENT_FUNDS, LIMIT_EXCEEDED.
+  string failure_reason = 10;
+  string ledger_entry_id = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+}
+
+message CreateTransferRequest {
+  string idempotency_key = 1;
+  string from_account_id = 2;
+  string to_account_id = 3;
+  bank.common.v1.Money amount = 4;
+  string description = 5;
+}
+
+message CreateTransferResponse {
+  Transaction transaction = 1;
+}
+
+message ReserveOutgoingRequest {
+  string idempotency_key = 1;
+  TransactionType type = 2;
+  string from_account_id = 3;
+  // Internal account credited on completion, e.g. the Pix settlement account.
+  string to_account_id = 4;
+  bank.common.v1.Money amount = 5;
+  string description = 6;
+  map<string, string> metadata = 7;
+}
+
+message ReserveOutgoingResponse {
+  Transaction transaction = 1;
+}
+
+message CompleteTransactionRequest {
+  string id = 1;
+}
+
+message CompleteTransactionResponse {
+  Transaction transaction = 1;
+}
+
+message CompensateTransactionRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message CompensateTransactionResponse {
+  Transaction transaction = 1;
+}
+
+message CreditIncomingRequest {
+  string idempotency_key = 1;
+  TransactionType type = 2;
+  // Internal account the money comes from, e.g. the Pix settlement account.
+  string from_account_id = 3;
+  string to_account_id = 4;
+  bank.common.v1.Money amount = 5;
+  string description = 6;
+  map<string, string> metadata = 7;
+}
+
+message CreditIncomingResponse {
+  Transaction transaction = 1;
+}
+
+message GetTransactionRequest {
+  string id = 1;
+}
+
+message GetTransactionResponse {
+  Transaction transaction = 1;
+}

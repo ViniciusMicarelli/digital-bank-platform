@@ -6,4 +6,6 @@ use (
 	./packages/go-platform
 	./services/account-service
 	./services/ledger-service
+	./services/transaction-service
+	./tests/e2e
 )

@@ -49,8 +49,8 @@ make lint    # gofmt + go vet
 - [x] `packages/go-common/money`: exact money type, no floats, overflow-checked
 - [x] **ledger-service**: journal entries, balanced postings, holds, reversals, idempotency (PostgreSQL + gRPC)
 - [x] **account-service**: account lifecycle, CPF validation, per-transaction/daily/nightly limits
-- [ ] Local stack with Docker Compose + migrations + integration tests
-- [ ] Internal transfers end to end (account → ledger → statement)
+- [x] Local stack with Docker Compose + migrations + integration tests
+- [x] **transaction-service**: orchestrated sagas (internal transfer, two-phase Pix out, Pix in) with recovery worker
 - [ ] Transactional outbox → Kafka
 - [ ] **pix-service** with an orchestrated saga
 - [ ] API gateway, identity and observability (OpenTelemetry)

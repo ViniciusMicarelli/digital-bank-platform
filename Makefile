@@ -7,13 +7,13 @@ BUF_VERSION          := v1.75.0
 PROTOC_GEN_GO        := v1.36.12
 PROTOC_GEN_GO_GRPC   := v1.6.2
 
-.PHONY: help up down test test-unit cover lint fmt tidy generate tools run-%
+.PHONY: help up down test test-unit e2e cover lint fmt tidy generate tools run-%
 
 help: ## List available targets
 	@grep -E '^[a-z%-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
 
-up: ## Start the local stack (docker compose)
-	docker compose up -d --wait
+up: ## Build and start the local stack (docker compose)
+	docker compose up -d --build --wait
 
 down: ## Stop the local stack
 	docker compose down
@@ -23,6 +23,9 @@ test: ## Run all tests, including integration tests (needs `make up`)
 
 test-unit: ## Run tests; integration tests are skipped when Postgres is down
 	go test -race $(MODULES)
+
+e2e: ## Run end-to-end tests against the running stack (`make up` first)
+	go test -tags e2e -count=1 -v ./tests/e2e/...
 
 cover: ## Print coverage per package
 	go test -cover $(MODULES)

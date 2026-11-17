@@ -36,5 +36,18 @@ services:
       postgres: { condition: service_healthy }
       ledger-service: { condition: service_started }
 
+  transaction-service:
+    build: { context: ., args: { SERVICE: transaction-service } }
+    environment:
+      DATABASE_URL: postgres://bank:bank@postgres:5432/transaction?sslmode=disable
+      GRPC_ADDR: ":9003"
+      LEDGER_ADDR: ledger-service:9001
+      ACCOUNT_ADDR: account-service:9002
+    ports: ["9003:9003"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      ledger-service: { condition: service_started }
+      account-service: { condition: service_started }
+
 volumes:
   pgdata:

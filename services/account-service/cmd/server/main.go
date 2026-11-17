@@ -37,7 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	ledgerConn, err := grpcserver.Dial(config.String("LEDGER_ADDR", "localhost:9001"))
+	ledgerConn, err := grpcserver.Dial(config.String("LEDGER_ADDR", "127.0.0.1:9001"))
 	if err != nil {
 		log.Error("dial ledger", "error", err)
 		os.Exit(1)
