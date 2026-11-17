@@ -56,7 +56,12 @@ func main() {
 	go app.RunKeyRotation(ctx, config.Duration("SIGNING_KEY_MAX_AGE", 30*24*time.Hour))
 	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
 
-	srv := grpcserver.New(log, grpcserver.Options{})
+	srvOpts, err := grpcserver.OptionsFromEnv()
+	if err != nil {
+		log.Error("tls", "error", err)
+		os.Exit(1)
+	}
+	srv := grpcserver.New(log, srvOpts)
 	identityv1.RegisterIdentityServiceServer(srv, grpcapi.NewServer(app))
 	if err := grpcserver.Serve(ctx, log, srv, config.String("GRPC_ADDR", ":9006")); err != nil {
 		log.Error("serve", "error", err)

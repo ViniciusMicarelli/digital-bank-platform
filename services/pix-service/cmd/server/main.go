@@ -77,7 +77,12 @@ func main() {
 	}
 	go app.RunRecovery(ctx, config.Duration("RECOVERY_INTERVAL", 5*time.Second), config.Duration("RECOVERY_STALE_AFTER", 10*time.Second))
 
-	srv := grpcserver.New(log, grpcserver.Options{})
+	srvOpts, err := grpcserver.OptionsFromEnv()
+	if err != nil {
+		log.Error("tls", "error", err)
+		os.Exit(1)
+	}
+	srv := grpcserver.New(log, srvOpts)
 	pixv1.RegisterPixServiceServer(srv, grpcapi.NewServer(app))
 	if err := grpcserver.Serve(ctx, log, srv, config.String("GRPC_ADDR", ":9004")); err != nil {
 		log.Error("serve", "error", err)

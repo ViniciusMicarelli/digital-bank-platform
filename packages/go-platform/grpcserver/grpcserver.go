@@ -23,6 +23,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/correlation"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/mtls"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 )
 
@@ -30,6 +31,23 @@ import (
 type Options struct {
 	UnaryInterceptors []grpc.UnaryServerInterceptor
 	ServerOptions     []grpc.ServerOption
+}
+
+// OptionsFromEnv enables mutual TLS and caller authorization when TLS_CERT is
+// set (see package mtls); otherwise the server speaks plaintext.
+func OptionsFromEnv() (Options, error) {
+	cfg := mtls.FromEnv()
+	if !cfg.Enabled() {
+		return Options{}, nil
+	}
+	creds, err := cfg.ServerCredentials()
+	if err != nil {
+		return Options{}, err
+	}
+	return Options{
+		ServerOptions:     []grpc.ServerOption{grpc.Creds(creds)},
+		UnaryInterceptors: []grpc.UnaryServerInterceptor{mtls.Authorize(mtls.AllowedCallersFromEnv())},
+	}, nil
 }
 
 // New builds a server with tracing (OpenTelemetry), correlation IDs, panic
@@ -80,11 +98,18 @@ func Serve(ctx context.Context, log *slog.Logger, srv *grpc.Server, addr string)
 	return nil
 }
 
-// Dial creates a client connection to another service.
-// Transport security (mTLS) is added at the mesh layer, see docs/architecture/security.md.
+// Dial creates a client connection to another service, with mutual TLS when
+// TLS_CERT is set (the server name is the target's host).
 func Dial(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	creds := insecure.NewCredentials()
+	if cfg := mtls.FromEnv(); cfg.Enabled() {
+		var err error
+		if creds, err = cfg.ClientCredentials(target); err != nil {
+			return nil, err
+		}
+	}
 	opts = append([]grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithTransportCredentials(creds),
 		// No service config via DNS TXT records: the lookup times out on
 		// Docker's resolver and delayed every first call by ~8 s.
 		grpc.WithDisableServiceConfig(),

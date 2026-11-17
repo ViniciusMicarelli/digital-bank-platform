@@ -51,7 +51,12 @@ func main() {
 	app := application.New(pgstore.NewStore(pool), ledger.New(ledgerv1.NewLedgerServiceClient(ledgerConn)), nil)
 	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
 
-	srv := grpcserver.New(log, grpcserver.Options{})
+	srvOpts, err := grpcserver.OptionsFromEnv()
+	if err != nil {
+		log.Error("tls", "error", err)
+		os.Exit(1)
+	}
+	srv := grpcserver.New(log, srvOpts)
 	accountv1.RegisterAccountServiceServer(srv, grpcapi.NewServer(app))
 
 	if err := grpcserver.Serve(ctx, log, srv, config.String("GRPC_ADDR", ":9002")); err != nil {

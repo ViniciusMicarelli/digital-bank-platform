@@ -7,15 +7,21 @@ BUF_VERSION          := v1.75.0
 PROTOC_GEN_GO        := v1.36.12
 PROTOC_GEN_GO_GRPC   := v1.6.2
 
-.PHONY: help up up-obs demo down test test-unit e2e cover lint fmt tidy generate tools run-%
+.PHONY: help certs up up-obs demo down test test-unit e2e cover lint fmt tidy generate tools run-%
 
 help: ## List available targets
 	@grep -E '^[a-z%-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
 
-up: ## Build and start the local stack (docker compose)
+certs: ## Generate the development CA and mTLS certificates (infrastructure/certs)
+	go run ./packages/go-platform/cmd/devcerts -out infrastructure/certs
+
+infrastructure/certs/ca.pem:
+	$(MAKE) certs
+
+up: infrastructure/certs/ca.pem ## Build and start the local stack (docker compose)
 	docker compose up -d --build --wait
 
-up-obs: ## Start the stack plus Grafana (http://127.0.0.1:3000)
+up-obs: infrastructure/certs/ca.pem ## Start the stack plus Grafana (http://127.0.0.1:3000)
 	docker compose --profile observability up -d --build --wait
 
 demo: ## Walk through the public API with curl (needs `make up` and jq)
@@ -30,8 +36,13 @@ test: ## Run all tests, including integration tests (needs `make up`)
 test-unit: ## Run tests; integration tests are skipped when Postgres is down
 	go test -race $(MODULES)
 
+# Host-side gRPC clients (e2e tests, grpcurl) use the dev-client identity.
+DEV_CLIENT_TLS := TLS_CA=$(CURDIR)/infrastructure/certs/ca.pem \
+	TLS_CERT=$(CURDIR)/infrastructure/certs/dev-client.pem \
+	TLS_KEY=$(CURDIR)/infrastructure/certs/dev-client-key.pem
+
 e2e: ## Run end-to-end tests against the running stack (`make up` first)
-	go test -tags e2e -count=1 -v ./tests/e2e/...
+	$(DEV_CLIENT_TLS) go test -tags e2e -count=1 -v ./tests/e2e/...
 
 cover: ## Print coverage per package
 	go test -cover $(MODULES)

@@ -54,7 +54,12 @@ func main() {
 		log.Warn("KAFKA_BROKERS not set: the feed will not be updated")
 	}
 
-	srv := grpcserver.New(log, grpcserver.Options{})
+	srvOpts, err := grpcserver.OptionsFromEnv()
+	if err != nil {
+		log.Error("tls", "error", err)
+		os.Exit(1)
+	}
+	srv := grpcserver.New(log, srvOpts)
 	statementv1.RegisterStatementServiceServer(srv, grpcapi.NewServer(p))
 	if err := grpcserver.Serve(ctx, log, srv, config.String("GRPC_ADDR", ":9005")); err != nil {
 		log.Error("serve", "error", err)

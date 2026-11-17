@@ -7,6 +7,9 @@ coverage.*
 go.work.sum
 vendor/
 
+# Development certificates (make certs)
+infrastructure/certs/
+
 # Environment & secrets
 .env
 .env.*
