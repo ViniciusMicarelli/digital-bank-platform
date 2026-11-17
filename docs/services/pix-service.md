@@ -6,59 +6,68 @@ Pix, the Brazilian instant payment system. Integrations with the Central Bank (*
 
 ## Capabilities
 
-- **Keys**: register, list and delete Pix keys (CPF, email, phone, random EVP). A customer can have at most 5 keys per account.
-- **Key lookup**: resolve a key to the recipient's name, bank and masked document before confirming.
-- **Transfers out**: send a Pix with a key, manual bank data or a QR code.
-- **Transfers in**: receive Pix credits from the simulated SPI.
-- **QR codes**: static (fixed key, optional amount) and dynamic (one-time charge with expiry), following the EMV BR Code format.
-- **Refunds**: return a received Pix (full or partial).
-- **Limits**: daytime and night-time limits enforced through `account-service`.
+| Capability | Status |
+|---|---|
+| Keys: register, list, delete (CPF, email, phone `+55DD9XXXXXXXX`, random EVP). Max 5 per account; a CPF key must be the holder's CPF | ✅ |
+| Key lookup: receiver name, masked document (`***.982.247-**`), bank | ✅ |
+| Transfer to a customer of this bank (one-step saga) | ✅ |
+| Transfer to another bank: reserve → SPI → capture / release | ✅ |
+| Incoming transfer from another bank (simulated SPI delivery) | ✅ |
+| Keys removed when an account closes (`account.closed` consumer, inbox) | ✅ |
+| QR codes (EMV BR Code), refunds, night-time Pix limits via `account-service` | planned |
 
 ## Outgoing Transfer Flow
-
-See [overview › Pix transfer](../architecture/overview.md#pix-transfer-outgoing).
 
 ```mermaid
 stateDiagram-v2
     [*] --> CREATED
-    CREATED --> FUNDS_RESERVED
-    CREATED --> REJECTED: limits / funds
-    FUNDS_RESERVED --> SENT_TO_SPI
-    SENT_TO_SPI --> COMPLETED
-    SENT_TO_SPI --> FAILED: rejected / timeout → compensation
-    COMPLETED --> REFUNDED: refund requested
+    CREATED --> COMPLETED: same bank (transaction-service transfer)
+    CREATED --> REJECTED: limits / funds / inactive account
+    CREATED --> FUNDS_RESERVED: other bank (limit + hold)
+    FUNDS_RESERVED --> SENT_TO_SPI: intent recorded before calling SPI
+    SENT_TO_SPI --> COMPLETED: SPI settled → capture
+    SENT_TO_SPI --> FAILED: receiving bank refused → release + restore limit
 ```
 
+- Every downstream call is idempotent: transaction keys are `pix:<transfer id>` (outgoing) and `pix-in:<E2E id>` (incoming), and SPI is idempotent on the E2E ID.
+- A lease on the transfer row serializes processing; a recovery worker resumes transfers stuck in `CREATED`, `FUNDS_RESERVED` or `SENT_TO_SPI` (for example when transaction-service was down).
+- `SENT_TO_SPI` is saved **before** calling SPI, so after a crash the worker asks SPI again (same E2E ID) instead of guessing.
+
+## Simulators
+
+The Central Bank systems are behind ports (`Directory`, `SPI`) with in-memory simulators:
+
+| Key | Behaviour |
+|---|---|
+| `maria@outrobanco.com.br`, `+5511987654321` | Accounts at "Banco Exemplo" (ISPB 12345678); payments settle |
+| `recusa@outrobanco.com.br` | The receiving bank rejects every payment (`RECEIVER_BANK_REJECTED`) |
+
+`SimulateIncoming` plays the SPI delivering a Pix from another bank to one of our keys.
+
 ## gRPC API
+
+Defined in [`contracts/proto/bank/pix/v1/pix.proto`](../../contracts/proto/bank/pix/v1/pix.proto).
 
 | Method | Description |
 |---|---|
 | `RegisterKey` / `DeleteKey` / `ListKeys` | Key management |
 | `LookupKey` | Resolve a key |
-| `CreateTransfer` | Send a Pix |
+| `CreateTransfer` | Send a Pix (idempotent on `idempotency_key`) |
 | `GetTransfer` | Transfer status |
-| `CreateQrCode` / `DecodeQrCode` | QR code operations |
-| `RefundTransfer` | Refund a received Pix |
+| `SimulateIncoming` | Simulated SPI delivery |
 
 ## Events
 
-| Publishes | Consumes |
+| Publishes (`bank.pix.events`) | Consumes |
 |---|---|
-| `pix.key.registered` | `account.opened` (enable Pix) |
-| `pix.key.deleted` | `account.blocked`, `account.closed` (disable keys) |
-| `pix.transfer.completed` | |
-| `pix.transfer.failed` | |
-| `pix.transfer.received` | |
-| `pix.refund.completed` | |
+| `pix.key.registered`, `pix.key.deleted` | `account.closed` (remove keys) |
+| `pix.transfer.completed`, `pix.transfer.failed`, `pix.transfer.received` | |
 
 ## Dependencies
 
-- `transaction-service` (gRPC)
-- `account-service` (gRPC, limits)
-- DICT / SPI simulators (ports `KeyDirectory`, `SettlementGateway`)
+- `account-service` (gRPC): holder name, document and status
+- `transaction-service` (gRPC): transfers, reservations, credits
 
 ## Data
 
-`pix_keys`, `pix_transfers`, `qr_codes`, `refunds`, `outbox`, `inbox`.
-
-Every transfer stores its `end_to_end_id` (E2E ID), the unique identifier of the payment.
+`pix_keys`, `pix_transfers`, `outbox`, `inbox`. Every transfer stores its `end_to_end_id` (E2E ID), the unique identifier of a Pix payment.

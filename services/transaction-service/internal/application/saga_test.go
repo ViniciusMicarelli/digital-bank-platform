@@ -206,7 +206,7 @@ func events(t *testing.T, pool *pgxpool.Pool, id uuid.UUID) []string {
 
 func TestTransferCompletes(t *testing.T) {
 	e := setup(t)
-	tx, err := e.svc.Transfer(context.Background(), "k1", e.alice, e.bob, brl("100"), "rent")
+	tx, err := e.svc.Transfer(context.Background(), "k1", e.alice, e.bob, brl("100"), "rent", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,18 +219,18 @@ func TestTransferCompletes(t *testing.T) {
 	if got := events(t, e.pool, tx.ID); len(got) != 1 || got[0] != "transaction.completed" {
 		t.Fatalf("events = %v", got)
 	}
-	again, err := e.svc.Transfer(context.Background(), "k1", e.alice, e.bob, brl("100"), "rent")
+	again, err := e.svc.Transfer(context.Background(), "k1", e.alice, e.bob, brl("100"), "rent", nil)
 	if err != nil || again.ID != tx.ID || e.ledger.balances[e.bob] != 10_000 {
 		t.Fatalf("retry moved money again or failed: %v", err)
 	}
-	if _, err := e.svc.Transfer(context.Background(), "k1", e.alice, e.bob, brl("101"), "rent"); !errors.Is(err, domain.ErrIdempotencyConflict) {
+	if _, err := e.svc.Transfer(context.Background(), "k1", e.alice, e.bob, brl("101"), "rent", nil); !errors.Is(err, domain.ErrIdempotencyConflict) {
 		t.Fatalf("conflict err = %v", err)
 	}
 }
 
 func TestTransferInsufficientFundsCompensatesLimit(t *testing.T) {
 	e := setup(t)
-	tx, err := e.svc.Transfer(context.Background(), "k", e.alice, e.bob, brl("600"), "")
+	tx, err := e.svc.Transfer(context.Background(), "k", e.alice, e.bob, brl("600"), "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,12 +252,12 @@ func TestTransferInsufficientFundsCompensatesLimit(t *testing.T) {
 func TestTransferRejectedBeforeMovingMoney(t *testing.T) {
 	e := setup(t)
 	e.accounts.limit = 1_000
-	tx, _ := e.svc.Transfer(context.Background(), "k1", e.alice, e.bob, brl("20"), "")
+	tx, _ := e.svc.Transfer(context.Background(), "k1", e.alice, e.bob, brl("20"), "", nil)
 	if tx.Status != domain.StatusFailed || tx.FailureReason != "LIMIT_EXCEEDED" || e.accounts.restores != 0 {
 		t.Fatalf("limit: %+v restores=%d", tx, e.accounts.restores)
 	}
 	e.accounts.inactive[e.bob] = true
-	tx, _ = e.svc.Transfer(context.Background(), "k2", e.alice, e.bob, brl("1"), "")
+	tx, _ = e.svc.Transfer(context.Background(), "k2", e.alice, e.bob, brl("1"), "", nil)
 	if tx.Status != domain.StatusFailed || tx.FailureReason != "DESTINATION_NOT_ACTIVE" {
 		t.Fatalf("inactive destination: %+v", tx)
 	}
@@ -269,7 +269,7 @@ func TestTechnicalFailureIsRecovered(t *testing.T) {
 
 	// The ledger posts the entry but the response is lost.
 	e.ledger.lostResponse = true
-	tx, err := e.svc.Transfer(ctx, "k", e.alice, e.bob, brl("10"), "")
+	tx, err := e.svc.Transfer(ctx, "k", e.alice, e.bob, brl("10"), "", nil)
 	if err == nil {
 		t.Fatal("expected a technical error")
 	}
@@ -296,11 +296,11 @@ func TestDownstreamDownThenClientRetry(t *testing.T) {
 	e := setup(t)
 	ctx := context.Background()
 	e.ledger.down = true
-	if _, err := e.svc.Transfer(ctx, "k", e.alice, e.bob, brl("10"), ""); err == nil {
+	if _, err := e.svc.Transfer(ctx, "k", e.alice, e.bob, brl("10"), "", nil); err == nil {
 		t.Fatal("expected error while ledger is down")
 	}
 	e.ledger.down = false
-	tx, err := e.svc.Transfer(ctx, "k", e.alice, e.bob, brl("10"), "")
+	tx, err := e.svc.Transfer(ctx, "k", e.alice, e.bob, brl("10"), "", nil)
 	if err != nil || tx.Status != domain.StatusCompleted {
 		t.Fatalf("retry = %+v, %v", tx, err)
 	}
@@ -381,7 +381,7 @@ func TestConcurrentRunsAreSerialized(t *testing.T) {
 	e := setup(t)
 	ctx := context.Background()
 	e.ledger.down = true
-	tx, _ := e.svc.Transfer(ctx, "k", e.alice, e.bob, brl("10"), "")
+	tx, _ := e.svc.Transfer(ctx, "k", e.alice, e.bob, brl("10"), "", nil)
 	e.ledger.down = false
 
 	var wg sync.WaitGroup

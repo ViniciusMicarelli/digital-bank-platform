@@ -52,7 +52,7 @@ make lint    # gofmt + go vet
 - [x] Local stack with Docker Compose + migrations + integration tests
 - [x] **transaction-service**: orchestrated sagas (internal transfer, two-phase Pix out, Pix in) with recovery worker
 - [x] Transactional outbox → Kafka relay, consumer groups with DLQ, inbox deduplication
-- [ ] **pix-service** with an orchestrated saga
+- [x] **pix-service**: keys, lookup, same-bank and cross-bank Pix (simulated DICT/SPI), incoming Pix
 - [ ] API gateway, identity and observability (OpenTelemetry)
 
 ## License

@@ -36,7 +36,7 @@ func (s *Server) CreateTransfer(ctx context.Context, req *txv1.CreateTransferReq
 	if err != nil {
 		return nil, err
 	}
-	t, err := s.app.Transfer(ctx, req.GetIdempotencyKey(), from, to, amount, req.GetDescription())
+	t, err := s.app.Transfer(ctx, req.GetIdempotencyKey(), from, to, amount, req.GetDescription(), req.GetMetadata())
 	return respond(t, err, func(p *txv1.Transaction) *txv1.CreateTransferResponse {
 		return &txv1.CreateTransferResponse{Transaction: p}
 	})

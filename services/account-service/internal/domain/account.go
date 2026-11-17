@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/google/uuid"
 
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/document"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
 )
 
@@ -137,36 +137,11 @@ func FormatNumber(seq int64) string {
 	return fmt.Sprintf("%s-%d", base, d)
 }
 
-// NormalizeCPF strips punctuation and validates the two CPF check digits.
+// NormalizeCPF validates a CPF and returns its 11 digits.
 func NormalizeCPF(s string) (string, error) {
-	digits := strings.Map(func(r rune) rune {
-		if unicode.IsDigit(r) {
-			return r
-		}
-		if r == '.' || r == '-' || r == ' ' {
-			return -1
-		}
-		return 'x'
-	}, s)
-	invalid := fmt.Errorf("%w: invalid CPF", ErrInvalidArgument)
-	if len(digits) != 11 || strings.ContainsRune(digits, 'x') {
-		return "", invalid
+	cpf, err := document.NormalizeCPF(s)
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
-	if strings.Count(digits, digits[:1]) == 11 { // 000.000.000-00, 111..., etc.
-		return "", invalid
-	}
-	for _, n := range []int{9, 10} {
-		sum := 0
-		for i := range n {
-			sum += int(digits[i]-'0') * (n + 1 - i)
-		}
-		d := sum * 10 % 11
-		if d == 10 {
-			d = 0
-		}
-		if d != int(digits[n]-'0') {
-			return "", invalid
-		}
-	}
-	return digits, nil
+	return cpf, nil
 }

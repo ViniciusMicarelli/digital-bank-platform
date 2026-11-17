@@ -64,6 +64,7 @@ message CreateTransferRequest {
   string to_account_id = 3;
   bank.common.v1.Money amount = 4;
   string description = 5;
+  map<string, string> metadata = 6;
 }
 
 message CreateTransferResponse {

@@ -43,8 +43,8 @@ func New(store ports.Store, ledger ports.Ledger, accounts ports.Accounts, log *s
 }
 
 // Transfer moves money between two customer accounts in one step.
-func (s *Service) Transfer(ctx context.Context, key string, from, to uuid.UUID, amount money.Money, description string) (domain.Transaction, error) {
-	return s.start(ctx, key, domain.TypeInternalTransfer, from, to, amount, description, nil)
+func (s *Service) Transfer(ctx context.Context, key string, from, to uuid.UUID, amount money.Money, description string, metadata map[string]string) (domain.Transaction, error) {
+	return s.start(ctx, key, domain.TypeInternalTransfer, from, to, amount, description, metadata)
 }
 
 // ReserveOutgoing consumes the limit and holds the funds; the transaction

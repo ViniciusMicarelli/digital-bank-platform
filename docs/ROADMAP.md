@@ -51,7 +51,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Common event envelope (id, type, version, occurred_at, correlation_id, payload).
 - Consumer helper with an inbox table for idempotent handling.
 
-## Phase 5 — Pix
+## Phase 5 — Pix ✅
 
 [pix-service](services/pix-service.md)
 

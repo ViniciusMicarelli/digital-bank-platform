@@ -78,5 +78,20 @@ services:
       ledger-service: { condition: service_started }
       account-service: { condition: service_started }
 
+  pix-service:
+    build: { context: ., args: { SERVICE: pix-service } }
+    environment:
+      DATABASE_URL: postgres://bank:bank@postgres:5432/pix?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      GRPC_ADDR: ":9004"
+      ACCOUNT_ADDR: account-service:9002
+      TRANSACTION_ADDR: transaction-service:9003
+    ports: ["9004:9004"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      account-service: { condition: service_started }
+      transaction-service: { condition: service_started }
+
 volumes:
   pgdata:
