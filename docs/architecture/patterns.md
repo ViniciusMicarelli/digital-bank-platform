@@ -1,102 +1,238 @@
-# Architectural Patterns
+# Patterns
+
+This document describes the architectural patterns used throughout the platform.
 
 ## Hexagonal Architecture (Ports and Adapters)
 
-Every service isolates domain logic from infrastructure:
+All services follow the hexagonal (ports and adapters) architecture pattern:
 
-```text
-           ┌────────────────────────────────────────┐
- gRPC ───▶ │ adapters/grpc                          │
- Kafka ──▶ │ adapters/kafka (consumer)              │
-           │        │                               │
-           │        ▼                               │
-           │  application (use cases)               │
-           │        │                               │
-           │        ▼                               │
-           │  domain (entities, rules)              │
-           │        ▲                               │
-           │        │ ports (interfaces)            │
-           │  adapters/postgres, adapters/kafka     │ ───▶ DB / Kafka
-           └────────────────────────────────────────┘
+```
+                    ┌─────────────────────┐
+                    │   Application Layer │
+                    │ (Use Cases/Handlers)│
+                    └─────────────────────┘
+                   /                      \
+                  /                        \
+         ┌──────────────┐         ┌──────────────┐
+         │   Ports      │         │   Ports      │
+         │ (Interfaces) │         │ (Interfaces) │
+         └──────────────┘         └──────────────┘
+            |  (Adapter)            |  (Adapter)
+            |                      |
+    ┌──────────────┐       ┌──────────────┐
+    │   Adapters   │       │   Adapters   │
+    │  Inbound    │       │  Outbound    │
+    └──────────────┘       └──────────────┘
+         |                      |
+    ┌──────────────┐       ┌──────────────┐
+    │  gRPC        │       │  PostgreSQL  │
+    │  Kafka       │       │  Redis       │
+    └──────────────┘       └──────────────┘
+         |                      |
+    ┌──────────────┐       ┌──────────────┐
+    │   Domain     │       │   Domain     │
+    │  Models     │       │  Models     │
+    └──────────────┘       └──────────────┘
 ```
 
-- `domain` depends on nothing.
-- `application` depends only on `domain` and `ports`.
-- `adapters` implement `ports` and are wired together in `cmd/server`.
+### Benefits
+
+- **Clear separation of concerns**: Domain logic is independent of infrastructure
+- **Easy testing**: Can test domain logic without infrastructure
+- **Swappable infrastructure**: Can change databases, message brokers, etc. without changing domain logic
+- **Testability**: Ports (interfaces) can be mocked in tests
+
+### Implementation Details
+
+**Domain Layer**
+- Contains business entities, value objects, and domain rules
+- No dependencies on external systems
+- Pure business logic
+
+**Application Layer**
+- Orchestrates domain logic
+- Handles commands and queries
+- Coordinates between domain entities and infrastructure
+
+**Ports (Interfaces)**
+- Define contracts for external interactions
+- No implementation, just interfaces
+- Example: `MoneyRepository`, `KafkaPublisher`
+
+**Adapters (Implementations)**
+- Implement ports using concrete technologies
+- Example: `PostgresMoneyRepository` implements `MoneyRepository`
+
+### Example Structure
+
+```go
+// ports
+type MoneyRepository interface {
+    GetMoney(ctx context.Context, id string) (*Money, error)
+}
+
+// adapters/ports/postgres
+type PostgresMoneyRepository struct{}
+
+func (r *PostgresMoneyRepository) GetMoney(ctx context.Context, id string) (*Money, error) {
+    // Implementation using PostgreSQL
+}
+```
+
+## Event-Driven Architecture
+
+Services communicate asynchronously through domain events published to Kafka.
+
+### Event Schema
+
+- Events are defined in `contracts/events/`
+- Schemas are versioned
+- JSON Schema format for compatibility
+
+### Event Handling
+
+- Consumers are idempotent (can handle the same event multiple times safely)
+- Out-of-order events are handled gracefully
+- Dead letter queues for failed processing
+
+### Lifecycle
+
+1. Event is published (via transactional outbox)
+2. Event is committed to Kafka
+3. Consumers poll for new events
+4. Processing happens (idempotently)
+4. Side effects (notifications, projections, etc.)
+
+## CQRS (Command Query Responsibility Segregation)
+
+Read and write operations are separated into different models.
+
+### Write Model
+
+- The domain model used for writing
+- Normalized for consistency
+- Stored in the primary database
+
+### Read Model
+
+- Optimized for specific queries
+- Can be denormalized
+- Stored in optimized format (can be different database)
+
+### Example: Statement Service
+
+**Write Model**: Transaction records (normalized, linked to accounts)
+
+**Read Model**: Pre-computed projection per account (denormalized, ready for fast reads)
+
+**Commands**: `CreateTransaction` → updates write model → publishes event → triggers read model update
+
+**Queries**: `GetAccountStatement` → reads from read model directly (no join to write model)
+
+## API Gateway Pattern
+
+Single entry point for all external client traffic.
+
+### Responsibilities
+
+- Request routing
+- Authentication and authorization
+- Rate limiting
+- Request validation
+- Response transformation
+
+### Flow
+
+```
+Client → API Gateway → Service Router → Specific Service
+```
+
+### Benefits
+
+- Single point of entry for clients
+- Centralized security and monitoring
+- Service decoupling from clients
+- Easy to add new services without client changes
+
+## Saga Pattern for Distributed Transactions
+
+Since we don't use distributed transactions (2-phase commit), we use Sagas.
+
+### Choreography Saga
+
+Services publish events, other services subscribe and react.
+
+### Orchestration Saga
+
+A central orchestrator coordinates the saga steps.
+
+### Example: Fund Transfer Saga (Orchestrated)
+
+1. Client sends `TransferFunds` command
+2. Orchestrator checks account balance
+3. Orchestator debits sender account (transaction 1)
+4. Orchestrator credits recipient account (transaction 2)
+5. If any step fails, compensating transactions are executed
+
+### Compensating Transactions
+
+Each transaction in the saga has a corresponding compensation:
+
+| Operation | Compensation |
+|-----------|--------------|
+| Debit account | Credit account |
+| Credit account | Debit account |
+| Issue card | Cancel card |
+| Create bill payment | Cancel payment |
 
 ## Double-Entry Ledger
 
-Every money movement is a **journal entry** with two or more **postings** whose sum is zero.
+The core financial system is a double-entry ledger.
 
-```text
-Transfer of R$ 50.00 from Alice to Bob
+### Basic Principle
 
-Journal Entry #9f3c...
-  ├── DEBIT   alice:checking   -5000 BRL
-  └── CREDIT  bob:checking     +5000 BRL
-                               ─────────
-                                   0  ✔
+For every transaction, there must be:
+- At least one debit
+- At least one credit
+- Total debits = Total credits
+
+### Example
+
+```
+Account A (Debit): +1000
+Account B (Credit): -1000
+
+Total debits: 1000
+Total credits: 1000
+✓ Balanced
 ```
 
-- Entries are **append-only**. Corrections are made with reversal entries, never with updates.
-- Balances are computed from postings and cached in a balance snapshot that is updated in the same DB transaction.
-- See [ledger-service](../services/ledger-service.md) and [ADR-0005](../decisions/0005-double-entry-ledger.md).
+### Benefits
 
-## Saga (Orchestration)
+- Self-checking: The system can't be inconsistent
+- Audit trail: Every movement is recorded
+- Accurate balances: Sum of all movements
 
-Money movements that span multiple services (Pix, card debit, bill payment) are coordinated by `transaction-service` as **orchestrated sagas**:
+## Repository Pattern
 
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING
-    PENDING --> RESERVED: funds held in ledger
-    RESERVED --> COMPLETED: external confirmation
-    RESERVED --> COMPENSATING: external failure / timeout
-    COMPENSATING --> FAILED: reversal posted
-    PENDING --> FAILED: insufficient funds
-    COMPLETED --> [*]
-    FAILED --> [*]
-```
+Each service has its own database. Instead of calling other services, repositories communicate with databases.
 
-Each step has a **compensating action**. Saga state is persisted, so a saga can resume after a crash.
+### Anti-Corruption Layer
 
-## Transactional Outbox
+When integrating with external systems (or other services), use an anti-corruption layer to translate between incompatible data formats.
 
-To publish events atomically with state changes:
+## Circuit Breaker Pattern
 
-1. In the same DB transaction, the service writes its aggregate **and** a row in the `outbox` table.
-2. A relay (in `packages/go-messaging`) polls the outbox, or uses CDC, and publishes to Kafka.
-3. The row is marked as published.
+For resilience in distributed systems.
 
-This guarantees **at-least-once** delivery with no dual-write problem. See [ADR-0007](../decisions/0007-transactional-outbox.md).
+### States
 
-## Inbox / Idempotent Consumers
+1. **Closed**: Normal operation, requests go through
+2. **Open**: Too many failures, requests fail immediately
+3. **Half-Open**: Testing if service is recovered
 
-Consumers store processed `event_id`s in an `inbox` table, in the same transaction as their side effects. Duplicate events are ignored.
+### Implementation
 
-## Idempotency Keys
-
-- Every state-changing public endpoint requires an `Idempotency-Key` header (UUID).
-- The gateway and the services store `(key, request_hash, response)` for 24 hours.
-- Same key with the same payload: the stored response is returned.
-- Same key with a different payload: `409 Conflict`.
-
-## CQRS
-
-- **Write side**: domain services (`ledger`, `transaction`, `pix`, ...) handle commands.
-- **Read side**: `statement-service` builds denormalized projections from events, optimized for the queries the app needs, such as the transaction feed, monthly statements and search.
-
-## Resilience
-
-| Concern | Approach |
-|---|---|
-| Timeouts | Every outgoing call has a context deadline |
-| Retries | Exponential backoff with jitter, only for idempotent operations |
-| Circuit breaker | Around external integrations (SPI, card network, providers) |
-| Bulkheads | Separate worker pools per consumer group |
-| Dead-letter queues | Each topic has a `.dlq` companion for poison messages |
-| Graceful shutdown | Drain in-flight requests and commit consumer offsets before exiting |
-
-## Optimistic Concurrency
-
-Aggregates carry a `version` column. Updates use `WHERE version = $n`, and a conflict causes a retry of the use case.
+- Track failure rate over time window
+- Open circuit when threshold exceeded
+- Try half-open requests after timeout

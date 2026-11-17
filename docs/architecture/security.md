@@ -1,69 +1,431 @@
-# Security
+# Security Architecture
+
+This document describes the security architecture of the Digital Bank Platform.
+
+## Security Principles
+
+### Zero Trust
+
+- **Never trust, always verify**: All service-to-service communication is authenticated and authorized
+- **Least privilege**: Services only have access to what they need
+- **Micro-segmentation**: Lateral movement is prevented by segmenting the infrastructure
+
+### Defense in Depth
+
+Multiple security layers protect the system:
+- Network segmentation
+- Authentication at multiple points
+- Encryption in transit and at rest
+- Continuous monitoring and detection
+
+### Data Privacy
+
+- **Sensitive data encryption**: Personal identifiable information (PII) encrypted at rest
+- **Tokenization**: Card data tokenized and stored in dedicated vault
+- **Data minimization**: Only collect and store necessary data
+
+### Compliance
+
+Designed to meet regulatory requirements:
+- **LGPD** (Brazil General Data Protection Law)
+- **PCI-DSS** (Payment Card Industry)
+- **SOX** (Sarbanes-Oxley for financial reporting)
+- **BACEN** (Central Bank of Brazil regulations)
 
 ## Authentication
 
-```mermaid
-sequenceDiagram
-    participant App
-    participant GW as api-gateway
-    participant IDN as identity-service
+### External Clients
 
-    App->>GW: POST /v1/auth/login (cpf, password, device_id)
-    GW->>IDN: Authenticate
-    IDN->>IDN: verify Argon2id hash, device trust, risk score
-    alt new device or high risk
-        IDN-->>App: MFA challenge (OTP)
-        App->>GW: POST /v1/auth/mfa
-    end
-    IDN-->>App: access_token (JWT, 15 min) + refresh_token (opaque, rotating)
+**JWT Access Tokens**
+- Issued by identity-service
+- Valid for 1 hour
+- Sent in `Authorization: Bearer <token>` header
+- Signed with RSA-256
+
+**Refresh Tokens**
+- Long-lived (7 days)
+- Stored securely (HTTP-only cookie)
+- Rotated on each use
+- Revoked on logout or compromise
+
+### Internal Services
+
+**mTLS Mutual Authentication**
+- All services authenticate with each other using certificates
+- Service identity verified before any request
+- Implemented via service mesh (Istio)
+
 ```
-
-- **Access tokens**: short-lived JWTs (15 min), signed with asymmetric keys (EdDSA / ES256), validated at the gateway via JWKS.
-- **Refresh tokens**: opaque, single use, rotated on every refresh. Reuse detection revokes the whole token family.
-- **Passwords**: hashed with Argon2id.
-- **MFA**: TOTP or OTP via SMS/email. Required for new devices and sensitive operations.
-- **Device binding**: each session is tied to a registered device.
+Service A ──mTLS──> Service B
+  |                 |
+  |           Certificate
+  v           Verification
+```
 
 ## Authorization
 
-- The gateway checks token validity and scopes.
-- Services enforce **resource ownership**: a customer can only access their own accounts, cards and transactions.
-- Sensitive operations, such as large Pix transfers, adding a new Pix key or showing card details, require **step-up authentication**.
+### JWT Claims
 
-## Service-to-Service
+Access tokens contain claims:
+- `sub`: User ID
+- `customer_id`: Customer ID (customer identifier)
+- `roles`: User roles (admin, customer)
+- `scope`: API scopes (accounts:read, payments:write)
 
-- **mTLS** between all services (zero trust).
-- The original user identity is propagated through gRPC metadata. Each service re-validates it.
+### Resource Authorization
+
+Every request validates:
+1. User is authenticated
+2. User has required scope
+3. Requested resource belongs to user/customer
+
+### Authorization Levels
+
+| Endpoint | Authentication | Authorization |
+|----------|----------------|---------------|
+| /v1/auth/login | None | None |
+| /v1/auth/token | None | None |
+| /v1/account/{id}/balance | JWT | account:read, customer:read |
+| /v1/payment/create | JWT + 2FA | payment:write, customer:read |
+| /internal/ledger/{id} | mTLS | ledger:all |
+
+## API Security
+
+### Rate Limiting
+
+| Tier | Endpoint | Limit |
+|------|----------|-------|
+| Public | /auth/login | 5 requests per minute |
+| Public | /payment/validate-boleto | 10 requests per minute |
+| Authenticated | /account/balance | 60 requests per minute |
+| Authenticated | /payment/create | 10 requests per minute |
+| Internal | gRPC internal calls | 1000 RPS per service |
+
+Rate limit headers:
+```
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 59
+Retry-After: 60
+```
+
+### Input Validation
+
+All inputs validated:
+- Type checking
+- Length limits
+- Format validation (email, phone, currency)
+- Sanitization (prevent injection)
+
+### API Keys
+
+API keys generated for server-to-server communication:
+- Bounded by scope
+- Bounded by time
+- Revocable
+
+## Network Security
+
+### Network Segmentation
+
+```
+┌─────────────────────────────────┐
+│         External Network        │
+│    ┌──────────────────────┐     │
+│    │  Load Balancer (80/443)│    │
+│    └──────────────────────┘     │
+│         │                       │
+│    ┌──────────────────────┐     │
+│    │   API Gateway (8080)  │     │
+│    └──────────────────────┘     │
+│         │                       │
+│    └───────Internal────────────┘ │
+│         │                       │
+│  ┌──────┐ ┌──────┐ ┌──────┐     │
+│  │Auth │ │User │ │Acct │ │Ledger│ │
+│  └──────┘ └──────┘ └──────┘     │
+│         │                       │
+│    └────┼─────────────────────┘ │
+│         │                       │
+│    ┌──────────────────────┐     │
+│    │   Kafka Cluster      │     │
+│    └──────────────────────┘     │
+│         │                       │
+│    ┌──────────────────────┐     │
+│    │   Redis Cluster      │     │
+│    └──────────────────────┘     │
+└─────────────────────────────────┘
+```
+
+### Private Endpoints
+
+- External clients connect via public endpoints
+- Services only reachable internally (mTLS)
+- Database directly accessible only by services
+- Kafka accessible by services and consumers
+
+### Encryption in Transit
+
+- **External to Gateway**: TLS 1.3
+- **Gateway to Services**: TLS with mutual authentication
+- **Services to Services**: gRPC with mTLS
+- **Kafka**: TLS with SASL_SSL authentication
+- **Redis**: TLS connections
+- **Internal DB**: TLS connections via PgBouncer
+
+## Cryptography
+
+### JWT Signing
+
+```
+Algorithm: RS256
+RSA Key Size: 2048 bits
+Key Rotation: Monthly
+Storage: HSM or KMS
+```
+
+### Secret Management
+
+- **Service secrets**: Injected via Kubernetes Secrets
+- **Rotation**: Quarterly with automated rotation
+- **Transmission**: Never logged
+- **Access**: Least privilege
+
+### Encryption Keys
+
+| Data Type | Algorithm | Key Size | Provider |
+|-----------|-----------|---------|----------|
+| Customer PII | AES-256-GCM | 256 | KMS |
+| Card Data | AES-256-GCM | 256 | HSM |
+| JWT Sign | RSA-256 | 2048 | Internal |
+| Internal Keys | AES-256 | 256 | KMS |
+
+### Field-Level Encryption
+
+Sensitive fields encrypted at the field level:
+```sql
+-- Example: customer table
+CREATE TABLE customers (
+  id UUID PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  encrypted_email BYTEA,  -- AES encrypted
+  encrypted_document BYTEA,  -- AES encrypted
+  -- Non-sensitive fields unencrypted
+  status VARCHAR(20) NOT NULL
+);
+```
 
 ## Data Protection
 
-| Data | Protection |
-|---|---|
-| Passwords | Argon2id hash |
-| PAN / CVV | Stored only in the card vault, encrypted with AES-256-GCM. CVV is never stored after issuing |
-| CPF, phone, email | Encrypted at rest (envelope encryption) plus a blind index for lookups |
-| Tokens / secrets | Kubernetes Secrets / external secret manager, never in the repository |
-| Logs | PII masked by `go-logger` (for example `***.456.789-**`) |
+### Customer Data
 
-## Card Data (PCI DSS-inspired)
+| Field | Protection |
+|-------|-----------|
+| Document Number | Encrypted at rest, masked in UI |
+| Document Expiry | Encrypted at rest |
+| Address | Encrypted at rest |
+| Phone | Masked, encrypted at rest |
+| Email | Encrypted at rest |
 
-- The card vault is an isolated module inside `card-service` with its own database and network policy.
-- Other services only see **tokens** and the **last 4 digits**.
+### Card Data
 
-## API Protection
+Compliant with PCI-DSS:
+- **Never store** full PAN (Primary Account Number)
+- **CVV**: Never store
+- **Cardholder Name**: Never store
+- **Expiry**: Masked
+- **Tokenization**: PAN tokenized, only token stored
 
-- Rate limiting per IP, per user and per endpoint (Redis, token bucket).
-- Request size limits, strict input validation and CORS allow-list.
-- Security headers (HSTS, CSP for the web app).
+### Card Vault
 
-## Fraud Prevention
+```
+┌───────────────────────┐
+│   Card Vault (HSM)    │
+│                       │
+│  Token Generation    │
+│  Token Decryption     │
+│                       │
+└───────────────────────┘
+     │               │
+  Token          Card #
+     │               │
+     ▼               ▼
+   Token      Merchant #
+   Server      Terminal
+```
 
-- Per-transaction and daily limits per account (configurable by the customer).
-- Night-time Pix limits.
-- Velocity rules on card authorizations and Pix transfers.
+### Transaction Data
 
-## Supply Chain
+| Field | Protection |
+|-------|-----------|
+| Amount | Unencrypted (audit requirement) |
+| Counterparty | Encrypted if PII |
+| Description | Encrypted |
+| Reference ID | Encrypted |
 
-- `govulncheck` and dependency scanning in CI.
-- Minimal, non-root, distroless container images.
-- Image scanning before deploy.
+## Key Management
+
+### Certificate Lifecycle
+
+```
+1. Generate (monthly)
+2. Distribute (HSM protected)
+3. Deploy (services)
+4. Rotate (monthly)
+5. Revoke (emergency)
+```
+
+### Key Rotation
+
+- **Service keys**: Monthly
+- **Database keys**: Quarterly
+- **KMS master keys**: Annually
+- **HSM keys**: Never (manual process)
+
+### Secret Storage
+
+- **Kubernetes Secrets**: Encrypted at rest (KMS)
+- **HSM**: High-value keys and card keys
+- **Vault**: External secrets access (development)
+
+## Monitoring
+
+### Security Alerts
+
+| Alert | Severity | Action |
+|-------|----------|--------|
+| Multiple failed logins | Medium | Account lock |
+| New API key created | Low | Require approval |
+| mTLS cert expiring | High | Auto-renew or alert |
+| Unusual request patterns | High | Rate limit |
+| Authentication bypass attempt | Critical | Block IP |
+| Data exfiltration attempt | Critical | Block and investigate |
+
+### Monitoring Points
+
+- **Authentication failures**: By user, IP, service
+- **Authorization denials**: By endpoint, role
+- **mTLS failures**: By service pair
+- **API key usage**: Revoked keys, unusual patterns
+- **Rate limit violations**: By tier, source
+
+## Incident Response
+
+### Security Incident Flow
+
+```mermaid
+graph TD
+    A[Incident Detected] --> B{Triage}
+    B -->|False Positive| C[Close Ticket]
+    B -->|Valid Incident| D[Contain]
+    D --> E{Containment Type}
+    E -->|User Account| F[Lock Account]
+    E -->|API Key| G[Revoke Key]
+    E -->|Service| H[Disable Service]
+    E -->|Network| I[Isolate Segment]
+    D --> J[Eradicate]
+    J --> K[Recover]
+    K --> L[Monitor]
+    L --> M[Post-Mortem]
+```
+
+### Response Procedures
+
+1. **Immediate Actions**: Stop data loss, contain impact
+2. **Communication**: Notify affected parties, regulators
+3. **Documentation**: Record timeline, actions taken
+4. **Root Cause Analysis**: Identify cause
+5. **Remediation**: Fix the vulnerability
+6. **Prevention**: Update controls, procedures
+
+## Compliance
+
+### LGPD (Brazil)
+
+| Requirement | Implementation |
+|-------------|----------------|
+| Consent | Stored with user profile, logged |
+| Data Portability | API to export all personal data |
+| Erasure | Account deletion cascade |
+| Breach Notification | < 120 hours to data subjects and ANPD |
+
+### PCI-DSS
+
+| Requirement | Implementation |
+|-------------|----------------|
+| Network Security | Network segmentation, firewalls |
+| Encryption | Strong cryptography for card data |
+| Vulnerability Management | Regular scans, penetration testing |
+| Access Control | Least privilege, MFA for admins |
+| Monitoring | Continuous monitoring, alerts |
+
+### BACEN (Central Bank)
+
+| Requirement | Implementation |
+|-------------|----------------|
+| Authentication | Multi-factor authentication |
+| Authorization | Role-based access control |
+| Logging | Full audit trail (5 years) |
+| Backup | Encrypted, off-site |
+| Testing | Quarterly security testing |
+
+## Security Testing
+
+### Static Analysis
+
+```bash
+# Go code scanning
+gosec ./...
+
+# Dependency scanning
+dependency-check
+
+# Secret scanning
+gitleaks
+```
+
+### Dynamic Testing
+
+```bash
+# API testing
+k6 run api-tests.js
+
+# Container scanning
+docker scan
+
+# Infrastructure scanning
+trivy config
+```
+
+### Penetration Testing
+
+- Quarterly external penetration tests
+- Annual internal penetration test
+- New feature security review
+
+## Implementation
+
+### Local Development
+
+- Secrets never committed
+- Development secrets in `.kilo/secrets`
+- Local testing with mock services
+- Security headers configured
+
+### Production
+
+- Secrets injected via Vault
+- Automatic cert rotation
+- Real-time monitoring
+- Automated incident response
+
+## Directory Structure
+
+| File | Description |
+|------|-------------|
+| [security.md](security.md) | This security architecture document |
+| [authentication.md](./authentication.md) | Authentication implementation |
+| [authorization.md](./authorization.md) | Authorization implementation |
+| [encryption.md](./encryption.md) | Encryption at rest |
+| [tls.md](./tls.md) | TLS configuration |
+| [compliance.md](./compliance.md) | Compliance requirements |
+| [testing.md](./testing.md) | Security testing procedures |

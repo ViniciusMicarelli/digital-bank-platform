@@ -1,55 +1,153 @@
-# Contributing
+# Contributing to Digital Bank Platform
 
-Thanks for your interest in contributing! This guide covers the conventions used across the repository.
+Thank you for your interest in contributing to this project!
 
-## Workflow
+## Getting Started
 
-1. Create a branch from `main` using the pattern `<type>/<short-description>`, for example `feat/pix-qr-code` or `fix/ledger-rounding`.
-2. Make your changes, with tests.
-3. Make sure `make lint test` passes.
-4. Open a Pull Request that describes **what** changed and **why**.
+1. Fork the repository
+2. Clone your fork:
+   ```bash
+   git clone https://github.com/your-username/digital-bank-platform.git
+   ```
+3. Create a new branch:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+4. Install dependencies:
+   ```bash
+   make install
+   ```
+5. Start infrastructure:
+   ```bash
+   make infra-up
+   ```
+6. Run migrations:
+   ```bash
+   make migrate
+   ```
+
+## Development
+
+### Running the Development Environment
+
+```bash
+make dev
+```
+
+This will start all services in development mode.
+
+### Making Changes
+
+1. Make your changes in a feature branch
+2. Run tests before committing:
+   ```bash
+   make test
+   ```
+3. Lint your code:
+   ```bash
+   make lint
+   ```
+4. Format your code:
+   ```bash
+   make format
+   ```
+
+### Code Style Guidelines
+
+- **TypeScript**: Use Prettier with the configured ESLint rules
+- **Python**: Follow PEP 8 style guide
+- **JavaScript**: Use ESLint with Prettier
+- **Protobuf**: Follow Google's Style Guide
 
 ## Commit Messages
 
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
+Use [Conventional Commits](https://www.conventionalcommits.org/):
 
-```text
-<type>(<scope>): <description>
+- `feat:` - New feature
+- `fix:` - Bug fix
+- `docs:` - Documentation changes
+- `style:` - Code style changes (formatting)
+- `refactor:` - Code refactoring
+- `perf:` - Performance improvements
+- `test:` - Adding or updating tests
+- `chore:` - Maintenance tasks
 
-feat(pix): add dynamic QR code generation
-fix(ledger): reject entries with unbalanced postings
-docs(adr): add ADR-0007 transactional outbox
+Example:
+```
+feat(accounts): Add new account creation endpoint
 ```
 
-Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`, `perf`, `build`.
-Scope: the service or package name (`pix`, `ledger`, `go-messaging`, ...).
+## Pull Requests
 
-## Go Code Guidelines
+1. Update your branch:
+   ```bash
+   git rebase main
+   ```
+2. Ensure all tests pass:
+   ```bash
+   make test
+   ```
+3. Ensure linting passes:
+   ```bash
+   make lint
+   ```
+4. Create a pull request
+5. Request reviews from maintainers
 
-- Follow [Effective Go](https://go.dev/doc/effective_go) and the [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments).
-- Code must pass `gofmt`, `go vet` and `golangci-lint`.
-- **Never use `float` for money.** Use the `Money` type from `packages/go-common` (`int64` minor units plus currency).
-- Pass `context.Context` as the first argument of every function that does I/O.
-- Wrap errors with context (`fmt.Errorf("creating account: %w", err)`) and use typed errors from `packages/go-errors` at boundaries.
-- The `domain` layer must not import adapters, frameworks or infrastructure packages.
-- Use structured logging with `packages/go-logger`. Never log sensitive data (PAN, CVV, passwords, tokens, full CPF).
+## Architecture
 
-## Tests
+This project follows a microservices architecture:
 
-| Type | Location | Tooling |
-|---|---|---|
-| Unit | Next to the code (`*_test.go`) | `testing`, table-driven tests |
-| Integration | `services/<name>/test/integration` | Testcontainers (PostgreSQL, Kafka) |
-| Contract | `contracts/` | `buf breaking`, schema validation |
-| End-to-end | `tests/e2e` | Black-box tests through the API Gateway |
+### Services
+- **Ledger**: Core accounting and transaction management
+- **Payment Gateway**: Payment processing and reconciliation
+- **Identity**: User authentication and authorization
+- **Accounts**: Account management and operations
+- **API Gateway**: Entry point for all API requests
 
-Domain logic should be well covered by unit tests.
+### Contracts
+- **Protobuf**: Protocol buffer definitions
+- **OpenAPI**: API specifications
 
-## Contracts
+### Infrastructure
+- **PostgreSQL**: Primary database
+- **Redis**: Caching and session management
+- **Docker Compose**: Infrastructure orchestration
 
-- Any change to `contracts/` must be **backward compatible**. CI runs `buf breaking`.
-- A breaking change requires a new version (`v2`) of the API or event.
+## Testing
 
-## Architecture Decisions
+### Unit Tests
+```bash
+make test:unit
+```
 
-Significant technical decisions must be recorded as an ADR in [`docs/decisions`](docs/decisions/README.md).
+### Integration Tests
+```bash
+make test:integration
+```
+
+### Contract Tests
+```bash
+make test:contracts
+```
+
+## Documentation
+
+- Update API documentation for new endpoints
+- Add examples to usage documentation
+- Update architecture diagrams if needed
+
+## Code of Conduct
+
+- Be respectful and inclusive
+- Focus on collaboration, not conflict
+- Provide constructive feedback
+- Be open to differing opinions
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the MIT License.
+
+## Questions?
+
+Feel free to open an issue for any questions or concerns.

@@ -1,169 +1,198 @@
 # Architecture Overview
 
-## Principles
+This document describes the high-level architecture of the Digital Bank Platform.
 
-1. **The ledger is the source of truth.** Balances are never stored as a mutable field. They are derived from immutable double-entry postings.
-2. **Each service owns its data.** One database per service, and other services never access it directly.
-3. **Async by default, sync when necessary.** Commands that need an immediate answer, such as a balance check or a card authorization, use gRPC. Everything else reacts to events.
-4. **Every write is idempotent.** Retries are expected at every layer.
-5. **Contracts first.** Protobuf, OpenAPI and event schemas in `contracts/` are written before the implementation.
-6. **Observable by design.** Every request carries a trace ID from the client to the database.
-7. **Horizontally scalable.** Stateless services, separate read and write paths, and data partitioned by customer. See [scalability.md](scalability.md).
-8. **Measurable targets.** Every flow has a latency budget in milliseconds. See [requirements.md](requirements.md).
+## System Design
 
-## System Context
+The platform is designed as a cloud-native, event-driven system optimized for financial transactions requiring strong consistency, high availability, and horizontal scalability.
 
-```mermaid
-flowchart TB
-    Customer((Customer))
-    Customer --> Apps[Web / Mobile Apps]
-    Apps --> Platform[Digital Bank Platform]
+## Key Architectural Principles
 
-    Platform <--> BCB[Central Bank: Pix SPI / DICT<br/><i>simulated</i>]
-    Platform <--> Network[Card Network<br/><i>simulated</i>]
-    Platform <--> Bureau[KYC / Credit Bureau<br/><i>simulated</i>]
-    Platform --> Providers[Email / SMS / Push Providers]
+- **Double-Entry Ledger**: A dedicated ledger service maintains immutable journal entries, serving as the single source of truth for all balances.
+- **Event-Driven Architecture**: Services communicate asynchronously via domain events published to Apache Kafka, enabling loose coupling and independent scaling.
+- **Read-Write Separation**: Write operations target the primary database; reads may be served from read replicas, caches, or materialized views (CQRS).
+- **Database Per Service**: Each service owns its database with no cross-service direct database access.
+- **Stateless Services**: All services are stateless, enabling horizontal scaling and simplified deployment.
+- **Zero-Trust Internal Communication**: Services authenticate and authorize each other using mutual TLS (mTLS).
+
+## Technology Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Language | Go 1.23+ |
+| Internal API | gRPC + Protocol Buffers |
+| External API | REST + OpenAPI 3.1 |
+| Messaging | Apache Kafka |
+| Databases | PostgreSQL (one per service) |
+| Cache | Redis Cluster |
+| Infrastructure | Kubernetes, Terraform |
+| Observability | OpenTelemetry + Prometheus + Grafana + Loki + Jaeger + Pyroscope |
+
+See [docs/tech-stack.md](./tech-stack.md) for detailed technology choices.
+
+## Repository Structure
+
+```text
+.
+├── contracts/          # API/event schemas (source of truth)
+│   ├── proto/          # gRPC/Protobuf definitions
+│   ├── openapi/        # REST API specs
+│   └── events/         # Event schemas
+├── services/           # Go microservices
+│   ├── api-gateway/
+│   ├── identity-service/
+│   ├── user-service/
+│   ├── account-service/
+│   ├── ledger-service/
+│   ├── transaction-service/
+│   ├── pix-service/
+│   ├── payment-service/
+│   ├── card-service/
+│   ├── credit-service/
+│   ├── statement-service/
+│   └── notification-service/
+└── packages/           # Shared Go libraries
+    ├── go-common/
+    ├── go-errors/
+    ├── go-logger/
+    ├── go-messaging/
+    └── go-observability/
 ```
 
-External integrations are implemented as **simulators** behind ports (interfaces), so they can be replaced by real adapters without changing domain code.
+See [docs/architecture/repository-structure.md](./repository-structure.md) for detailed layout conventions.
 
-## Containers
+## Service Communication Diagram
 
 ```mermaid
 flowchart LR
-    GW[api-gateway]
+    subgraph Clients
+        WEB[Web App]
+        AND[Android App]
+        IOS[iOS App]
+    end
 
-    subgraph Identity
+    subgraph Infrastructure
+        GW[API Gateway]
+        BUS[(Kafka)]
+    end
+
+    subgraph Services
         IDN[identity-service]
         USR[user-service]
-    end
-
-    subgraph Core Banking
         ACC[account-service]
-        LED[ledger-service]
         TRX[transaction-service]
-    end
-
-    subgraph Payments
+        LED[ledger-service]
         PIX[pix-service]
         PAY[payment-service]
-    end
-
-    subgraph Cards & Credit
         CRD[card-service]
         CRE[credit-service]
-    end
-
-    subgraph Read Side
         STM[statement-service]
         NOT[notification-service]
     end
 
-    GW --> IDN & USR & ACC & TRX & PIX & PAY & CRD & CRE & STM
-    PIX & PAY & CRD --> TRX
-    TRX --> LED
-    CRD --> CRE
-    Kafka[(Kafka)]
-    IDN & USR & ACC & LED & TRX & PIX & PAY & CRD & CRE --> Kafka
-    Kafka --> STM & NOT
+    WEB & AND & IOS -->|HTTPS / REST| GW
+    GW -->|gRPC| IDN
+    GW -->|gRPC| USR
+    GW -->|gRPC| ACC
+    GW -->|gRPC| TRX
+    GW -->|gRPC| PIX
+    GW -->|gRPC| PAY
+    GW -->|gRPC| CRD
+    GW -->|gRPC| CRE
+    GW -->|gRPC| STM
+
+    TRX -->|gRPC| LED
+    PIX -->|call| TRX
+    PAY -->|call| CRD
+
+    IDN & USR & ACC & TRX & PIX & PAY & CRD & CRE & LED -.->|events| BUS
+    BUS -.-> STM
+    BUS -.-> NOT
 ```
 
-| Bounded context | Services |
-|---|---|
-| Identity | `identity-service`, `user-service` |
-| Core Banking | `account-service`, `ledger-service`, `transaction-service` |
-| Payments | `pix-service`, `payment-service` |
-| Cards & Credit | `card-service`, `credit-service` |
-| Read Side | `statement-service`, `notification-service` |
+## Key Architectural Components
 
-## Communication
+### API Gateway
+Single entry point for all external traffic. Responsibilities include:
+- Request routing to appropriate services
+- Authentication and token validation
+- Rate limiting and throttling
+- Request/response transformation
+- API versioning
 
-| Type | Technology | When to use |
-|---|---|---|
-| Client → Platform | REST/JSON over HTTPS | All client traffic, only through the gateway |
-| Service → Service (sync) | gRPC over mTLS | Queries and commands that need an immediate result |
-| Service → Service (async) | Kafka events | State changes, integrations and projections |
+### Ledger Service
+The **single source of truth** for all money movements. All balance changes are recorded as immutable double-entry journal entries:
 
-## Main Flows
+- `credit_ledger`: Credits to an account (positive balance entry)
+- `debit_ledger`: Debits from an account (negative balance entry)
+- `account_ledger`: Net position of each account
 
-### Customer onboarding
+See [docs/services/ledger-service.md](./services/ledger-service.md) for implementation details.
 
-```mermaid
-sequenceDiagram
-    participant App
-    participant GW as api-gateway
-    participant USR as user-service
-    participant IDN as identity-service
-    participant ACC as account-service
-    participant LED as ledger-service
-    participant K as Kafka
+### Transaction Service
+Orchestrates money-movement workflows using the Saga pattern:
+- Internal transfers (debit one account, credit another)
+- Pix transfers (initiate end-to-end Pix payments)
+- Payment authorizations
 
-    App->>GW: POST /v1/users
-    GW->>USR: CreateUser
-    USR->>K: user.registered
-    K->>IDN: create credentials
-    USR->>USR: run KYC (async)
-    USR->>K: user.kyc.approved
-    K->>ACC: open checking account
-    ACC->>LED: CreateLedgerAccount
-    ACC->>K: account.opened
-    K-->>App: push notification (via notification-service)
-```
+Transactions publish events on completion (success or failure) for consumers to process.
 
-### Pix transfer (outgoing)
+### CQRS Projection
+Some services maintain separate read models (projections) optimized for querying:
+- Statement service maintains materialized views of transaction history
+- Cache layer (Redis) for frequently accessed reference data
 
-```mermaid
-sequenceDiagram
-    participant App
-    participant GW as api-gateway
-    participant PIX as pix-service
-    participant TRX as transaction-service
-    participant LED as ledger-service
-    participant SPI as SPI (simulated)
-    participant K as Kafka
+## Domain Events
 
-    App->>GW: POST /v1/pix/transfers (Idempotency-Key)
-    GW->>PIX: CreateTransfer
-    PIX->>PIX: resolve key in DICT
-    PIX->>TRX: StartTransaction
-    TRX->>LED: Post (debit customer, credit pix-settlement)
-    LED-->>TRX: posted
-    TRX-->>PIX: reserved
-    PIX->>SPI: send payment order
-    alt settled
-        SPI-->>PIX: confirmed
-        PIX->>TRX: Complete
-        PIX->>K: pix.transfer.completed
-    else rejected
-        SPI-->>PIX: rejected
-        PIX->>TRX: Compensate
-        TRX->>LED: Post (reversal)
-        PIX->>K: pix.transfer.failed
-    end
-```
+Events are the glue between services. Every significant state change publishes one or more domain events:
+- `UserCreated`, `UserVerified`, `SessionCreated`
+- `AccountOpened`, `AccountClosed`
+- `PixKeyRegistered`, `PixTransferInitiated`, `PixTransferSettled`
+- `PaymentAuthorized`, `PaymentSettled`
+- `CardIssued`, `CardAuthorized`, `CardBlocked`
 
-### Card purchase authorization
+See [docs/events/README.md](../events/README.md) for the complete event catalog.
 
-```mermaid
-sequenceDiagram
-    participant NET as Card Network (simulated)
-    participant CRD as card-service
-    participant CRE as credit-service
-    participant TRX as transaction-service
+## Data Consistency Model
 
-    NET->>CRD: Authorization request
-    CRD->>CRD: validate card status, CVV, limits, fraud rules
-    alt credit
-        CRD->>CRE: ReserveLimit
-    else debit
-        CRD->>TRX: StartTransaction (hold)
-    end
-    CRD-->>NET: approved / declined (< 200 ms)
-```
+### Strong Consistency
+Ledger entries are written atomically using database transactions with row-level locks.
+
+### Eventual Consistency
+Downstream services (statements, notifications, analytics) consume events asynchronously. They may lag behind real-time but remain consistent within the SLA.
+
+### Transactional Outbox Pattern
+Each event is written to a database table in the same transaction as the event record. A separate process polls for committed outbox records and publishes them to Kafka.
+
+See [docs/architecture/consistency.md](./consistency.md) for detailed consistency guarantees.
 
 ## Deployment
 
-- **Local**: Docker Compose (`infrastructure/docker`)
-- **Cloud**: Kubernetes (`infrastructure/kubernetes`) provisioned with Terraform (`infrastructure/terraform`)
-- Each service is a stateless container that scales horizontally. State lives in PostgreSQL, Redis and Kafka.
-- Production runs across 3 availability zones, with a cell-based layout for large scale. See [scalability.md](scalability.md#cell-based-architecture).
+### Local Development
+- Docker Compose orchestration with individual service images
+- Hot-reload for development services
+
+### Production
+- Kubernetes with Kustomize overlays per environment
+- Horizontal Pod Autoscaling (CPU and RPS metrics)
+- Cell-based sharding for horizontal scaling
+
+See [docs/architecture/deployment.md](./deployment.md) for deployment strategies.
+
+## Documentation Index
+
+| Document | Description |
+|----------|-------------|
+| [overview.md](./overview.md) | This overview of the architecture |
+| [requirements.md](./requirements.md) | Functional and non-functional requirements |
+| [scalability.md](./scalability.md) | Horizontal scaling strategies |
+| [patterns.md](./patterns.md) | Architectural patterns used |
+| [security.md](./security.md) | Security architecture and practices |
+| [observability.md](./observability.md) | Observability and monitoring |
+| [consistency.md](./consistency.md) | Data consistency model |
+| [deployment.md](./deployment.md) | Deployment and operations |
+| [repository-structure.md](./repository-structure.md) | Repository layout conventions |
+
+## Contributing
+
+When contributing, ensure you update relevant architecture documentation. See [CONTRIBUTING.md](../../CONTRIBUTING.md) for contribution guidelines.

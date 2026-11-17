@@ -1,344 +1,390 @@
 # Digital Bank Platform
 
-> A cloud-native digital banking platform built with **Go** and a microservices architecture. It covers checking accounts, Pix instant payments, credit and debit cards, bill payments and statements.
-
-![Status](https://img.shields.io/badge/status-work%20in%20progress-yellow)
-![Go](https://img.shields.io/badge/go-1.23+-00ADD8?logo=go)
-![License](https://img.shields.io/badge/license-MIT-blue)
-
----
+A microservices-based digital banking platform built with Go and gRPC for high-performance financial transactions.
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
-- [Performance Targets](#performance-targets)
-- [Architecture](#architecture)
-- [Scalability](#scalability)
-- [Services](#services)
+- [Project Overview](#project-overview)
 - [Tech Stack](#tech-stack)
-- [Repository Structure](#repository-structure)
-- [Getting Started](#getting-started)
+- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
+- [Service Dependencies](#service-dependencies)
+- [Build & Deploy](#build-deploy)
+- [CI/CD Pipeline](#cicd-pipeline)
 - [Documentation](#documentation)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
 
----
+## Project Overview
 
-## Overview
+The Digital Bank Platform is a distributed system designed for secure, scalable, and compliant financial operations. It supports core banking functions including account management, payments, transfers, card issuance, and authentication.
 
-This project implements the core of a modern digital bank as a set of independent, event-driven services. The main goals are:
+### Key Features
 
-- **Correctness first**: every money movement goes through a **double-entry ledger**, which is the single source of truth for balances.
-- **Resilience**: services talk asynchronously through events and use the **transactional outbox**, **idempotency keys** and **sagas** to stay consistent without distributed transactions.
-- **Scale**: designed for tens of millions of customers, with horizontal scaling, separate read and write paths, and data sharded by customer.
-- **Low latency**: every critical flow has a latency budget in milliseconds.
-- **Observability**: logs, metrics and traces (OpenTelemetry) are built in from day one.
-- **Security**: zero-trust internal communication, encrypted sensitive data and an isolated card data vault.
+- **Accounts**: Multi-currency account creation and management
+- **Ledger**: Double-entry bookkeeping for transaction processing
+- **Payments**: Credit/debit card payment processing with PCI compliance
+- **Cards**: Virtual and physical card lifecycle management
+- **Transfers**: SEPA and instant payment transfers
+- **Auth**: OAuth2/OIDC authentication and authorization
+- **Users**: User profiles and preferences management
 
-## Features
+### Security Highlights
 
-| Domain | Capabilities |
-|---|---|
-| Onboarding | Sign-up, KYC (Know Your Customer) verification, profile management |
-| Identity | Login, MFA, JWT access/refresh tokens, device binding, session management |
-| Accounts | Opening, blocking and closing checking accounts; balances; limits |
-| Pix | Key registration (CPF, email, phone, random), transfers, static and dynamic QR codes |
-| Payments | Bill (boleto) payments, scheduled payments, bank transfers |
-| Cards | Virtual and physical debit and credit cards, purchase authorization, block and unblock |
-| Credit | Credit limits, monthly invoices, installments, interest calculation |
-| Statements | Real-time transaction history, monthly statements, PDF export |
-| Notifications | Push, email and SMS triggered by domain events |
-
-## Performance Targets
-
-Designed for **100 M customers**, **30 M daily active users**, **100k RPS** of reads and **20k TPS** of financial writes at peak, with 3× headroom.
-
-| Operation | p95 | p99 |
-|---|---|---|
-| Get balance | 30 ms | 50 ms |
-| Transaction feed (first page) | 60 ms | 100 ms |
-| Internal transfer | 100 ms | 200 ms |
-| Create Pix transfer (accepted) | 150 ms | 300 ms |
-| Card authorization | 100 ms | **200 ms** |
-| Ledger posting | 15 ms | 30 ms |
-| Pix end-to-end settlement | 2 s | 5 s |
-| Transaction visible in the feed | 1 s | 3 s |
-
-| Availability | Target |
-|---|---|
-| Tier 0 (ledger, Pix, card authorization, login) | 99.99% |
-| Tier 1 (accounts, payments, credit, feed) | 99.95% |
-| Ledger data loss (RPO) | 0 |
-
-Full list: [docs/architecture/requirements.md](docs/architecture/requirements.md).
-
-## Architecture
-
-```mermaid
-flowchart LR
-    subgraph Clients
-        WEB[Web App]
-        AND[Android App]
-        IOS[iOS App]
-    end
-
-    WEB & AND & IOS -->|HTTPS / REST| GW[API Gateway]
-
-    GW -->|gRPC| IDN[identity-service]
-    GW -->|gRPC| USR[user-service]
-    GW -->|gRPC| ACC[account-service]
-    GW -->|gRPC| TRX[transaction-service]
-    GW -->|gRPC| PIX[pix-service]
-    GW -->|gRPC| PAY[payment-service]
-    GW -->|gRPC| CRD[card-service]
-    GW -->|gRPC| CRE[credit-service]
-    GW -->|gRPC| STM[statement-service]
-
-    TRX -->|gRPC| LED[ledger-service]
-    PIX --> TRX
-    PAY --> TRX
-    CRD --> TRX
-
-    IDN & USR & ACC & TRX & PIX & PAY & CRD & CRE & LED -.->|events| BUS[(Kafka)]
-    BUS -.-> STM
-    BUS -.-> NOT[notification-service]
-```
-
-- **External API**: REST/JSON exposed only by the API Gateway and described in OpenAPI.
-- **Internal API**: gRPC with Protocol Buffers between services.
-- **Async communication**: domain events on Kafka, published through the transactional outbox.
-- **Data**: one PostgreSQL database per service. No service reads another service's database.
-
-See [docs/architecture](docs/architecture/overview.md) for details.
-
-## Scalability
-
-| Concern | Approach |
-|---|---|
-| Compute | Stateless Go services, Kubernetes HPA (CPU/RPS) and KEDA (Kafka lag), at least 3 replicas across 3 AZs |
-| Writes | PostgreSQL **primary** per shard, synchronous standby in another AZ, PgBouncer pooling |
-| Reads | **Read replicas** (`DB_READ_URL`), CQRS projections in `statement-service`, Redis cache |
-| Data growth | Sharded by `customer_id` (4,096 logical shards), monthly table partitioning, cold storage |
-| Blast radius | **Cell-based architecture**: independent stacks, each serving a subset of customers |
-| Messaging | Kafka topics with 64–256 partitions keyed by account, idempotent consumers |
-| Overload | Rate limiting, priority-based load shedding, circuit breakers, timeouts on every call |
-| Hot accounts | Internal ledger accounts split into sub-accounts to avoid lock contention |
-
-Money decisions (balance checks, limits, idempotency) **always** read from the primary. Display data can come from replicas or cache.
-
-See [docs/architecture/scalability.md](docs/architecture/scalability.md).
-
-## Services
-
-| Service | Responsibility | Docs |
-|---|---|---|
-| `api-gateway` | Single entry point: routing, authentication, rate limiting | [link](docs/services/api-gateway.md) |
-| `identity-service` | Credentials, MFA, tokens, sessions and devices | [link](docs/services/identity-service.md) |
-| `user-service` | Customer profile, onboarding and KYC | [link](docs/services/user-service.md) |
-| `account-service` | Checking account lifecycle and limits | [link](docs/services/account-service.md) |
-| `ledger-service` | Double-entry ledger, source of truth for balances | [link](docs/services/ledger-service.md) |
-| `transaction-service` | Orchestrates money movements (sagas) | [link](docs/services/transaction-service.md) |
-| `pix-service` | Pix keys, transfers and QR codes | [link](docs/services/pix-service.md) |
-| `payment-service` | Bill payments, scheduled payments, transfers | [link](docs/services/payment-service.md) |
-| `card-service` | Card issuing, authorization and controls | [link](docs/services/card-service.md) |
-| `credit-service` | Credit limits, invoices, installments and interest | [link](docs/services/credit-service.md) |
-| `statement-service` | Read models for history and statements (CQRS) | [link](docs/services/statement-service.md) |
-| `notification-service` | Push, email and SMS delivery | [link](docs/services/notification-service.md) |
+- **mTLS** between all internal services
+- **TLS 1.3** for external API communication
+- **PCI-DSS Level 1** compliant for payment processing
+- **LGPD/GDPR** compliant for data handling
+- **AES-256** encryption for sensitive data at rest
+- **Field-level encryption** for PCI-sensitive data
+- **Automatic key rotation** via HashiCorp Vault
+- **JWT-based authentication** with short-lived tokens
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Language | Go 1.23+ |
-| Internal communication | gRPC + Protocol Buffers ([buf](https://buf.build)) |
-| External API | REST + OpenAPI 3.1 |
-| Messaging | Apache Kafka (events), with schemas versioned in `contracts/events` |
-| Databases | PostgreSQL 17 (one per service, primary + read replicas), PgBouncer, Redis Cluster |
-| Data access | `pgx` + `sqlc` (type-safe SQL), `golang-migrate` |
-| Observability | OpenTelemetry, Prometheus, Grafana, Loki, Jaeger, Pyroscope |
-| Containers | Docker, Docker Compose (local), Kubernetes (Helm/Kustomize) |
-| Autoscaling | Kubernetes HPA, KEDA, Karpenter |
-| Testing | Go `testing`, Testcontainers, k6 (load), Chaos Mesh |
-| Infrastructure as Code | Terraform |
-| CI/CD | GitHub Actions |
-| Clients | Web app; native Android and iOS apps |
+| Technology | Purpose |
+|------------|---------|
+| **Go 1.21** | Core microservice implementation |
+| **gRPC** | Internal service-to-service communication |
+| **PostgreSQL 15** | Primary database for transactional data |
+| **gRPC-Go** | gRPC client and server generation |
+| **Kong** | API gateway with mTLS termination |
+| **OpenResty** | Rate limiting and request routing |
+| **Redis** | Caching and session management |
+| **OpenTelemetry** | Distributed tracing and metrics |
+| **Prometheus** | Metrics collection and alerting |
+| **Jaeger** | Distributed tracing backend |
+| **HashiCorp Vault** | Secrets and key management |
+| **Vault Agent** | Automatic secrets rotation |
+| **Kubernetes** | Container orchestration |
+| **Helm** | Kubernetes package manager |
 
-## Repository Structure
+## Project Structure
 
-```text
-.
-├── .github/workflows/      # CI/CD pipelines (lint, test, build, deploy)
-├── apps/                   # Client applications
-│   ├── web/                # Web banking
-│   └── mobile/
-│       ├── android/
-│       └── ios/
-├── contracts/              # Source of truth for every interface
-│   ├── proto/              # gRPC / Protobuf definitions
-│   ├── openapi/            # Public REST API specs
-│   └── events/             # Event schemas (JSON Schema / Protobuf)
-├── docs/                   # Architecture, services, ADRs, API, events, database
+```
+digital-bank-platform/
+├── api/
+│   ├── auth/                    # OAuth2/OIDC service
+│   │   ├── proto/               # gRPC protobuf definitions
+│   │   ├── http/                # REST API handlers
+│   │   └── cmd/                # Service entrypoint
+│   ├── ledger/                 # Transaction ledger service
+│   │   ├── proto/               # gRPC protobuf definitions
+│   │   ├── cmd/                # Service entrypoint
+│   │   └── migrations/         # Database migrations
+│   ├── payments/               # Payment processing service
+│   │   ├── proto/               # gRPC protobuf definitions
+│   │   ├── cmd/                # Service entrypoint
+│   │   └── tokenization/       # Card token storage
+│   ├── cards/                  # Card lifecycle service
+│   │   ├── proto/               # gRPC protobuf definitions
+│   │   ├── cmd/                # Service entrypoint
+│   │   └── vault/              # Vault integration
+│   ├── transfers/              # Transfer service
+│   │   ├── proto/               # gRPC protobuf definitions
+│   │   ├── cmd/                # Service entrypoint
+│   │   └── routing/           # Payment routing logic
+│   └── users/                  # User management service
+│       ├── proto/               # gRPC protobuf definitions
+│       └── cmd/                # Service entrypoint
 ├── infrastructure/
-│   ├── databases/          # Init scripts, local seeds
-│   ├── docker/             # Dockerfiles and docker-compose for local dev
-│   ├── kubernetes/         # Manifests / Helm charts
-│   ├── messaging/          # Kafka topics and config
-│   ├── monitoring/         # Prometheus, Grafana dashboards, alerts
-│   ├── scripts/            # Infra helper scripts
-│   └── terraform/          # Cloud infrastructure
-├── packages/               # Shared Go libraries
-│   ├── go-common/          # Money, IDs, pagination, time and other helpers
-│   ├── go-errors/          # Typed domain errors and gRPC/HTTP mapping
-│   ├── go-logger/          # Structured logging (slog)
-│   ├── go-messaging/       # Kafka producer/consumer, outbox, inbox
-│   ├── go-observability/   # OpenTelemetry tracing and metrics setup
-│   └── go-security/        # JWT, mTLS, encryption, hashing
-├── scripts/                # Developer scripts (codegen, migrations, bootstrap)
-└── services/               # Go microservices (one folder per service)
+│   ├── k8s/                    # Kubernetes manifests
+│   │   ├── base/              # Base deployments and services
+│   │   ├── network/          # Network policies, ingress
+│   │   ├── monitoring/       # Prometheus, Jaeger
+│   │   └── vault/             # Vault secrets management
+│   ├── docker/                # Dockerfiles and Compose
+│   └── scripts/              # Deployment scripts
+├── pkg/                       # Shared code packages
+│   ├── auth/                  # Authentication helpers
+│   ├── ledger/                # Ledger implementation
+│   ├── payments/              # Payment processing
+│   ├── validation/            # Input validation
+│   └── vault/                 # Vault client
+├── config/                    # Configuration templates
+│   ├── environment.yaml
+│   └── secrets.yaml
+├── scripts/                   # Utility scripts
+│   ├── generate-proto.sh     # gRPC proto generation
+│   ├── gen-keycloak.sh       # Keycloak setup
+│   └── vault-init.sh         # Vault secrets
+├── tests/
+│   ├── e2e/                   # End-to-end tests
+│   ├── integration/          # Integration tests
+│   └── unit/                 # Unit tests
+└── docs/                      # Documentation
+    ├── architecture.md
+    └── api/                   # API documentation
 ```
 
-Each service follows the same layout (hexagonal architecture):
-
-```text
-services/<name>/
-├── cmd/server/             # main.go: wiring and startup
-├── internal/
-│   ├── domain/             # Entities, value objects, domain rules (no dependencies)
-│   ├── application/        # Use cases / command and query handlers
-│   ├── ports/              # Interfaces (repositories, publishers, clients)
-│   └── adapters/
-│       ├── grpc/           # Inbound gRPC handlers
-│       ├── postgres/       # Repository implementations
-│       └── kafka/          # Event publishers and consumers
-├── migrations/             # SQL migrations
-├── config/                 # Configuration loading
-├── Dockerfile
-└── go.mod
-```
-
-## Getting Started
-
-> 🚧 The platform is under active development. The commands below show the planned developer workflow.
+## Quick Start
 
 ### Prerequisites
 
-**Required**
+- Docker & Docker Compose
+- Docker Compose V2 (required for mTLS)
+- Go 1.21+
+- gRPC Tools
 
-| Tool | Version | Purpose |
-|---|---|---|
-| [Go](https://go.dev/dl/) | 1.23+ | Build and run services |
-| [Docker](https://docs.docker.com/get-docker/) + Docker Compose | 24+ / v2 | Local infrastructure |
-| `make` | any | Developer commands |
-| [`buf`](https://buf.build/docs/installation) | 1.x | Protobuf linting and code generation |
-| [`sqlc`](https://docs.sqlc.dev/) | 1.x | Type-safe SQL code generation |
-| [`golang-migrate`](https://github.com/golang-migrate/migrate) | 4.x | Database migrations |
-| [`golangci-lint`](https://golangci-lint.run/) | 1.6x+ | Linting |
-
-**Optional**
-
-| Tool | Purpose |
-|---|---|
-| [`k6`](https://k6.io/) | Load testing |
-| [`kubectl`](https://kubernetes.io/docs/tasks/tools/) + [`kind`](https://kind.sigs.k8s.io/) | Local Kubernetes cluster |
-| [Terraform](https://developer.hashicorp.com/terraform/install) 1.6+ | Cloud infrastructure |
-| [`grpcurl`](https://github.com/fullstorydev/grpcurl) | Calling gRPC services manually |
-
-**Machine**
-
-- 16 GB RAM recommended (at least 8 GB allocated to Docker) to run the full stack locally
-- 4+ CPU cores
-- ~20 GB free disk space
-
-### Running locally
+### Development Setup
 
 ```bash
-# 1. Clone the repository
-git clone <repository-url>
-cd <repository>
+# Start the local environment
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
-# 2. Start infrastructure (PostgreSQL, Kafka, Redis, observability stack)
-make infra-up
+# Wait for services to be ready
+sleep 30
 
-# 3. Generate code from contracts
-make generate
-
-# 4. Run database migrations
-make migrate
-
-# 5. Start all services
-make run
+# Access the services
+# - API Gateway: http://localhost:8000
+# - gRPC clients: connect to localhost:50051
 ```
 
-| Tool | URL |
-|---|---|
-| API Gateway | http://localhost:8080 |
-| Grafana | http://localhost:3000 |
-| Jaeger | http://localhost:16686 |
-| Kafka UI | http://localhost:8085 |
-
-### Running tests
+### Generate gRPC Clients
 
 ```bash
-make test             # unit tests
-make test-integration # integration tests (Testcontainers)
-make lint             # golangci-lint
+# Install protoc and gRPC plugins
+brew install protobuf grpcio grpc_tools
+
+# Generate Go client stubs
+go generate ./api/...
+
+# Run the generator
+protoc --go_out=. \
+    --go_opt=paths=source_relative \
+    --go-grpc_out=. \
+    --go-grpc_opt=paths=source_relative \
+    api/auth/proto/*.proto
 ```
 
-## Documentation
+### Run Services Locally
 
-| Topic | Link |
-|---|---|
-| Documentation index | [docs/README.md](docs/README.md) |
-| Non-functional requirements | [docs/architecture/requirements.md](docs/architecture/requirements.md) |
-| Scalability | [docs/architecture/scalability.md](docs/architecture/scalability.md) |
-| Architecture overview | [docs/architecture/overview.md](docs/architecture/overview.md) |
-| Architectural patterns | [docs/architecture/patterns.md](docs/architecture/patterns.md) |
-| Security | [docs/architecture/security.md](docs/architecture/security.md) |
-| Observability | [docs/architecture/observability.md](docs/architecture/observability.md) |
-| API guidelines | [docs/api/README.md](docs/api/README.md) |
-| Event catalog | [docs/events/README.md](docs/events/README.md) |
-| Database guidelines | [docs/database/README.md](docs/database/README.md) |
-| Architecture Decision Records | [docs/decisions/README.md](docs/decisions/README.md) |
+```bash
+# Start services in development mode
+go run ./api/auth/cmd/server.go &
+go run ./api/ledger/cmd/server.go &
+go run ./api/payments/cmd/server.go &
+go run ./api/cards/cmd/server.go &
+go run ./api/transfers/cmd/server.go &
+go run ./api/users/cmd/server.go &
+```
 
-## Roadmap
+## Service Dependencies
 
-- [ ] **Phase 1: Foundation**
-  - [ ] Shared packages (`go-common`, `go-errors`, `go-logger`, `go-observability`)
-  - [ ] Local infrastructure with Docker Compose
-  - [ ] CI pipeline (lint, test, build)
-- [ ] **Phase 2: Core banking**
-  - [ ] `identity-service` and `user-service`
-  - [ ] `account-service`
-  - [ ] `ledger-service` (double-entry)
-  - [ ] `transaction-service` (internal transfers)
-  - [ ] `api-gateway`
-- [ ] **Phase 3: Payments**
-  - [ ] `pix-service` (simulated central bank integration)
-  - [ ] `payment-service` (boletos, scheduled payments)
-  - [ ] `statement-service`
-  - [ ] `notification-service`
-- [ ] **Phase 4: Cards and credit**
-  - [ ] `card-service`
-  - [ ] `credit-service`
-- [ ] **Phase 5: Clients and production readiness**
-  - [ ] Web app
-  - [ ] Mobile apps
-  - [ ] Kubernetes manifests and Terraform
-  - [ ] Read replicas and PgBouncer in every environment
-  - [ ] Load testing at 1× and 3× peak (k6) and chaos testing
-- [ ] **Phase 6: Large scale**
-  - [ ] Sharding by customer (logical shards + shard directory)
-  - [ ] Cell-based deployment
-  - [ ] Multi-region (active-passive, then active-active by cell)
+```
+┌────────────────────────────────────────────────────────────┐
+│                        API Gateway                         │
+│                   (Kong + OpenResty)                       │
+└────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────────┐
+                    │         mTLS        │
+                    └─────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              │               │               │
+              ▼               ▼               ▼
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │   Auth       │  │   Ledger     │  │   Payments    │
+    │   Service    │  │   Service    │  │   Service     │
+    └──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+           │                 │                 │
+           │                 │                 │
+           ▼                 ▼                 ▼
+    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+    │   Accounts   │  │   Ledger     │  │    Cards     │
+    │   Service    │  │   DB         │  │   Service    │
+    └──────────────┘  │             │  └──────┬───────┘
+                      └──────┬───────┘        │
+                             │               │
+                             ▼               ▼
+                      ┌──────────────┐  ┌──────────────┐
+                      │   Transfer   │  │    Vault     │
+                      │   Service    │  │   (Secrets)  │
+                      └──────┬───────┘  └──────────────┘
+                             │
+                             ▼
+                      ┌──────────────┐
+                      │    Users     │
+                      │   Service    │
+                      └──────┬───────┘
+                             │
+                              ▼
+                      ┌──────────────┐
+                      │     Redis    │
+                      │   (Cache)    │
+                      └──────────────┘
+                             
+                              ▼
+                      ┌──────────────┐
+                      │  PostgreSQL  │
+                      │    (Primary) │
+                      └──────────────┘
 
-## Contributing
+External Services:
+┌────────────────────────────────────────────────────────────┐
+│                    External Services                       │
+├────────────────────────────────────────────────────────────┤
+│  Keycloak         │ Identity management                   │
+│  OpenTelemetry    │ Distributed tracing                   │
+│  Prometheus      │ Metrics collection                    │
+│  Jaeger          │ Trace backend                         │
+│  Vault           │ Secrets management                     │
+│  Stripe          │ Payment processing (optional)          │
+└────────────────────────────────────────────────────────────┘
+```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+## Build & Deploy
+
+### Building Images
+
+```bash
+# Build all services
+make build
+
+# Build and push to registry
+docker build -t digitalbank/ledger:latest -f api/ledger/Dockerfile .
+docker push registry.digitalbank.io/ledger:latest
+```
+
+### Local Deployment
+
+```bash
+# Start with docker-compose
+docker compose up -d
+
+# Or with kubectl
+kubectl apply -f infrastructure/k8s/base/
+```
+
+### Kubernetes Deployment
+
+```bash
+# Apply configuration
+helm repo add digitalbank https://charts.digitalbank.io
+helm install digitalbank-digitalbank digitalbank/digitalbank \
+  --create-namespace \
+  --namespace digitalbank \
+  --values values.yaml
+
+# Verify deployment
+kubectl get pods -n digitalbank
+```
+
+### Environment Variables
+
+```bash
+# .env.local
+API_KEY=your-api-key
+DATABASE_URL=postgresql://user:pass@localhost:5432/digitalbank
+SECRET_KEY=your-secret-key
+VAULT_ADDR=http://vault:8200
+VAULT_TOKEN=your-vault-token
+```
+
+## CI/CD Pipeline
+
+### Pipeline Stages
+
+```mermaid
+graph TD
+    A[Developer Push] --> B[Lint & Test]
+    B --> C[Build Container]
+    C --> D[Run E2E Tests]
+    D --> E{Push to Environment}
+    E -->|Staging| F[Run Integration Tests]
+    E -->|Production| G[Run Production Tests]
+    F --> H[Manual Approval]
+    G --> H
+    H --> I[Deploy to Production]
+    I --> J[Run Smoke Tests]
+```
+
+### GitHub Actions Workflow
+
+```yaml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: make lint
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+      redis:
+        image: redis:7
+    steps:
+      - uses: actions/checkout@v3
+      - run: make test
+
+  build:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v3
+      - run: make build
+      - run: docker push ${REGISTRY}:${BUILD_REF}
+
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v3
+      - run: kubectl apply -f k8s/staging/
+
+  deploy-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      - run: kubectl apply -f k8s/production/
+```
+
+## API Documentation
+
+### gRPC Services
+
+See [/api/](/api/) directory for proto definitions.
+
+### REST APIs
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| /v1/auth/login | POST | User authentication |
+| /v1/auth/token | POST | Token refresh |
+| /v1/auth/logout | POST | User logout |
+| /v1/accounts | GET | List accounts |
+| /v1/accounts/{id} | GET | Get account |
+| /v1/accounts | POST | Create account |
+| /v1/accounts/{id}/close | POST | Close account |
+
+### WebSocket Events
+
+| Event | Description |
+|-------|-------------|
+| payment.completed | Payment successfully processed |
+| transfer.completed | Transfer successfully processed |
+| card.issued | Virtual card created |
+| card.expired | Card expiration event |
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE).
+MIT License - See [LICENSE](LICENSE) file for details.
 
-> **Disclaimer:** This is an educational project. It is not affiliated with any financial institution and does not process real money. External systems such as the central bank's Pix infrastructure and card networks are simulated.
+---
+
+For technical documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).

@@ -1,165 +1,362 @@
-# Database Guidelines
+# Database Documentation
 
-## Database per Service
+This directory contains database architecture and design for the Digital Bank Platform.
 
-Each service owns a dedicated **PostgreSQL** database (or schema in local development). Cross-service data access happens **only** through APIs or events, never through direct queries or shared tables.
+## Overview
 
-| Service | Database | Main tables |
-|---|---|---|
-| identity-service | `identity` | `credentials`, `sessions`, `refresh_tokens`, `devices`, `mfa_factors` |
-| user-service | `users` | `users`, `addresses`, `kyc_verifications` |
-| account-service | `accounts` | `accounts`, `account_limits` |
-| ledger-service | `ledger` | `ledger_accounts`, `journal_entries`, `postings`, `balances` |
-| transaction-service | `transactions` | `transactions`, `saga_steps` |
-| pix-service | `pix` | `pix_keys`, `pix_transfers`, `qr_codes` |
-| payment-service | `payments` | `boleto_payments`, `scheduled_payments` |
-| card-service | `cards`, `card_vault` | `cards`, `authorizations` / `vault_entries` |
-| credit-service | `credit` | `credit_lines`, `invoices`, `invoice_items`, `installments` |
-| statement-service | `statements` | `feed_items`, `monthly_statements` |
-| notification-service | `notifications` | `notifications`, `preferences`, `templates` |
+The database architecture follows a **per-service database** pattern with PostgreSQL clusters. Each microservice owns its database with no cross-service direct access.
 
-Every service that publishes or consumes events also has `outbox` and `inbox` tables.
+## Architecture
 
-## Read / Write Separation
+### Write-First CQRS
 
-Each service connects to **two** database endpoints ([ADR-0009](../decisions/0009-read-write-separation.md)):
+Each service maintains:
+- **Primary database**: For write operations and source of truth
+- **Read replicas**: For read-only queries (after warm-up)
+- **Cache layer**: For frequently accessed data (Redis)
 
-| Variable | Target | Used by |
-|---|---|---|
-| `DB_WRITE_URL` | Primary (via PgBouncer) | `CommandRepository`: inserts, updates, `SELECT ... FOR UPDATE`, reads that decide money movements |
-| `DB_READ_URL` | Read replicas (via PgBouncer, load-balanced) | `QueryRepository`: screens, lists, history |
-
-```text
-            writes                         async streaming
-  service ─────────▶ [ primary ] ───────────────────────▶ [ replica 1..N ]
-     │                    │ sync                                ▲
-     │                    ▼                                     │
-     │              [ standby (other AZ) ]                      │
-     └──────────────────────── reads ───────────────────────────┘
+```
+    App
+     │
+     │ (writes)
+     ▼
+  Primary (PostgreSQL) ←─── Outbox (events)
+     │
+     │ (syncs)
+     ▼
+  Replica (PostgreSQL) →─── Cache (Redis)
+     │                       │
+     │                       │
+  (reads)              Consumes events
+     │                    └───► Updates read model
 ```
 
-- In local development, both variables can point to the same database.
-- Replica lag is monitored, and replicas lagging more than 500 ms are removed from the read pool.
-- See [scalability.md](../architecture/scalability.md#read--write-separation) for read-your-writes handling.
+## Database Per Service
 
-## Sharding
+| Service | Database | Purpose |
+|--------|----------|---------|
+| `api-gateway` | `gateway` | Sessions, rate limits, API keys |
+| `identity-service` | `identity` | Users, sessions, MFA, devices |
+| `user-service` | `users` | Customer profiles, KYC data |
+| `account-service` | `accounts` | Checking account metadata |
+| `ledger-service` | `ledgers` | Ledger entries, customer accounts, hot accounts |
+| `transaction-service` | `transactions` | Transfer records, pending items |
+| `pix-service` | `pix` | Pix keys, dynamic QR codes |
+| `payment-service` | `payments` | Bill payments, scheduled payments |
+| `card-service` | `cards` | Card metadata, PINs, controls |
+| `credit-service` | `credit` | Credit limits, invoices, installments |
+| `statement-service` | `statements` | Statement projections (read model) |
+| `notification-service` | `notifications` | Notification preferences, queues |
 
-High-volume services (ledger, transactions, Pix, cards, statements) are sharded by `customer_id` into **4,096 logical shards** mapped to physical clusters ([ADR-0010](../decisions/0010-sharding-and-cells.md)). Every table in a sharded service includes the `customer_id` (or a key derived from it) so each query is routed to exactly one shard.
+## Table Naming Convention
 
-## Partitioned Tables
+```
+{Domain}Table
 
-Append-only, high-volume tables use PostgreSQL declarative partitioning:
+Examples:
+- users_customers
+- accounts_checking
+- ledgers_entries
+- transactions_transfers
+- pix_keys
+- cards_cards
+```
+
+## Table Structure Patterns
+
+### Entity Tables (Primary)
 
 ```sql
-CREATE TABLE postings (
-    id                 TEXT        NOT NULL,
-    entry_id           TEXT        NOT NULL,
-    ledger_account_id  TEXT        NOT NULL,
-    amount_cents       BIGINT      NOT NULL,
-    currency           CHAR(3)     NOT NULL,
-    created_at         TIMESTAMPTZ NOT NULL,
-    PRIMARY KEY (id, created_at)
-) PARTITION BY RANGE (created_at);
-
-CREATE TABLE postings_2026_11 PARTITION OF postings
-    FOR VALUES FROM ('2026-11-01') TO ('2026-12-01');
-```
-
-Partitions are created ahead of time by a scheduled job (`pg_partman`) and old partitions are moved to cold storage.
-
-## Connection Pooling
-
-- **PgBouncer** in transaction mode in front of every primary and replica.
-- `pgxpool` per pod with explicit `MaxConns`. Total = `pods × MaxConns` must stay below the PgBouncer pool.
-- Every query has `statement_timeout`. Every transaction has `lock_timeout` and `idle_in_transaction_session_timeout`.
-
-## Indexing Rules
-
-- Every query on a hot path must use an index. CI runs `EXPLAIN` checks on critical queries.
-- Prefer composite indexes that match the access pattern, for example `(account_id, created_at DESC)` for the feed.
-- Use keyset (cursor) pagination. `OFFSET` is forbidden on large tables.
-- Create indexes with `CREATE INDEX CONCURRENTLY` in migrations.
-
-## Conventions
-
-- Table names: `snake_case`, plural.
-- Primary keys: `id` as ULID stored in `TEXT`/`UUID`, generated by the application.
-- Timestamps: `TIMESTAMPTZ` in UTC (`created_at`, `updated_at`).
-- Concurrency: `version BIGINT` column for optimistic locking on mutable aggregates.
-- Soft deletes only when required by the business. Financial records are never deleted.
-
-## Money
-
-```sql
-amount_cents  BIGINT      NOT NULL,
-currency      CHAR(3)     NOT NULL DEFAULT 'BRL'
-```
-
-- **Never** use `FLOAT`, `REAL` or `DOUBLE`.
-- Interest calculations use `NUMERIC` internally and round explicitly (banker's rounding) before persisting cents.
-
-## Ledger Model
-
-```mermaid
-erDiagram
-    LEDGER_ACCOUNTS ||--o{ POSTINGS : has
-    JOURNAL_ENTRIES ||--|{ POSTINGS : contains
-    LEDGER_ACCOUNTS ||--|| BALANCES : snapshot
-
-    LEDGER_ACCOUNTS {
-        text id PK
-        text owner_id
-        text type "ASSET | LIABILITY | ..."
-        char currency
-    }
-    JOURNAL_ENTRIES {
-        text id PK
-        text idempotency_key UK
-        text description
-        timestamptz occurred_at
-    }
-    POSTINGS {
-        text id PK
-        text entry_id FK
-        text ledger_account_id FK
-        bigint amount_cents "signed"
-    }
-    BALANCES {
-        text ledger_account_id PK
-        bigint available_cents
-        bigint pending_cents
-        bigint version
-    }
-```
-
-Invariants (enforced in the domain **and** checked in the database):
-
-- `SUM(postings.amount_cents) = 0` for each `journal_entry`.
-- `journal_entries` and `postings` are append-only (`UPDATE`/`DELETE` revoked at the role level).
-- Customer checking balances cannot become negative unless an overdraft limit exists.
-
-## Outbox Table
-
-```sql
-CREATE TABLE outbox (
-    id            TEXT PRIMARY KEY,
-    aggregate_id  TEXT        NOT NULL,
-    topic         TEXT        NOT NULL,
-    payload       JSONB       NOT NULL,
-    headers       JSONB       NOT NULL DEFAULT '{}',
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    published_at  TIMESTAMPTZ
+CREATE TABLE IF NOT EXISTS users_customers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id CHAR(20) NOT NULL UNIQUE,
+  name VARCHAR(255) NOT NULL,
+  document_type VARCHAR(20) NOT NULL,
+  document_number VARCHAR(30) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  cell_id VARCHAR(50),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_cell FOREIGN KEY (cell_id) REFERENCES cells(id)
 );
-CREATE INDEX idx_outbox_unpublished ON outbox (created_at) WHERE published_at IS NULL;
 ```
 
-## Migrations
+### Journal Tables (Audit Trail)
 
-- Tool: [`golang-migrate`](https://github.com/golang-migrate/migrate) (or `goose`).
-- Location: `services/<name>/migrations/`.
-- File naming: `000001_create_accounts.up.sql` / `000001_create_accounts.down.sql`.
-- Migrations must be **backward compatible** with the previously deployed version (expand → migrate → contract).
+```sql
+CREATE TABLE IF NOT EXISTS users_journal (
+  id BIGSERIAL PRIMARY KEY,
+  table_name VARCHAR(50) NOT NULL,
+  record_id CHAR(36) NOT NULL,
+  column_name VARCHAR(50),
+  old_value TEXT,
+  new_value TEXT,
+  reason VARCHAR(100),
+  performed_by VARCHAR(50),
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  cell_id VARCHAR(50)
+);
+CREATE INDEX idx_journal_table_record ON users_journal(table_name, record_id);
+```
 
-## Local Development
+### Ledger Tables
 
-Initialization scripts and seed data live in `infrastructure/databases/`.
+```sql
+-- Customer accounts (write source)
+CREATE TABLE IF NOT EXISTS ledgers_accounts_customers (
+  customer_id CHAR(20) PRIMARY KEY,
+  account_balance NUMERIC(18,2) NOT NULL DEFAULT 0,
+  currency_code CHAR(3) NOT NULL DEFAULT 'BRL',
+  cell_id VARCHAR(50)
+);
+
+-- Ledger entries (append-only, immutable)
+CREATE TABLE IF NOT EXISTS ledgers_entries (
+  id BIGSERIAL PRIMARY KEY,
+  counterparty_customer_id CHAR(20) NOT NULL,
+  counterparty_account_no VARCHAR(50),
+  counterparty_account_id VARCHAR(50),
+  transaction_id VARCHAR(50) NOT NULL,
+  credit_ledger VARCHAR(100),
+  debit_ledger VARCHAR(100),
+  currency_code CHAR(3) NOT NULL,
+  amount NUMERIC(18,2) NOT NULL,
+  description VARCHAR(255),
+  posted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  cell_id VARCHAR(50)
+);
+```
+
+See [ledger-service documentation](../services/ledger-service.md) for full table definitions.
+
+## Partitioning Strategy
+
+### Time-Based Partitioning (Monthly)
+
+Large tables are partitioned by month:
+
+```sql
+CREATE TABLE IF NOT EXISTS ledgers_entries_2025_01 (
+  -- Same schema as main table
+  CONSTRAINT pk_ledger PRIMARY KEY (id)
+) PARTITION BY RANGE (posted_at) (
+  RANGE (POSTED_AT FROM '2025-01-01' TO '2025-02-01')
+);
+```
+
+Monthly partitions are:
+- Dropped after 2 years (retention policy)
+- Archived to cold storage (S3/GCS)
+
+### Customer-Based Partitioning (Logical Sharding)
+
+Customers are hashed into 4,096 logical shards. Data is routed accordingly:
+
+```sql
+SELECT modulo(customer_id_hash, 4096) AS shard_id;
+```
+
+### Customer-Based Sharding (Physical)
+
+Shards are distributed across cells:
+
+```
+Customer → Shard ID → Cell → Database
+```
+
+## Index Strategy
+
+### Primary Keys
+
+All tables have PRIMARY KEY constraints with auto-generated IDs:
+- PostgreSQL UUIDs for main entities
+- BIGSERIAL/SEQ for journal entries
+- UPPERCASE table name prefix for clarity
+
+### Secondary Indexes
+
+Created only when:
+1. Used in WHERE, JOIN, or ORDER BY clauses
+2. Selectivity > 5%
+3. Cover index for INCLUDE columns
+4. Composite indexes for common query patterns
+
+Example:
+```sql
+CREATE INDEX IF NOT EXISTS idx_accounts_customer_status
+ON accounts_checks (customer_id, status);
+```
+
+## Read Replicas
+
+### Configuration
+
+```bash
+# Database URL with replica host
+DB_URL="postgresql://user:pass@host:5432/db?sslmode=require"
+DB_READ_URL="postgresql://user:pass@replica-host:5432/db?sslmode=require"
+```
+
+### Routing
+
+- **Writes**: Always routed to primary (connection pool, service config)
+- **Reads**: Default to read replicas, fall back to primary during promotion
+
+### Replication Lag
+
+Read queries are rejected if lag exceeds threshold (default 5 seconds):
+
+```sql
+SELECT pg_stat_get_replication(lag)
+```
+
+## Connection Management
+
+### PgBouncer
+
+Pooling layer between services and databases:
+
+```yaml
+# services/identity-service/docker-compose.override.yml
+identity-service:
+  depends_on:
+    - pgbouncer
+  environment:
+    - DATABASE_URL=postgresql://pgbouncer/db
+    - DB_MAX_OPEN_CONNS=25
+    - DB_MAX_IDLE_CONNS=10
+
+pgbouncer:
+  environment:
+    - Databases=identity=host/db
+    - PoolMode=transaction
+    - DefaultPoolSize=50
+    - MaxClientConn lifetime=1h
+    - MaxDBClientConn=100
+```
+
+### Connection Pool Sizing
+
+| Metric | Formula |
+|--------|---------|
+| `max_connections` | (CPU cores × 4) × concurrency factor |
+| `max_cached_connections` | `max_connections` × 2 |
+| `max_db_connections` | 1 per primary per shard |
+| `default_pool_size` | `max_connections` / `num_shards` |
+
+## Migration Strategy
+
+### Tools
+
+- [`golang-migrate`](https://github.com/golang-migrate/migrate) for versioning
+- Migration files stored in `services/<service>/migrations/`
+
+### Workflow
+
+1. Create migration: `migrate create 001_add_field --ext sql --idempotent`
+2. Write schema changes (DDL)
+3. Test locally: `make db-up && make migrate`
+4. Deploy to dev: `migrate -database https://dev.db -path ./migrations -verbose`
+5. Deploy to staging: repeat step 4
+6. Deploy to production: repeat step 4
+
+### Rollback
+
+- `migrate -database prod -path ./migrations -down 1`
+- Keep migrations for 2 years (can recreate schema)
+
+## Backup Strategy
+
+### Physical Backups
+
+```bash
+# Daily full backup with WAL archiving
+0 0 * * * /scripts/backup-databases.sh
+```
+
+### Point-in-Time Recovery
+
+- WAL archiving to object storage
+- RPO (Recovery Point Objective): < 1 hour
+- RTO (Recovery Time Objective): < 30 minutes
+
+### Retention
+
+| Backup Type | Retention |
+|------------|-----------|
+| Daily full | 7 days |
+| Incremental | 7 days |
+| Monthly full | 12 months |
+| Quarterly full | 7 years |
+
+## Monitoring
+
+### Metrics
+
+- `database_connections_usedactive` / `database_connections_usedmax` (target: < 80%)
+- `pg_stat_database_tup_inserted` rate (queries/sec)
+- `pg_stat_replication_replay_lag` (seconds)
+- `pg_locks` count (deadlocks: 0)
+- `pg_stat_statements` (slow queries, execution time)
+
+### Alerts
+
+| Metric | Warning | Critical |
+|--------|---------|----------|
+| Connection utilization | > 70% | > 90% |
+| Replication lag | > 10s | > 30s |
+| Lock waits | > 1/min | > 5/min |
+| Deadlocks | > 0 | Any |
+
+## Security
+
+### Authentication
+
+- SCRAM authentication (PostgreSQL)
+- TLS for all connections (server-side certificate)
+
+### Encryption
+
+- All sensitive columns encrypted at rest:
+  - customer_name
+  - document_number
+  - password
+  - card_pin
+- TDE (Transparent Data Encryption) for full database
+
+### Access Control
+
+- Role-based access control (RBAC)
+- Service accounts with least privilege
+- Connection pool credentials rotated quarterly
+
+## Disaster Recovery
+
+### Strategy
+
+| Service | Architecture | RTO | RPO |
+|--------|--------------|----|----|
+| Ledger | 3-way sync + async backup | < 5 min | 0 |
+| Transaction | 2-way sync + async backup | < 15 min | < 5 min |
+| Identity | 2-way sync + async backup | < 30 min | < 10 min |
+| Others | Primary + replica | < 60 min | < 15 min |
+
+### Testing
+
+Quarterly failover drills:
+1. Primary instance fails
+2. Measure failover time
+3. Verify data consistency
+4. Document any issues
+
+## Directory Structure
+
+| File | Description |
+|------|-------------|
+| [README.md](README.md) | This database documentation |
+| [schema.md](./schema.md) | Database schema design patterns |
+| [migrations.md](./migrations.md) | Migration strategy and tools |
+| [backups.md](./backups.md) | Backup and recovery procedures |
+| [monitoring.md](./monitoring.md) | Database monitoring and alerting |
+| [security.md](./security.md) | Database security practices |
+| [ledger.md](./ledger.md) | Ledger database design |

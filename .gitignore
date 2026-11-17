@@ -1,0 +1,34 @@
+# Go
+/bin/
+*.exe
+*.test
+*.out
+coverage.*
+go.work.sum
+vendor/
+
+# Generated code
+contracts/gen/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Docker / local overrides
+docker-compose.override.yml
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

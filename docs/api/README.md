@@ -1,134 +1,155 @@
-# API Guidelines
+# API Documentation
+
+This directory contains API documentation for the Digital Bank Platform.
 
 ## Overview
 
-| Surface | Protocol | Contract location |
-|---|---|---|
-| Public API (clients) | REST / JSON over HTTPS | `contracts/openapi/` |
-| Internal API (services) | gRPC / Protobuf over mTLS | `contracts/proto/` |
+The platform exposes two types of APIs:
 
-Only `api-gateway` is exposed to the internet.
+1. **External API (REST)**: JSON-based REST API exposed through the API Gateway for client applications (web and mobile).
+2. **Internal API (gRPC)**: Protocol Buffers-based gRPC API for inter-service communication.
 
-## REST Conventions
+## External API
 
-### URLs and versioning
+| Specification | Location |
+|--------------|----------|
+| OpenAPI 3.1 | [contracts/openapi/spec.yaml](../../contracts/openapi/spec.yaml) |
 
-```text
-https://api.<domain>/v1/accounts/{account_id}/balance
+Generated clients:
+- TypeScript: `npm run generate:openapi`
+- Kotlin: `make generate-kotlin`
+- Swift: `make generate-swift`
+
+### Authentication
+
+All external API requests require a JWT access token in the `Authorization: Bearer <token>` header. Tokens are obtained through the identity service's login endpoint.
+
+See [https://swagger.io/docs/open-source-tools/swagger-ui/](https://swagger.io/docs/open-source-tools/swagger-ui/) for interactive API documentation.
+
+### Rate Limiting
+
+External API endpoints are protected by rate limiting:
+- Public endpoints: 100 requests per minute per IP
+- Authenticated endpoints: 1000 requests per minute per user
+
+Rate limit headers are included in all responses:
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 99
+Retry-After: 60
 ```
 
-- Version in the path (`/v1`). A breaking change means a new version.
-- Plural nouns for resources, kebab-case for multi-word paths (`/pix/keys`, `/scheduled-payments`).
-- IDs are ULIDs (sortable, URL-safe).
+## Internal API
 
-### Main endpoints
+| Protocol | Location |
+|----------|----------|
+| Protocol Buffers | [contracts/proto/](../../contracts/proto/) |
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/v1/users` | Sign up |
-| `POST` | `/v1/auth/login` | Authenticate |
-| `POST` | `/v1/auth/refresh` | Refresh tokens |
-| `GET` | `/v1/me` | Current user profile |
-| `GET` | `/v1/accounts/{id}` | Account details |
-| `GET` | `/v1/accounts/{id}/balance` | Current balance |
-| `GET` | `/v1/accounts/{id}/transactions` | Transaction feed |
-| `GET` | `/v1/pix/keys` | List Pix keys |
-| `POST` | `/v1/pix/keys` | Register a Pix key |
-| `POST` | `/v1/pix/transfers` | Send a Pix transfer |
-| `POST` | `/v1/pix/qr-codes` | Generate a Pix QR code |
-| `POST` | `/v1/payments/boletos` | Pay a boleto |
-| `GET` | `/v1/cards` | List cards |
-| `POST` | `/v1/cards/virtual` | Create a virtual card |
-| `PATCH` | `/v1/cards/{id}` | Block or unblock a card, change limits |
-| `GET` | `/v1/credit/invoices` | List credit card invoices |
-| `GET` | `/v1/statements/{year}/{month}` | Monthly statement |
-
-The full specification lives in `contracts/openapi/`.
-
-### Money representation
-
-```json
-{
-  "amount": { "value": 5000, "currency": "BRL" }
-}
-```
-
-`value` is an **integer in minor units** (cents). Floats are never used.
-
-### Idempotency
-
-State-changing requests (`POST`, `PATCH`, `DELETE`) **must** send:
-
-```http
-Idempotency-Key: 6c1b0b9e-6f0e-4b3a-9e3e-8a3b2f9c1d2a
-```
-
-### Pagination
-
-Cursor-based:
-
-```http
-GET /v1/accounts/{id}/transactions?limit=20&cursor=eyJpZCI6...
-```
-
-```json
-{
-  "data": [ ... ],
-  "pagination": { "next_cursor": "eyJpZCI6...", "has_more": true }
-}
-```
-
-### Errors
-
-Errors follow [RFC 9457 (Problem Details)](https://www.rfc-editor.org/rfc/rfc9457):
-
-```json
-{
-  "type": "https://docs.<domain>/errors/insufficient-funds",
-  "title": "Insufficient funds",
-  "status": 422,
-  "code": "INSUFFICIENT_FUNDS",
-  "detail": "The account balance is lower than the requested amount.",
-  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736"
-}
-```
-
-| HTTP | When |
-|---|---|
-| `400` | Malformed request / validation error |
-| `401` | Missing or invalid token |
-| `403` | Authenticated but not allowed |
-| `404` | Resource not found (or not owned by the caller) |
-| `409` | Conflict / idempotency key reused with a different payload |
-| `422` | Business rule violation (insufficient funds, limit exceeded...) |
-| `429` | Rate limited |
-| `5xx` | Unexpected errors (never leak internals) |
-
-### Standard headers
-
-| Header | Direction | Purpose |
-|---|---|---|
-| `Authorization: Bearer <jwt>` | Request | Authentication |
-| `Idempotency-Key` | Request | Safe retries |
-| `X-Device-Id` | Request | Device binding |
-| `traceparent` | Both | W3C trace context |
-| `X-Request-Id` | Response | Correlation |
-
-## gRPC Conventions
-
-- Package naming: `bank.<service>.v1` (for example `bank.ledger.v1`).
-- One `service` per bounded context. Methods are verbs (`PostEntry`, `GetBalance`).
-- Use `google.protobuf.Timestamp` for time and a shared `bank.common.v1.Money` for money.
-- Errors use standard gRPC status codes with `google.rpc.ErrorInfo` details.
-- Linting and breaking-change detection with `buf lint` and `buf breaking`.
+Services expose specific gRPC services defined in Protocol Buffer files. Example:
 
 ```protobuf
+// services/identity-service/internal/ports/identity.proto
 syntax = "proto3";
 
-package bank.ledger.v1;
-
-service LedgerService {
-  rpc PostEntry(PostEntryRequest) returns (PostEntryResponse);
-  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+service IdentityService {
+  rpc Login (LoginRequest) returns (LoginResponse);
+  rpc RefreshToken (RefreshRequest) returns (RefreshResponse);
+  rpc VerifyMFA (MFARequest) returns (MFAResponse);
 }
 ```
+
+### Authentication
+
+Services authenticate via mTLS using the service mesh. Each service presents a TLS certificate during gRPC connection establishment.
+
+### Error Handling
+
+gRPC errors follow the [gRPC status codes](https://grpc.io/docs/guides/status/):
+- `UNKNOWN`: General unknown error
+- `INVALID_ARGUMENT`: Client sent invalid arguments
+- `NOT_FOUND`: Resource not found
+- `UNAUTHENTICATED`: Missing or invalid credentials
+- `UNAVAILABLE`: Service unavailable
+
+Error codes are mapped from domain errors via `go-errors`. See [packages/go-errors/README.md](../../packages/go-errors/README.md).
+
+## API Versioning
+
+### External API
+
+Versioning via URL path with semantic versioning:
+```
+/v1/users
+/v2/users
+```
+
+Breaking changes:
+- Bump minor version
+- Document deprecation in OpenAPI
+
+New versions are:
+- Auto-routed by Accept-Version header
+- Default to latest stable version
+
+### Internal API
+
+Versioning via separate services:
+```
+identity-service-v1
+identity-service-v2
+```
+
+## API Guidelines
+
+1. **External API** follows [REST best practices](https://www.infoq.com/articles/restful-service-arch/):
+   - Resources have nouns, actions have verbs
+   - HTTP methods have consistent semantics (GET for read, POST for create, PUT for update, DELETE for remove)
+   - Response status codes have standard meanings
+
+2. **Internal API** follows gRPC design patterns:
+   - Each service is a single logical unit of work
+   - Methods are verbs matching the business operation
+   - Request/response objects are well-defined
+   - Errors follow domain error mappings
+
+## Generated Code
+
+- Generated clients in `packages/`
+- Generated SDKs per target language in `contracts/`
+- Regenerate: `make generate`
+
+## API Testing
+
+API tests are defined in service test directories. Example:
+
+```go
+// services/identity-service/internal/application/handlers_test.go
+func TestLogin(t *testing.T) {
+  // Test case
+}
+```
+
+Integration tests:
+```bash
+make test-api
+```
+
+## API Development Workflow
+
+1. Define contracts in `contracts/` directory
+2. Generate code: `make generate`
+3. Implement handlers in service
+4. Run tests: `make test`
+5. Update API specs if breaking changes: `make generate-openapi`
+
+## Directory Structure
+
+| File | Description |
+|------|-------------|
+| [README.md](README.md) | This API documentation |
+| [external.md](./external.md) | External REST API documentation |
+| [internal.md](./internal.md) | Internal gRPC API documentation |
+| [authentication.md](./authentication.md) | Authentication and authorization |
+| [error-codes.md](./error-codes.md) | API error code definitions |
+| [versioning.md](./versioning.md) | API versioning strategy |
+| [guidelines.md](./guidelines.md) | API development guidelines |

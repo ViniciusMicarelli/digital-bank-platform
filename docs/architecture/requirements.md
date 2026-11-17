@@ -1,125 +1,282 @@
-# Non-Functional Requirements
+# Architecture Requirements
 
-These are the targets the platform is designed and tested against. Each architectural decision should be traceable to at least one of these requirements.
+This document defines the non-functional requirements for the Digital Bank Platform.
 
-## Scale Assumptions
+## Availability and Reliability
 
-The platform is designed for a bank with **tens of millions of active customers**:
+### Service Availability Targets
 
-| Metric | Design target | Notes |
-|---|---|---|
-| Registered customers | 100 M | |
-| Daily active users (DAU) | 30 M | |
-| Peak concurrent sessions | 5 M | Paydays, Black Friday, 13th salary |
-| Peak API requests (read) | 100,000 RPS | Mostly balance, feed and card screens |
-| Peak financial writes | 20,000 TPS | Pix, transfers, card purchases, boletos |
-| Peak card authorizations | 10,000 TPS | |
-| Peak Pix transfers | 8,000 TPS | |
-| Ledger postings | ~3 B / month | ~2 postings per movement |
-| Events on Kafka | 200,000 msg/s at peak | |
-| Growth headroom | 3× peak | Without architectural changes, only more instances or shards |
+| Tier | Services | Target Availability | Measurement Window |
+|------|----------|---------------------|-------------------|
+| Tier 0 | Ledger, Pix, Card Authorization, Login | 99.99% | Monthly |
+| Tier 1 | Accounts, Payments, Credit, Feed | 99.95% | Monthly |
+| Tier 2 | Statements, Notifications | 99.90% | Monthly |
 
-> These are design numbers, not measured production traffic. Load tests (`k6`) validate them per release.
+### Failover Requirements
 
-## Latency Targets
+- **Automatic failover** for all Tier 0 services
+- **Failover time**: < 30 seconds
+- **Manual failover** with approval for non-critical services
+- **Graceful degradation**: When primary fails, return cached or partial data
 
-Server-side latency measured **at the API Gateway** (excludes the client's network). These are the SLOs for each endpoint and operation.
+### Consistency
 
-### Public API
+- **Ledger**: Strong consistency (linearizable reads)
+- **Balance checks**: Strong consistency
+- **Money movements**: Eventually consistent (< 5 seconds)
+- **Statements**: Eventually consistent
 
-| Operation | Endpoint | p50 | p95 | p99 |
-|---|---|---|---|---|
-| Get balance | `GET /v1/accounts/{id}/balance` | 10 ms | 30 ms | 50 ms |
-| Transaction feed (first page) | `GET /v1/accounts/{id}/transactions` | 20 ms | 60 ms | 100 ms |
-| Profile | `GET /v1/me` | 10 ms | 30 ms | 50 ms |
-| List cards | `GET /v1/cards` | 15 ms | 40 ms | 80 ms |
-| List invoices | `GET /v1/credit/invoices` | 20 ms | 60 ms | 100 ms |
-| Login | `POST /v1/auth/login` | 80 ms | 150 ms | 300 ms |
-| Token refresh | `POST /v1/auth/refresh` | 15 ms | 40 ms | 80 ms |
-| Pix key lookup | `GET /v1/pix/keys/{key}` | 20 ms | 50 ms | 100 ms |
-| Create Pix transfer (accepted) | `POST /v1/pix/transfers` | 60 ms | 150 ms | 300 ms |
-| Internal transfer | `POST /v1/transfers` | 40 ms | 100 ms | 200 ms |
-| Parse boleto | `POST /v1/payments/boletos/parse` | 15 ms | 50 ms | 100 ms |
-| Pay boleto (accepted) | `POST /v1/payments/boletos` | 60 ms | 150 ms | 300 ms |
-| Monthly statement PDF | `POST /v1/statements/export` | async | async | async (ready in < 30 s) |
+## Performance Targets
 
-> Argon2id hashing makes login slower than other endpoints on purpose.
+### Latency Targets
 
-### Critical internal paths
+| Operation | p50 | p95 | p99 | p999 | Budget |
+|-----------|-----|-----|-----|------|--------|
+| Ledger posting | 5 ms | 15 ms | 30 ms | 50 ms | 50 ms |
+| Get balance (primary) | 10 ms | 20 ms | 40 ms | 60 ms | 50 ms |
+| Get balance (replica) | 5 ms | 10 ms | 25 ms | 40 ms | 30 ms |
+| Internal transfer | 50 ms | 100 ms | 200 ms | 300 ms | 200 ms |
+| Pix transfer (accepted) | 100 ms | 150 ms | 300 ms | 500 ms | 300 ms |
+| Card authorization | 50 ms | 100 ms | 200 ms | 300 ms | 200 ms |
+| Pix end-to-end settlement | 500 ms | 2 s | 5 s | 10 s | 5 s |
+| Transaction feed (first page) | 30 ms | 60 ms | 100 ms | 150 ms | 100 ms |
+| Card issuance | 200 ms | 500 ms | 1 s | 2 s | 1 s |
+| Account creation | 100 ms | 200 ms | 500 ms | 1 s | 500 ms |
 
-| Operation | p50 | p95 | p99 |
-|---|---|---|---|
-| Card authorization (network → decision) | 40 ms | 100 ms | **200 ms** |
-| Pix end-to-end settlement (request → confirmed) | 500 ms | 2 s | 5 s |
-| `ledger.PostEntry` | 5 ms | 15 ms | 30 ms |
-| Single internal gRPC hop | 2 ms | 10 ms | 20 ms |
-| Redis read | < 1 ms | 2 ms | 5 ms |
-| Primary DB write transaction | 3 ms | 10 ms | 25 ms |
+### Throughput Targets
 
-### Asynchronous propagation
+| Metric | Target | Peak | Notes |
+|--------|--------|------|-------|
+| Ledger TPS | 5k | 20k | With sharding |
+| Kafka RPS | 50k | 200k | With proper partitioning |
+| API Gateway RPS | 100k | 500k | Rate limited to 10k per customer |
+| DB Connections | 10k | 50k | With PgBouncer |
 
-| Flow | p95 | p99 |
-|---|---|---|
-| Outbox → Kafka publish | 200 ms | 500 ms |
-| Transaction → visible in the feed (`statement-service`) | 1 s | 3 s |
-| Transaction → push notification delivered to provider | 2 s | 5 s |
-| Read replica lag | 100 ms | 500 ms |
+### Scalability
 
-### Latency budget example: card authorization (p99 = 200 ms)
+- **Linear scaling**: Adding a shard should increase capacity proportionally
+- **Cross-shard operations**: Minimize network latency
+- **Read amplification**: < 2× for balanced reads
 
-| Step | Budget |
-|---|---|
-| Network ingress + TLS | 20 ms |
-| `card-service`: card status, controls, vault lookup | 30 ms |
-| Fraud rules engine | 50 ms |
-| `credit-service.ReserveLimit` or `ledger.Hold` | 50 ms |
-| Persist authorization + outbox | 20 ms |
-| Safety margin | 30 ms |
+## Security Requirements
 
-Every synchronous chain must fit its budget. A new hop must take its time from the existing budget.
+### Authentication
 
-## Availability
+- **MFA**: Required for all accounts (2+ factors)
+- **Session timeout**: 15 minutes for web, 4 hours for mobile
+- **Token storage**: Secure enclave/Keychain for mobile
+- **Session binding**: Bind to device and IP range
 
-| Tier | Services / flows | Availability | Max downtime / month |
-|---|---|---|---|
-| **Tier 0** (money critical) | ledger, transaction, card authorization, Pix, identity (login/refresh), gateway | **99.99%** | ~4.3 min |
-| **Tier 1** | account, user, payment, credit, statement (feed) | 99.95% | ~22 min |
-| **Tier 2** | notifications, exports, analytics | 99.9% | ~43 min |
+### Authorization
 
-## Durability and Recovery
+- **RBAC**: Role-based access control for admin APIs
+- **Permission delegation**: Users can delegate limited permissions
+- **Least privilege**: Only access required resources
 
-| Data | RPO (data loss) | RTO (recovery time) |
-|---|---|---|
-| Ledger, transactions, Pix, card authorizations | **0** (synchronous replication across AZs) | < 1 min (AZ failure), < 15 min (region failure) |
-| Other transactional data | < 1 s | < 5 min |
-| Read models (statements, feed) | Rebuildable from Kafka / ledger | < 1 h for a full rebuild |
-| Kafka | 0 (`acks=all`, `min.insync.replicas=2`) | < 1 min |
+### Data Protection
 
-## Consistency per Domain
+- **At rest**: AES-256 encryption for all sensitive data
+- **In transit**: TLS 1.3 for all external communication
+- **mTLS**: Mutual TLS for internal service communication
+- **Key management**: HashiCorp Vault or AWS KMS
 
-| Domain | Model | Why |
-|---|---|---|
-| Ledger balances used for decisions | **Strong** (primary only) | Prevents overdraft and double spending |
-| Limits checked before a transaction | **Strong** | Same reason |
-| Feed, statements, notifications | **Eventual** (seconds) | Display only |
-| Displayed balance | Read-your-writes | The customer must see the effect of their own action right away |
-| Cross-service flows | Eventual + sagas | No distributed transactions |
+### PCI DSS
 
-## Other Requirements
+- **Card data**: Encrypted with HSM-backed keys
+- **Tokenization**: Never store PAN (Primary Account Number)
+- **Logging**: Mask PAN in logs
+- **Network**: Card data in isolated network
 
-| Area | Requirement |
-|---|---|
-| Scalability | Every service scales **horizontally** (stateless pods). No vertical scaling to meet growth |
-| Throughput per pod | Each service pod handles at least 2,000 RPS of its main read operation |
-| Deployments | Zero downtime (rolling / canary), at least 10 deploys per day possible |
-| Backward compatibility | Contracts and DB schemas compatible with N-1 |
-| Security | See [security.md](security.md) |
-| Observability | 100% of requests traced (tail-based sampling for storage), see [observability.md](observability.md) |
-| Cost | Autoscaling down outside peak hours, with a minimum of 3 replicas per AZ-spread service |
+### PII Protection
 
-## How We Verify
+- **Encryption**: PII encrypted at rest
+- **Access logging**: All PII access logged and monitored
+- **Retention**: Only retain as long as legally required
+- **Deletion**: Secure deletion when records expire
 
-- **Load tests** (`k6`) run nightly against a staging environment at 1× peak, and before major releases at 3× peak.
-- **Soak tests** run for 12 h at average load to detect leaks.
-- **Chaos tests** (Chaos Mesh): kill pods, kill a DB primary, add network latency, lose an AZ.
-- **SLO dashboards and burn-rate alerts** in Grafana ([observability.md](observability.md)).
+## Compliance Requirements
+
+### Regulatory
+
+- **GDPR**: Data subject rights (access, deletion, export)
+- **KYC**: Know Your Customer verification
+- **AML**: Anti-Money Laundering monitoring
+- **PCI DSS**: Payment Card Industry compliance
+- **Local regulations**: Country-specific requirements
+
+### Audit
+
+- **Transaction logging**: Immutable audit trail for all money movements
+- **Retention**: Minimum 7 years for financial records
+- **Export**: Structured export for regulators
+
+## Observability Requirements
+
+### Logging
+
+- **Format**: Structured JSON logs
+- **Level**: DEBUG (dev), INFO (stage), ERROR (prod)
+- **Content**: Correlation IDs, service names, operation types
+- **Redaction**: PII and sensitive data removed
+- **Retention**: 90 days for INFO, 1 year for ERROR
+
+### Metrics
+
+- **Infrastructure**: CPU, memory, disk, network
+- **Application**: Request counts, latencies, error rates
+- **Business**: Transactions, balances, growth
+- **Financial**: Reconciliation, risk indicators
+
+### Tracing
+
+- **OpenTelemetry**: Standardized tracing format
+- **Sampling**: 100% for errors, 1% for normal traffic
+- **Correlation**: Trace ID through all services
+- **Pii**: Redact sensitive data in traces
+
+## Operational Requirements
+
+### Deployment
+
+- **GitOps**: All infrastructure as code in Git
+- **CI/CD**: Automated testing and deployment
+- **Rollback**: Automatic rollback on failure
+- **Canary**: Gradual rollout to 5% of traffic
+
+### Monitoring
+
+- **Dashboards**: Team-specific dashboards
+- **Alerting**: PagerDuty integration
+- **SLOs**: Service Level Objectives tracking
+- **Error tracking**: Automatic error classification
+
+### Incident Response
+
+- **Runbooks**: Step-by-step incident procedures
+- **Communication**: Automated incident notifications
+- **Post-mortems**: Blameless incident reviews
+- **Prevention**: Track and fix root causes
+
+## Development Requirements
+
+### Code Quality
+
+- **Linting**: Automated linting on every commit
+- **Testing**: Minimum 80% coverage for core services
+- **Reviews**: At least 2 reviewers for PRs
+- **Documentation**: API docs, service docs, ADRs
+
+### Testing Strategy
+
+| Test Type | Tools | Coverage Target |
+|-----------|-------|-----------------|
+| Unit tests | Go testing | 100% for domain |
+| Integration tests | Testcontainers | 100% for adapters |
+| Contract tests | Pact | 100% for APIs |
+| Load tests | k6 | 1× and 3× peak |
+| Chaos tests | Chaos Mesh | Resilience |
+
+### Code Generation
+
+- **Protobuf**: `buf generate` for all proto files
+- **SQL**: `sqlc generate` for all SQL files
+- **OpenAPI**: `openapi-generator` for client SDKs
+- **Event schemas**: `jsonschema2proto` for event contracts
+
+## Infrastructure Requirements
+
+### Infrastructure as Code
+
+- **Provider**: Terraform
+- **State**: Remote backend (S3 + DynamoDB locking)
+- **Modules**: Reusable Terraform modules
+- **Drift detection**: Automatic detection and alerting
+
+### Containers
+
+- **Base**: Alpine or Distroless images
+- **Multistage**: Separate build and runtime stages
+- **Scanning**: Automatic vulnerability scanning
+- **Signing**: Cosign for image signing
+
+### Networking
+
+- **Service mesh**: Istio or Linkerd
+- **mTLS**: Automatic mutual TLS
+- **Network policies**: Default deny, explicit allow
+- **VPC**: Isolated VPC per environment
+
+## Cost Requirements
+
+### Optimization
+
+- **Spot instances**: For non-critical workloads
+- **Auto-scaling**: Right-size resources automatically
+- **Right-sizing**: Regular resource utilization reviews
+- **Reserved capacity**: For steady-state workloads
+
+### Budgets
+
+- **Per-service budgets**: Cost tracking per service
+- **Alert thresholds**: Warn at 80%, critical at 90%
+- **Monthly reviews**: Monthly cost optimization meetings
+
+## Disaster Recovery
+
+### RTO/RPO
+
+| Service Class | RTO | RPO | Strategy |
+|---------------|-----|-----|----------|
+| Ledger | 1 min | 0 | Synchronous replication, hot standby |
+| Pix | 5 min | 5 min | Asynchronous replication, warm standby |
+| Cards | 15 min | 1 min | Asynchronous replication |
+| Accounts | 30 min | 5 min | Asynchronous replication |
+| Non-critical | 1 hour | 1 hour | Backup to cold storage |
+
+### Backup
+
+- **Ledger**: Every 5 minutes, stored in 3 regions
+- **Accounts**: Every 15 minutes, stored in 2 regions
+- **Logs**: Every hour, stored for 90 days
+- **Point-in-time recovery**: Every 5 minutes for ledger
+
+## Technical Constraints
+
+### Technology Choices
+
+- **Language**: Go 1.23+ (memory efficiency, performance)
+- **Database**: PostgreSQL 17 (ACID compliance, ecosystem)
+- **Message broker**: Kafka (throughput, durability)
+- **Cache**: Redis (speed, ecosystem)
+- **Kubernetes**: Managed Kubernetes (EKS, GKE, AKS)
+
+### Version Compatibility
+
+- **Go versions**: Support 2 consecutive LTS versions
+- **PostgreSQL**: Upgrade semver major versions annually
+- **Protobuf**: Upgrade to major version at release time
+- **Kafka**: Rolling upgrades, no downtime
+
+### Platform Constraints
+
+- **Multi-cloud**: Not required initially, architecture supports it
+- **K8s versions**: Support 2 consecutive minor versions
+- **Cloud providers**: Provider-agnostic where possible
+
+## Acceptance Criteria
+
+### Non-Goals (Things We Will Not Do Initially)
+
+- ❌ Blockchain-based ledgers (overkill for our needs)
+- ❌ Sharding at startup (can shard later)
+- ❌ Multi-region replication initially
+- ❌ Serverless for core services (latency concerns)
+- ❌ NoSQL for money (need ACID guarantees)
+
+### Future Considerations (May Add Later)
+
+- ✓ Multi-region active-active
+- ✓ Automatic sharding
+- ✓ Serverless compute for burst traffic
+- ✓ GraphQL for flexible querying
+- ✓ Edge computing for lower latency

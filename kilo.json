@@ -1,0 +1,241 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "agent": {
+    "api-gateway": {
+      "description": "Specialized for API gateway configuration, routing, and Kong/OpenResty setup",
+      "mode": "primary",
+      "color": "#3B82F6",
+      "model": "opus",
+      "reasoning_effort": "medium",
+      "permission": {
+        "edit": {
+          "services/api-gateway/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "account-service": {
+      "description": "Specialized for account service development and operations",
+      "mode": "primary",
+      "color": "#10B981",
+      "model": "opus",
+      "reasoning_effort": "medium",
+      "permission": {
+        "edit": {
+          "services/account-service/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "card-service": {
+      "description": "Specialized for card service development, Vault integration, and card lifecycle",
+      "mode": "primary",
+      "color": "#8B5CF6",
+      "model": "opus",
+      "reasoning_effort": "high",
+      "permission": {
+        "edit": {
+          "services/card-service/**": "allow",
+          "**": "deny"
+        },
+        "bash": "allow",
+        "glob": "deny"
+      }
+    },
+    "credit-service": {
+      "description": "Specialized for credit service, loan processing, and credit operations",
+      "mode": "primary",
+      "color": "#F59E0B",
+      "model": "opus",
+      "reasoning_effort": "high",
+      "permission": {
+        "edit": {
+          "services/credit-service/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "identity-service": {
+      "description": "Specialized for identity service, authentication, Keycloak integration, and security",
+      "mode": "primary",
+      "color": "#EF4444",
+      "model": "opus",
+      "reasoning_effort": "high",
+      "permission": {
+        "edit": {
+          "services/identity-service/**": "allow",
+          "**/auth/**": "allow",
+          "**": "deny"
+        },
+        "bash": "allow"
+      }
+    },
+    "ledger-service": {
+      "description": "Specialized for ledger service, double-entry accounting, and transaction processing",
+      "mode": "primary",
+      "color": "#06B6D4",
+      "model": "opus",
+      "reasoning_effort": "high",
+      "permission": {
+        "edit": {
+          "services/ledger-service/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "notification-service": {
+      "description": "Specialized for notification service, multi-channel delivery, and messaging",
+      "mode": "primary",
+      "color": "#EC4899",
+      "model": "opus",
+      "reasoning_effort": "medium",
+      "permission": {
+        "edit": {
+          "services/notification-service/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "payment-service": {
+      "description": "Specialized for payment service, payment processing, and Stripe integration",
+      "mode": "primary",
+      "color": "#84CC16",
+      "model": "opus",
+      "reasoning_effort": "high",
+      "permission": {
+        "edit": {
+          "services/payment-service/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "pix-service": {
+      "description": "Specialized for PIX (Brazilian instant payments) service",
+      "mode": "primary",
+      "color": "#FB7185",
+      "model": "opus",
+      "reasoning_effort": "high",
+      "permission": {
+        "edit": {
+          "services/pix-service/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "statement-service": {
+      "description": "Specialized for statement service, reporting, and account statements",
+      "mode": "primary",
+      "color": "#6B7280",
+      "model": "opus",
+      "reasoning_effort": "medium",
+      "permission": {
+        "edit": {
+          "services/statement-service/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "transaction-service": {
+      "description": "Specialized for transaction service, reconciliation, and transaction lifecycle",
+      "mode": "primary",
+      "color": "#0EA5E9",
+      "model": "opus",
+      "reasoning_effort": "high",
+      "permission": {
+        "edit": {
+          "services/transaction-service/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "user-service": {
+      "description": "Specialized for user service, customer management, and KYC verification",
+      "mode": "primary",
+      "color": "#F97316",
+      "model": "opus",
+      "reasoning_effort": "medium",
+      "permission": {
+        "edit": {
+          "services/user-service/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "infra-architect": {
+      "description": "Specialized for infrastructure, Terraform, and Kubernetes configuration",
+      "mode": "primary",
+      "color": "#14B8A6",
+      "model": "opus",
+      "reasoning_effort": "high",
+      "permission": {
+        "edit": {
+          "infrastructure/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "contract-dev": {
+      "description": "Specialized for API contract development, OpenAPI, and Protobuf",
+      "mode": "primary",
+      "color": "#E879F9",
+      "model": "opus",
+      "reasoning_effort": "medium",
+      "permission": {
+        "edit": {
+          "contracts/**": "allow",
+          "**": "deny"
+        },
+        "bash": "deny"
+      }
+    },
+    "dev-environment": {
+      "description": "Specialized for Docker Compose development environment setup and troubleshooting",
+      "mode": "primary",
+      "color": "#84CC16",
+      "model": "opus",
+      "reasoning_effort": "medium",
+      "permission": {
+        "edit": {
+          "docker-compose.dev.yml": "allow",
+          "docker-compose.prod.yml": "allow",
+          "**/Dockerfile": "allow",
+          "**.dockerignore": "allow",
+          "**": "deny"
+        },
+        "bash": {
+          "docker-compose.dev.yml": "allow",
+          "docker-compose.prod.yml": "allow",
+          "scripts/*.sh": "allow",
+          "**/tests/**": "allow",
+          "**": "deny"
+        }
+      }
+    },
+    "dev-full": {
+      "description": "Full development environment with all services - read/write access to everything",
+      "mode": "primary",
+      "color": "#A78BFA",
+      "model": "opus",
+      "reasoning_effort": "low",
+      "permission": {
+        "edit": {
+          "*": "allow"
+        },
+        "bash": {
+          "*": "allow"
+        }
+      }
+    }
+  }
+}
