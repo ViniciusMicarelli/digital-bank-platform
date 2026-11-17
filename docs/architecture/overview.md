@@ -46,8 +46,9 @@ The platform is designed as a cloud-native, event-driven system optimized for fi
 │   ├── identity-service/  # ✅ authentication
 │   ├── card-service/      # ✅ cards
 │   ├── credit-service/    # ✅ credit lines and invoices
+│   ├── payment-service/   # ✅ boletos
 │   ├── kms-service/       # ✅ envelope encryption
-│   └── …                  # user, payment, notification: planned
+│   └── …                  # user, notification: planned
 ├── tests/e2e/             # end-to-end tests against docker compose
 └── infrastructure/        # docker (Postgres init), monitoring (Prometheus, alerts, Grafana)
 ```

@@ -37,6 +37,8 @@ enum TransactionType {
   TRANSACTION_TYPE_CREDIT_INVOICE_PAYMENT = 6;
   // Fines and interest: credit-receivables -> credit-revenue.
   TRANSACTION_TYPE_CREDIT_CHARGES = 7;
+  // Two-phase: customer account -> boleto settlement.
+  TRANSACTION_TYPE_BOLETO_PAYMENT = 8;
 }
 
 enum TransactionStatus {

@@ -69,6 +69,8 @@ func main() {
 		application.ReservationTimeouts{
 			domain.TypePixOut:    config.Duration("PIX_RESERVATION_TIMEOUT", 15*time.Minute),
 			domain.TypeDebitCard: config.Duration("CARD_AUTHORIZATION_TIMEOUT", 7*24*time.Hour),
+			// The clearing network answers in seconds; a stuck one is released.
+			domain.TypeBoletoPayment: config.Duration("BOLETO_RESERVATION_TIMEOUT", 15*time.Minute),
 		})
 
 	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))

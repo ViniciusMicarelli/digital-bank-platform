@@ -37,6 +37,8 @@ const (
 	TransactionType_TRANSACTION_TYPE_CREDIT_INVOICE_PAYMENT TransactionType = 6
 	// Fines and interest: credit-receivables -> credit-revenue.
 	TransactionType_TRANSACTION_TYPE_CREDIT_CHARGES TransactionType = 7
+	// Two-phase: customer account -> boleto settlement.
+	TransactionType_TRANSACTION_TYPE_BOLETO_PAYMENT TransactionType = 8
 )
 
 // Enum value maps for TransactionType.
@@ -50,6 +52,7 @@ var (
 		5: "TRANSACTION_TYPE_CREDIT_CARD_PURCHASE",
 		6: "TRANSACTION_TYPE_CREDIT_INVOICE_PAYMENT",
 		7: "TRANSACTION_TYPE_CREDIT_CHARGES",
+		8: "TRANSACTION_TYPE_BOLETO_PAYMENT",
 	}
 	TransactionType_value = map[string]int32{
 		"TRANSACTION_TYPE_UNSPECIFIED":            0,
@@ -60,6 +63,7 @@ var (
 		"TRANSACTION_TYPE_CREDIT_CARD_PURCHASE":   5,
 		"TRANSACTION_TYPE_CREDIT_INVOICE_PAYMENT": 6,
 		"TRANSACTION_TYPE_CREDIT_CHARGES":         7,
+		"TRANSACTION_TYPE_BOLETO_PAYMENT":         8,
 	}
 )
 
@@ -1058,7 +1062,7 @@ const file_bank_transaction_v1_transaction_proto_rawDesc = "" +
 	"\x15GetTransactionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\\\n" +
 	"\x16GetTransactionResponse\x12B\n" +
-	"\vtransaction\x18\x01 \x01(\v2 .bank.transaction.v1.TransactionR\vtransaction*\xbd\x02\n" +
+	"\vtransaction\x18\x01 \x01(\v2 .bank.transaction.v1.TransactionR\vtransaction*\xe2\x02\n" +
 	"\x0fTransactionType\x12 \n" +
 	"\x1cTRANSACTION_TYPE_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"TRANSACTION_TYPE_INTERNAL_TRANSFER\x10\x01\x12\x1c\n" +
@@ -1067,7 +1071,8 @@ const file_bank_transaction_v1_transaction_proto_rawDesc = "" +
 	"$TRANSACTION_TYPE_DEBIT_CARD_PURCHASE\x10\x04\x12)\n" +
 	"%TRANSACTION_TYPE_CREDIT_CARD_PURCHASE\x10\x05\x12+\n" +
 	"'TRANSACTION_TYPE_CREDIT_INVOICE_PAYMENT\x10\x06\x12#\n" +
-	"\x1fTRANSACTION_TYPE_CREDIT_CHARGES\x10\a*\xde\x01\n" +
+	"\x1fTRANSACTION_TYPE_CREDIT_CHARGES\x10\a\x12#\n" +
+	"\x1fTRANSACTION_TYPE_BOLETO_PAYMENT\x10\b*\xde\x01\n" +
 	"\x11TransactionStatus\x12\"\n" +
 	"\x1eTRANSACTION_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aTRANSACTION_STATUS_PENDING\x10\x01\x12\x1f\n" +

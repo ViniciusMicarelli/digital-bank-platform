@@ -23,13 +23,24 @@ func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("postgres: open pool: %w", err)
 	}
-	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-	if err := pool.Ping(pingCtx); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("postgres: ping: %w", err)
+	// Wait up to 30 s for the database (starting up, failing over).
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		err = pool.Ping(pingCtx)
+		cancel()
+		if err == nil {
+			return pool, nil
+		}
+		if time.Now().After(deadline) || ctx.Err() != nil {
+			pool.Close()
+			return nil, fmt.Errorf("postgres: ping: %w", err)
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(time.Second):
+		}
 	}
-	return pool, nil
 }
 
 // SQLSTATE codes that are safe to retry: the whole transaction is replayed.

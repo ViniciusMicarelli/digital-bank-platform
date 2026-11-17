@@ -19,6 +19,7 @@ import (
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
 	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
+	paymentv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/payment/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
@@ -38,6 +39,7 @@ type Clients struct {
 	Statement statementv1.StatementServiceClient
 	Cards     cardv1.CardServiceClient
 	Credit    creditv1.CreditServiceClient
+	Payments  paymentv1.PaymentServiceClient
 }
 
 type Options struct {
@@ -90,7 +92,13 @@ func (a *API) Handler() http.Handler {
 		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations/{authID}/clear", a.authenticated(a.networkClear))
 		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations/{authID}/reverse", a.authenticated(a.networkReverse))
 		mux.HandleFunc("POST /v1/sandbox/accounts/{id}/credit/cycle", a.authenticated(a.owned(a.advanceCreditCycle)))
+		mux.HandleFunc("POST /v1/sandbox/boletos", a.authenticated(a.issueSandboxBoleto))
 	}
+	mux.HandleFunc("POST /v1/boletos/lookup", a.authenticated(a.lookupBoleto))
+	mux.HandleFunc("POST /v1/accounts/{id}/boleto-payments", a.authenticated(a.owned(a.payBoleto)))
+	mux.HandleFunc("GET /v1/accounts/{id}/boleto-payments", a.authenticated(a.owned(a.listBoletoPayments)))
+	mux.HandleFunc("GET /v1/accounts/{id}/boleto-payments/{paymentID}", a.authenticated(a.owned(a.ownedBoletoPayment(a.getBoletoPayment))))
+	mux.HandleFunc("DELETE /v1/accounts/{id}/boleto-payments/{paymentID}", a.authenticated(a.owned(a.ownedBoletoPayment(a.cancelBoletoPayment))))
 	mux.HandleFunc("POST /v1/accounts/{id}/credit", a.authenticated(a.owned(a.openCreditLine)))
 	mux.HandleFunc("GET /v1/accounts/{id}/credit", a.authenticated(a.owned(a.getCreditLine)))
 	mux.HandleFunc("GET /v1/accounts/{id}/credit/invoices", a.authenticated(a.owned(a.listInvoices)))

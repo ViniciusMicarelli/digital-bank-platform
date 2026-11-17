@@ -33,6 +33,7 @@ var types = map[txv1.TransactionType]domain.Type{
 	txv1.TransactionType_TRANSACTION_TYPE_CREDIT_CARD_PURCHASE:   domain.TypeCreditPurchase,
 	txv1.TransactionType_TRANSACTION_TYPE_CREDIT_INVOICE_PAYMENT: domain.TypeCreditInvoicePayment,
 	txv1.TransactionType_TRANSACTION_TYPE_CREDIT_CHARGES:         domain.TypeCreditCharges,
+	txv1.TransactionType_TRANSACTION_TYPE_BOLETO_PAYMENT:         domain.TypeBoletoPayment,
 }
 
 func (s *Server) CreateTransfer(ctx context.Context, req *txv1.CreateTransferRequest) (*txv1.CreateTransferResponse, error) {

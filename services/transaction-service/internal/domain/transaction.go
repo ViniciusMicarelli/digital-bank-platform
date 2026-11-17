@@ -55,10 +55,11 @@ const (
 	TypeCreditPurchase       Type = "CREDIT_CARD_PURCHASE"
 	TypeCreditInvoicePayment Type = "CREDIT_INVOICE_PAYMENT"
 	TypeCreditCharges        Type = "CREDIT_CHARGES"
+	TypeBoletoPayment        Type = "BOLETO_PAYMENT"
 )
 
 var validTypes = []Type{TypeInternalTransfer, TypePixOut, TypePixIn, TypeDebitCard,
-	TypeCreditPurchase, TypeCreditInvoicePayment, TypeCreditCharges}
+	TypeCreditPurchase, TypeCreditInvoicePayment, TypeCreditCharges, TypeBoletoPayment}
 
 type Status string
 
@@ -127,7 +128,7 @@ func New(key string, typ Type, from, to uuid.UUID, amount money.Money, descripti
 // credit card invoice does not count against transfer limits, and the other
 // credit types move money between bank-internal accounts.
 func (t Transaction) ConsumesLimit() bool {
-	return t.Type == TypeInternalTransfer || t.Type == TypePixOut || t.Type == TypeDebitCard
+	return t.Type == TypeInternalTransfer || t.Type == TypePixOut || t.Type == TypeDebitCard || t.Type == TypeBoletoPayment
 }
 
 // DebitsCustomerWithoutLimit reports whether the debited side is a customer
@@ -142,7 +143,9 @@ func (t Transaction) CreditsCustomer() bool {
 }
 
 // TwoPhase reports whether the money is held before an external confirmation.
-func (t Transaction) TwoPhase() bool { return t.Type == TypePixOut || t.Type == TypeDebitCard }
+func (t Transaction) TwoPhase() bool {
+	return t.Type == TypePixOut || t.Type == TypeDebitCard || t.Type == TypeBoletoPayment
+}
 
 // Idempotency keys for downstream calls, derived from the transaction id so
 // that replaying a step never moves money twice.

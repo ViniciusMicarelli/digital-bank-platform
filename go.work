@@ -11,6 +11,7 @@ use (
 	./services/identity-service
 	./services/kms-service
 	./services/ledger-service
+	./services/payment-service
 	./services/pix-service
 	./services/statement-service
 	./services/transaction-service

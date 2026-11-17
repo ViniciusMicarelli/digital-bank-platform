@@ -86,6 +86,12 @@ INVOICE_ID=$(call GET "/v1/accounts/$ANA_ACC/credit/invoices" "$ANA" | jq -r '.i
 call POST "/v1/accounts/$ANA_ACC/credit/invoices/$INVOICE_ID/payments" "$ANA" '{"amount":"100.00"}' "$(uuid)" | jq -c '{payment: .status, amount: .amount.amount}'
 call GET "/v1/accounts/$ANA_ACC/credit/invoices/$INVOICE_ID" "$ANA" | jq -c '{status, total: .total.amount, paid: .paid.amount, remaining: .remaining.amount, due_date}'
 
+step "Ana pays her electricity bill (boleto), 5 days late: fine and interest are added"
+BOLETO=$(call POST /v1/sandbox/boletos "$ANA" "{\"amount\":\"89.90\",\"due_date\":\"$(python3 -c 'import datetime; print(datetime.date.today() - datetime.timedelta(days=5))')\",\"payee_name\":\"CIA PAULISTA DE ENERGIA\"}" | jq -r .formatted_line)
+echo "$BOLETO"
+call POST /v1/boletos/lookup "$ANA" "{\"line\":\"$BOLETO\"}" | jq -c '{payee: .payee.name, due_date, nominal: .nominal.amount, fine: .fine.amount, interest: .interest.amount, total: .total.amount}'
+call POST "/v1/accounts/$ANA_ACC/boleto-payments" "$ANA" "{\"line\":\"$BOLETO\"}" "$(uuid)" | jq -c '{status, amount: .amount.amount}'
+
 step "A Pix the receiving bank rejects: the money comes back"
 call POST "/v1/accounts/$ANA_ACC/pix/transfers" "$ANA" '{"key":"recusa@outrobanco.com.br","amount":"10.00"}' "$(uuid)" | jq -c .
 

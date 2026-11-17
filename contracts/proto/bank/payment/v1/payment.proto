@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package bank.payment.v1;
+
+import "bank/common/v1/money.proto";
+import "google/protobuf/timestamp.proto";
+
+// PaymentService pays bills: boletos, now or on a scheduled date, through a
+// two-phase saga (hold the money, settle with the clearing network, then
+// capture or release).
+service PaymentService {
+  // Parses a linha digitável / barcode, checks it with the registry and
+  // quotes what paying it today costs (fine and interest when overdue).
+  rpc LookupBoleto(LookupBoletoRequest) returns (LookupBoletoResponse);
+  // Pays a boleto from an account, now or on scheduled_for. Idempotent on
+  // idempotency_key. Refusals are REJECTED / FAILED payments with a reason.
+  rpc PayBoleto(PayBoletoRequest) returns (PayBoletoResponse);
+  rpc GetBoletoPayment(GetBoletoPaymentRequest) returns (GetBoletoPaymentResponse);
+  rpc ListBoletoPayments(ListBoletoPaymentsRequest) returns (ListBoletoPaymentsResponse);
+  // Cancels a SCHEDULED payment.
+  rpc CancelBoletoPayment(CancelBoletoPaymentRequest) returns (CancelBoletoPaymentResponse);
+  // Sandbox: issues a valid boleto. behavior: "" (normal), PAID (the
+  // registry says it was paid), REJECT (the payee's bank refuses it).
+  rpc IssueSandboxBoleto(IssueSandboxBoletoRequest) returns (IssueSandboxBoletoResponse);
+}
+
+message Payee {
+  string name = 1;
+  string document_masked = 2;
+  string bank_name = 3;
+}
+
+message BoletoQuote {
+  // 47 digits, without punctuation.
+  string line = 1;
+  string formatted_line = 2;
+  string barcode = 3;
+  Payee payee = 4;
+  // YYYY-MM-DD; empty when the boleto has no due date.
+  string due_date = 5;
+  // Zero when the payer informs the amount.
+  bank.common.v1.Money nominal = 6;
+  bank.common.v1.Money fine = 7;
+  bank.common.v1.Money interest = 8;
+  bank.common.v1.Money total = 9;
+}
+
+message BoletoPayment {
+  string id = 1;
+  string account_id = 2;
+  // SCHEDULED, CREATED, FUNDS_RESERVED, SENT_TO_CLEARING, COMPLETED,
+  // REJECTED, FAILED, CANCELLED.
+  string status = 3;
+  string failure_reason = 4;
+  string line = 5;
+  Payee payee = 6;
+  string due_date = 7;
+  bank.common.v1.Money nominal = 8;
+  bank.common.v1.Money fine = 9;
+  bank.common.v1.Money interest = 10;
+  bank.common.v1.Money amount = 11;
+  string scheduled_for = 12;
+  google.protobuf.Timestamp created_at = 13;
+}
+
+message LookupBoletoRequest {
+  string line = 1;
+}
+
+message LookupBoletoResponse {
+  BoletoQuote quote = 1;
+}
+
+message PayBoletoRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string line = 3;
+  // Only for boletos without an amount.
+  bank.common.v1.Money amount = 4;
+  // YYYY-MM-DD; empty or today pays now.
+  string scheduled_for = 5;
+}
+
+message PayBoletoResponse {
+  BoletoPayment payment = 1;
+}
+
+message GetBoletoPaymentRequest {
+  string id = 1;
+}
+
+message GetBoletoPaymentResponse {
+  BoletoPayment payment = 1;
+}
+
+message ListBoletoPaymentsRequest {
+  string account_id = 1;
+}
+
+message ListBoletoPaymentsResponse {
+  repeated BoletoPayment payments = 1;
+}
+
+message CancelBoletoPaymentRequest {
+  string id = 1;
+}
+
+message CancelBoletoPaymentResponse {
+  BoletoPayment payment = 1;
+}
+
+message IssueSandboxBoletoRequest {
+  bank.common.v1.Money amount = 1;
+  string due_date = 2;
+  string payee_name = 3;
+  string behavior = 4;
+}
+
+message IssueSandboxBoletoResponse {
+  string line = 1;
+  string formatted_line = 2;
+}

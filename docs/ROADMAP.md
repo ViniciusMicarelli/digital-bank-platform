@@ -129,7 +129,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - credit-service: credit limits, credit-function authorizations against the limit, monthly invoices (closing and due dates), invoice payment from the checking account, late interest.
 - card-service: the card gains a credit function; the network chooses debit or credit.
 
-## Phase 16 — Bill payments (boleto)
+## Phase 16 — Bill payments (boleto) ✅
 
 - payment-service: boleto parsing and validation (47-digit line, check digits, due date, amount), payment through a two-phase saga with a simulated settlement network, scheduled payments.
 

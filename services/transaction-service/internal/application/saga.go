@@ -61,7 +61,7 @@ func (s *Service) Post(ctx context.Context, key string, typ domain.Type, from, t
 // ReserveOutgoing consumes the limit and holds the funds; the transaction
 // stays RESERVED until Complete or Compensate.
 func (s *Service) ReserveOutgoing(ctx context.Context, key string, typ domain.Type, from, to uuid.UUID, amount money.Money, description string, metadata map[string]string) (domain.Transaction, error) {
-	if typ != domain.TypePixOut && typ != domain.TypeDebitCard {
+	if typ != domain.TypePixOut && typ != domain.TypeDebitCard && typ != domain.TypeBoletoPayment {
 		return domain.Transaction{}, fmt.Errorf("%w: %s is not a two-phase type", domain.ErrInvalidArgument, typ)
 	}
 	return s.start(ctx, key, typ, from, to, amount, description, metadata)

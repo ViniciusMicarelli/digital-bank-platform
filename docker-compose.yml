@@ -11,7 +11,9 @@ services:
       - ./infrastructure/docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bank"]
+      # Over TCP: during first-time init Postgres runs a temporary server on
+      # the unix socket only, which a socket check would call ready.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U bank"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -135,7 +137,7 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/transaction-service.pem
       TLS_KEY: /certs/transaction-service-key.pem
-      ALLOWED_CALLERS: api-gateway,pix-service,card-service,credit-service,dev-client
+      ALLOWED_CALLERS: api-gateway,pix-service,card-service,credit-service,payment-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/transaction?sslmode=disable
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -287,6 +289,31 @@ services:
       account-service: { condition: service_healthy }
       transaction-service: { condition: service_healthy }
 
+  payment-service:
+    build: { context: ., args: { SERVICE: payment-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./infrastructure/certs:/certs:ro
+    environment:
+      TLS_CA: /certs/ca.pem
+      TLS_CERT: /certs/payment-service.pem
+      TLS_KEY: /certs/payment-service-key.pem
+      ALLOWED_CALLERS: api-gateway,dev-client
+      DATABASE_URL: postgres://bank:bank@postgres:5432/payment?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      GRPC_ADDR: ":9010"
+      TRANSACTION_ADDR: transaction-service:9003
+    ports: ["9010:9010"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      transaction-service: { condition: service_healthy }
+
   api-gateway:
     build: { context: ., args: { SERVICE: api-gateway } }
     healthcheck:
@@ -312,6 +339,7 @@ services:
       STATEMENT_ADDR: statement-service:9005
       CARD_ADDR: card-service:9007
       CREDIT_ADDR: credit-service:9009
+      PAYMENT_ADDR: payment-service:9010
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     ports: ["8000:8080"]
     depends_on:
@@ -323,6 +351,7 @@ services:
       statement-service: { condition: service_healthy }
       card-service: { condition: service_healthy }
       credit-service: { condition: service_healthy }
+      payment-service: { condition: service_healthy }
 
   jaeger:
     image: jaegertracing/jaeger:2.11.0

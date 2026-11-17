@@ -22,7 +22,7 @@
 | 403 | Sensitive action without a fresh step-up token | `STEP_UP_REQUIRED` |
 | 404 | Not found, or not yours | `NOT_FOUND` |
 | 409 | Same key, different request; or still processing | `IDEMPOTENCY_CONFLICT`, `IN_PROGRESS` |
-| 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS`, `QR_CODE_UNAVAILABLE`, `REFUND_TOO_LARGE`, `NOT_REFUNDABLE`, `CHARGE_NOT_ALLOWED`, `MANDATE_NOT_ACTIVE`, `CREDIT_LINE_EXISTS`, `PAYMENT_TOO_LARGE`, `INVOICE_NOT_PAYABLE` |
+| 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS`, `QR_CODE_UNAVAILABLE`, `REFUND_TOO_LARGE`, `NOT_REFUNDABLE`, `CHARGE_NOT_ALLOWED`, `MANDATE_NOT_ACTIVE`, `CREDIT_LINE_EXISTS`, `PAYMENT_TOO_LARGE`, `INVOICE_NOT_PAYABLE`, `BOLETO_ALREADY_PAID`, `BOLETO_EXPIRED`, `DUPLICATE_PAYMENT`, `SETTLEMENT_REJECTED`, `SCHEDULE_AFTER_DUE_DATE` |
 | 429 | Rate limited | `RATE_LIMITED` |
 | 503 | A dependency is down; retry with the same key | `RETRY_LATER` |
 
@@ -74,6 +74,11 @@
 | `DELETE` | `/v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}` | Delete it for good |
 | `POST` | `/v1/sandbox/card-network/authorizations` | *(sandbox)* Network authorization `{pan, expiry_month, expiry_year, cvv, amount, merchant_name, mcc, country, channel, function?}` (`function`: `DEBIT` default, or `CREDIT`) |
 | `POST` | `/v1/sandbox/card-network/authorizations/{id}/clear` · `/reverse` | *(sandbox)* Clearing `{amount?}` / merchant reversal |
+| `POST` | `/v1/boletos/lookup` | `{line}` → payee, due date, amount with charges if overdue |
+| `POST` | `/v1/accounts/{id}/boleto-payments` | Pay `{line, amount?, scheduled_for?}` (Idempotency-Key); refusals are 422 with the reason |
+| `GET` | `/v1/accounts/{id}/boleto-payments` | Payments, newest first |
+| `GET` · `DELETE` | `/v1/accounts/{id}/boleto-payments/{paymentID}` | Read / cancel a scheduled payment |
+| `POST` | `/v1/sandbox/boletos` | *(sandbox)* Issue a valid boleto `{amount, due_date, payee_name?, behavior?: PAID \| REJECT}` |
 | `POST` | `/v1/accounts/{id}/credit` | Open the credit line `{closing_day?}` (Idempotency-Key) |
 | `GET` | `/v1/accounts/{id}/credit` | Limit, used, available |
 | `GET` | `/v1/accounts/{id}/credit/invoices` | Invoices, newest first |

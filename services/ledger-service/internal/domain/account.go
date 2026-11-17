@@ -28,6 +28,7 @@ var (
 	// credit card invoices; CreditRevenueAccountID collects fines and interest.
 	CreditReceivablesAccountID = uuid.MustParse("00000000-0000-0000-0000-000000000004")
 	CreditRevenueAccountID     = uuid.MustParse("00000000-0000-0000-0000-000000000005")
+	BoletoSettlementAccountID  = uuid.MustParse("00000000-0000-0000-0000-000000000006")
 )
 
 // Account is a bucket of value in the ledger.
