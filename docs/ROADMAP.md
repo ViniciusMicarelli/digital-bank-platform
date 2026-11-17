@@ -60,7 +60,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Outgoing transfer: `CREATED → FUNDS_RESERVED → SENT_TO_SPI → COMPLETED | FAILED` through transaction-service.
 - Incoming transfers from the simulated SPI. End-to-end ID (E2E ID) per transfer.
 
-## Phase 6 — Statements (read side)
+## Phase 6 — Statements (read side) ✅
 
 [statement-service](services/statement-service.md)
 

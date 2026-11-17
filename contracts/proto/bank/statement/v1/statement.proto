@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package bank.statement.v1;
+
+import "bank/common/v1/money.proto";
+import "google/protobuf/timestamp.proto";
+
+// StatementService is the read side (CQRS): a per-account feed projected from
+// transaction and account events. It is eventually consistent.
+service StatementService {
+  // Newest first, cursor-paginated.
+  rpc ListFeed(ListFeedRequest) returns (ListFeedResponse);
+}
+
+enum Direction {
+  DIRECTION_UNSPECIFIED = 0;
+  DIRECTION_DEBIT = 1;
+  DIRECTION_CREDIT = 2;
+}
+
+message FeedItem {
+  string id = 1;
+  string account_id = 2;
+  string transaction_id = 3;
+  // INTERNAL_TRANSFER, PIX_OUT, PIX_IN.
+  string type = 4;
+  Direction direction = 5;
+  bank.common.v1.Money amount = 6;
+  string counterparty_name = 7;
+  string description = 8;
+  // Set for Pix.
+  string end_to_end_id = 9;
+  google.protobuf.Timestamp occurred_at = 10;
+}
+
+message ListFeedRequest {
+  string account_id = 1;
+  // Defaults to 20, maximum 100.
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListFeedResponse {
+  repeated FeedItem items = 1;
+  string next_page_token = 2;
+}

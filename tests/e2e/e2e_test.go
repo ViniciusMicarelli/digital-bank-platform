@@ -15,6 +15,7 @@ import (
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
 	ledgerv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/ledger/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
+	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 )
@@ -29,6 +30,7 @@ type stack struct {
 	accounts accountv1.AccountServiceClient
 	tx       txv1.TransactionServiceClient
 	pix      pixv1.PixServiceClient
+	feed     statementv1.StatementServiceClient
 }
 
 func addr(env, def string) string {
@@ -53,6 +55,7 @@ func connect(t *testing.T) stack {
 		accounts: accountv1.NewAccountServiceClient(dial(addr("ACCOUNT_ADDR", "127.0.0.1:9002"))),
 		tx:       txv1.NewTransactionServiceClient(dial(addr("TRANSACTION_ADDR", "127.0.0.1:9003"))),
 		pix:      pixv1.NewPixServiceClient(dial(addr("PIX_ADDR", "127.0.0.1:9004"))),
+		feed:     statementv1.NewStatementServiceClient(dial(addr("STATEMENT_ADDR", "127.0.0.1:9005"))),
 	}
 }
 

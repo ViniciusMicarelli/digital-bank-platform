@@ -93,5 +93,16 @@ services:
       account-service: { condition: service_started }
       transaction-service: { condition: service_started }
 
+  statement-service:
+    build: { context: ., args: { SERVICE: statement-service } }
+    environment:
+      DATABASE_URL: postgres://bank:bank@postgres:5432/statement?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      GRPC_ADDR: ":9005"
+    ports: ["9005:9005"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+
 volumes:
   pgdata:

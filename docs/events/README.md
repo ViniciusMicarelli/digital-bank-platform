@@ -65,6 +65,7 @@ Kafka headers repeat `event_type`, `event_id` and `correlation_id` for routing a
 | Consumer | Topics | Purpose |
 |---|---|---|
 | statement-service | `bank.transaction.events`, `bank.account.events` | Customer feed projection |
+| pix-service | `bank.account.events` (`account.closed`) | Remove the Pix keys of closed accounts |
 
 ## Testing
 
