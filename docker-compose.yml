@@ -65,6 +65,8 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/account-service.pem
       TLS_KEY: /certs/account-service-key.pem
+      # Development key-encryption key for CPFs. Production reads it from a KMS.
+      ACCOUNT_KEK: 8vw7TApbgElf6gJ33aCaHpoEXgwCXx1jwX/pW83osDo=
       ALLOWED_CALLERS: api-gateway,transaction-service,pix-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/account?sslmode=disable
       KAFKA_BROKERS: kafka:9092

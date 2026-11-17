@@ -1,6 +1,7 @@
 package application_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -60,8 +61,14 @@ func setup(t *testing.T) (*application.Service, *fakeLedger, *clock) {
 	ledger := &fakeLedger{created: map[uuid.UUID]int{}, balances: map[uuid.UUID]int64{}}
 	c := &clock{}
 	c.set("2026-03-10 10:00")
-	return application.New(pgstore.NewStore(pool), ledger, c.now), ledger, c
+	store, err := pgstore.NewStore(pool, testKEK)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return application.New(store, ledger, c.now), ledger, c
 }
+
+var testKEK = bytes.Repeat([]byte{9}, 32)
 
 func open(t *testing.T, svc *application.Service, key string) domain.Account {
 	t.Helper()

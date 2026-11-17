@@ -12,13 +12,15 @@ import (
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
 )
 
-// waitForFeed polls until the account's feed has n items (eventual consistency).
+// waitForFeed polls until the account's feed has n items whose counterparty
+// names are resolved. Account and transaction events travel on different
+// topics, so names may show up a moment after the items (eventual consistency).
 func waitForFeed(t *testing.T, s stack, account string, n int) []*statementv1.FeedItem {
 	t.Helper()
 	deadline := time.Now().Add(15 * time.Second)
 	for {
 		resp, err := s.feed.ListFeed(ctx(t), &statementv1.ListFeedRequest{AccountId: account})
-		if err == nil && len(resp.GetItems()) >= n {
+		if err == nil && len(resp.GetItems()) >= n && namesResolved(resp.GetItems()) {
 			return resp.GetItems()
 		}
 		if time.Now().After(deadline) {
@@ -53,4 +55,13 @@ func TestFeed(t *testing.T) {
 	if bobItems[0].GetDirection() != statementv1.Direction_DIRECTION_CREDIT || bobItems[0].GetCounterpartyName() != "Alice Souza" {
 		t.Errorf("bob = %v", bobItems[0])
 	}
+}
+
+func namesResolved(items []*statementv1.FeedItem) bool {
+	for _, it := range items {
+		if it.GetCounterpartyName() == "" {
+			return false
+		}
+	}
+	return true
 }

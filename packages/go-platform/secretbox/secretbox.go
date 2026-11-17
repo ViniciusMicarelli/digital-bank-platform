@@ -8,7 +8,9 @@ package secretbox
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -39,9 +41,9 @@ func New(key []byte) (*Box, error) {
 
 // FromBase64 builds a Box from a base64-encoded 32-byte key (e.g. an env var).
 func FromBase64(s string) (*Box, error) {
-	key, err := base64.StdEncoding.DecodeString(s)
+	key, err := DecodeKey(s)
 	if err != nil {
-		return nil, fmt.Errorf("secretbox: key is not base64: %w", err)
+		return nil, err
 	}
 	return New(key)
 }
@@ -67,4 +69,33 @@ func (b *Box) Open(sealed, associated []byte) ([]byte, error) {
 		return nil, ErrDecrypt
 	}
 	return pt, nil
+}
+
+// DecodeKey decodes a base64 32-byte key.
+func DecodeKey(s string) ([]byte, error) {
+	key, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return nil, fmt.Errorf("secretbox: key is not base64: %w", err)
+	}
+	if len(key) != 32 {
+		return nil, fmt.Errorf("secretbox: key must be 32 bytes, got %d", len(key))
+	}
+	return key, nil
+}
+
+// DeriveKey derives an independent subkey (HMAC-SHA256) for another purpose,
+// e.g. a blind-index key, so one master key does not serve two algorithms.
+func DeriveKey(master []byte, label string) []byte {
+	m := hmac.New(sha256.New, master)
+	m.Write([]byte(label))
+	return m.Sum(nil)
+}
+
+// BlindIndex is a keyed hash of a value: equal values give equal indexes,
+// so encrypted columns stay searchable, but the value cannot be recovered
+// or brute-forced without the key.
+func BlindIndex(key []byte, value string) []byte {
+	m := hmac.New(sha256.New, key)
+	m.Write([]byte(value))
+	return m.Sum(nil)
 }

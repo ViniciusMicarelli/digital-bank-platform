@@ -14,6 +14,7 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/secretbox"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/adapters/grpcapi"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/adapters/ledger"
@@ -48,7 +49,25 @@ func main() {
 	}
 	defer ledgerConn.Close()
 
-	app := application.New(pgstore.NewStore(pool), ledger.New(ledgerv1.NewLedgerServiceClient(ledgerConn)), nil)
+	// Key-encryption key for CPFs at rest (ADR-0015). Production: from a KMS.
+	kek, err := secretbox.DecodeKey(config.String("ACCOUNT_KEK", ""))
+	if err != nil {
+		log.Error("ACCOUNT_KEK", "error", err)
+		os.Exit(1)
+	}
+	store, err := pgstore.NewStore(pool, kek)
+	if err != nil {
+		log.Error("store", "error", err)
+		os.Exit(1)
+	}
+	if n, err := store.EncryptLegacyDocuments(ctx); err != nil {
+		log.Error("encrypt legacy documents", "error", err)
+		os.Exit(1)
+	} else if n > 0 {
+		log.Info("encrypted legacy documents", "count", n)
+	}
+
+	app := application.New(store, ledger.New(ledgerv1.NewLedgerServiceClient(ledgerConn)), nil)
 	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
 
 	srvOpts, err := grpcserver.OptionsFromEnv()
