@@ -175,16 +175,34 @@ func AllowedCallersFromEnv() []string {
 // health checks (probes). An empty list allows any authenticated workload.
 func Authorize(allowed []string) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		if info.FullMethod == "/grpc.health.v1.Health/Check" {
-			return handler(ctx, req)
-		}
-		id, ok := PeerIdentity(ctx)
-		if !ok {
-			return nil, status.Error(codes.Unauthenticated, "client certificate required")
-		}
-		if len(allowed) > 0 && !slices.Contains(allowed, id) {
-			return nil, status.Errorf(codes.PermissionDenied, "%s may not call %s", id, info.FullMethod)
+		if err := authorize(ctx, allowed, info.FullMethod); err != nil {
+			return nil, err
 		}
 		return handler(ctx, req)
 	}
+}
+
+// AuthorizeStream is Authorize for streaming RPCs (server streams such as
+// live notifications, and gRPC reflection).
+func AuthorizeStream(allowed []string) grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		if err := authorize(ss.Context(), allowed, info.FullMethod); err != nil {
+			return err
+		}
+		return handler(srv, ss)
+	}
+}
+
+func authorize(ctx context.Context, allowed []string, method string) error {
+	if method == "/grpc.health.v1.Health/Check" || method == "/grpc.health.v1.Health/Watch" {
+		return nil
+	}
+	id, ok := PeerIdentity(ctx)
+	if !ok {
+		return status.Error(codes.Unauthenticated, "client certificate required")
+	}
+	if len(allowed) > 0 && !slices.Contains(allowed, id) {
+		return status.Errorf(codes.PermissionDenied, "%s may not call %s", id, method)
+	}
+	return nil
 }

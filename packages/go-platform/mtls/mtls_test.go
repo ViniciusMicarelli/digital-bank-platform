@@ -15,6 +15,8 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/reflection"
+	reflectionpb "google.golang.org/grpc/reflection/grpc_reflection_v1"
 	"google.golang.org/grpc/status"
 
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/mtls"
@@ -52,6 +54,27 @@ func call(t *testing.T, addr string, creds credentials.TransportCredentials, met
 	return err
 }
 
+// stream lists services over gRPC reflection, a bidirectional stream.
+func stream(t *testing.T, addr string, creds credentials.TransportCredentials) error {
+	t.Helper()
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(creds))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	s, err := reflectionpb.NewServerReflectionClient(conn).ServerReflectionInfo(ctx)
+	if err != nil {
+		return err
+	}
+	if err := s.Send(&reflectionpb.ServerReflectionRequest{MessageRequest: &reflectionpb.ServerReflectionRequest_ListServices{}}); err != nil {
+		return err
+	}
+	_, err = s.Recv()
+	return err
+}
+
 func TestMutualTLSAndAuthorization(t *testing.T) {
 	dir := t.TempDir()
 	ca, _ := mtls.NewAuthority(time.Hour)
@@ -63,8 +86,10 @@ func TestMutualTLSAndAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv := grpc.NewServer(grpc.Creds(serverCreds), grpc.ChainUnaryInterceptor(mtls.Authorize([]string{"account-service"})))
+	srv := grpc.NewServer(grpc.Creds(serverCreds), grpc.ChainUnaryInterceptor(mtls.Authorize([]string{"account-service"})),
+		grpc.ChainStreamInterceptor(mtls.AuthorizeStream([]string{"account-service"})))
 	healthpb.RegisterHealthServer(srv, health.NewServer())
+	reflection.Register(srv)
 	lis, _ := net.Listen("tcp", "127.0.0.1:0")
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(srv.Stop)
@@ -78,6 +103,13 @@ func TestMutualTLSAndAuthorization(t *testing.T) {
 	denied, _ := gateway.ClientCredentials(addr)
 	if err := call(t, addr, denied, "list"); status.Code(err) != codes.PermissionDenied {
 		t.Fatalf("api-gateway calling the ledger: %v", err)
+	}
+	// Streaming RPCs are authorized too (reflection is one).
+	if err := stream(t, addr, denied); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("api-gateway opening a stream: %v", err)
+	}
+	if err := stream(t, addr, allowed); err != nil {
+		t.Fatalf("allowed caller opening a stream: %v", err)
 	}
 	// Health checks are open to any authenticated workload.
 	if err := call(t, addr, denied, "health"); err != nil {

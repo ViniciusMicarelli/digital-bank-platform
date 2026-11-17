@@ -55,7 +55,7 @@ services:
   account-service:
     port: 9002
     metricsPort: 9102
-    callers: [api-gateway, transaction-service, pix-service, card-service, credit-service]
+    callers: [api-gateway, transaction-service, pix-service, card-service, credit-service, notification-service]
     env:
       LEDGER_ADDR: ledger-service:9001
       KMS_ADDR: kms-service:9008
@@ -109,6 +109,12 @@ services:
     callers: [api-gateway]
     env:
       TRANSACTION_ADDR: transaction-service:9003
+  notification-service:
+    port: 9011
+    metricsPort: 9111
+    callers: [api-gateway]
+    env:
+      ACCOUNT_ADDR: account-service:9002
   kms-service:
     port: 9008
     metricsPort: 9108
@@ -128,4 +134,5 @@ services:
       CARD_ADDR: card-service:9007
       CREDIT_ADDR: credit-service:9009
       PAYMENT_ADDR: payment-service:9010
+      NOTIFICATION_ADDR: notification-service:9011
       REDIS_ADDR: redis-master.redis.svc:6379

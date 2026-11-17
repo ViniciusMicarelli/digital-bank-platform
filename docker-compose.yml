@@ -111,7 +111,7 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/account-service.pem
       TLS_KEY: /certs/account-service-key.pem
-      ALLOWED_CALLERS: api-gateway,transaction-service,pix-service,card-service,credit-service,dev-client
+      ALLOWED_CALLERS: api-gateway,transaction-service,pix-service,card-service,credit-service,notification-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/account?sslmode=disable
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -314,6 +314,31 @@ services:
       kafka: { condition: service_healthy }
       transaction-service: { condition: service_healthy }
 
+  notification-service:
+    build: { context: ., args: { SERVICE: notification-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./infrastructure/certs:/certs:ro
+    environment:
+      TLS_CA: /certs/ca.pem
+      TLS_CERT: /certs/notification-service.pem
+      TLS_KEY: /certs/notification-service-key.pem
+      ALLOWED_CALLERS: api-gateway,dev-client
+      DATABASE_URL: postgres://bank:bank@postgres:5432/notification?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      GRPC_ADDR: ":9011"
+      ACCOUNT_ADDR: account-service:9002
+    ports: ["9011:9011"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      account-service: { condition: service_healthy }
+
   api-gateway:
     build: { context: ., args: { SERVICE: api-gateway } }
     healthcheck:
@@ -340,6 +365,7 @@ services:
       CARD_ADDR: card-service:9007
       CREDIT_ADDR: credit-service:9009
       PAYMENT_ADDR: payment-service:9010
+      NOTIFICATION_ADDR: notification-service:9011
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     ports: ["8000:8080"]
     depends_on:
@@ -352,6 +378,7 @@ services:
       card-service: { condition: service_healthy }
       credit-service: { condition: service_healthy }
       payment-service: { condition: service_healthy }
+      notification-service: { condition: service_healthy }
 
   jaeger:
     image: jaegertracing/jaeger:2.11.0

@@ -133,7 +133,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 
 - payment-service: boleto parsing and validation (47-digit line, check digits, due date, amount), payment through a two-phase saga with a simulated settlement network, scheduled payments.
 
-## Phase 17 — Notifications
+## Phase 17 — Notifications ✅
 
 - notification-service: consumes domain events and notifies customers (in-app inbox, simulated push/email), with per-customer preferences and a live stream (SSE) through the gateway.
 

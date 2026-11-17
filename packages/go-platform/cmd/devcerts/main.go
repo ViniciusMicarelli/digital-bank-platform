@@ -17,7 +17,7 @@ import (
 
 func main() {
 	out := flag.String("out", "infrastructure/certs", "output directory")
-	names := flag.String("names", "api-gateway,identity-service,account-service,ledger-service,transaction-service,pix-service,statement-service,card-service,credit-service,payment-service,kms-service,dev-client",
+	names := flag.String("names", "api-gateway,identity-service,account-service,ledger-service,transaction-service,pix-service,statement-service,card-service,credit-service,payment-service,notification-service,kms-service,dev-client",
 		"comma-separated workload identities")
 	force := flag.Bool("force", false, "create a new CA and reissue every certificate")
 	reissue := flag.Bool("reissue", false, "keep the CA, reissue every workload certificate (rotation; services reload them)")

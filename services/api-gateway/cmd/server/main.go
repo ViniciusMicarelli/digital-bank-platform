@@ -20,6 +20,7 @@ import (
 	cardv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/card/v1"
 	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
+	notificationv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/notification/v1"
 	paymentv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/payment/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
@@ -73,6 +74,7 @@ func main() {
 	cards := dial("CARD_ADDR", "127.0.0.1:9007")
 	credit := dial("CREDIT_ADDR", "127.0.0.1:9009")
 	payments := dial("PAYMENT_ADDR", "127.0.0.1:9010")
+	notifications := dial("NOTIFICATION_ADDR", "127.0.0.1:9011")
 
 	identityClient := identityv1.NewIdentityServiceClient(identity)
 	verifier := auth.NewVerifier(func(ctx context.Context) ([]auth.JWK, error) {
@@ -88,14 +90,15 @@ func main() {
 	})
 
 	api := httpapi.New(httpapi.Clients{
-		Identity:  identityClient,
-		Accounts:  accountv1.NewAccountServiceClient(accounts),
-		Txs:       txv1.NewTransactionServiceClient(txs),
-		Pix:       pixv1.NewPixServiceClient(pix),
-		Statement: statementv1.NewStatementServiceClient(statement),
-		Cards:     cardv1.NewCardServiceClient(cards),
-		Credit:    creditv1.NewCreditServiceClient(credit),
-		Payments:  paymentv1.NewPaymentServiceClient(payments),
+		Identity:      identityClient,
+		Accounts:      accountv1.NewAccountServiceClient(accounts),
+		Txs:           txv1.NewTransactionServiceClient(txs),
+		Pix:           pixv1.NewPixServiceClient(pix),
+		Statement:     statementv1.NewStatementServiceClient(statement),
+		Cards:         cardv1.NewCardServiceClient(cards),
+		Credit:        creditv1.NewCreditServiceClient(credit),
+		Payments:      paymentv1.NewPaymentServiceClient(payments),
+		Notifications: notificationv1.NewNotificationServiceClient(notifications),
 	}, verifier, log, limiters(log))
 
 	mux := http.NewServeMux()

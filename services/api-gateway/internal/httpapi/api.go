@@ -19,6 +19,7 @@ import (
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
 	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
+	notificationv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/notification/v1"
 	paymentv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/payment/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
@@ -32,14 +33,15 @@ import (
 
 // Clients are the internal services behind the gateway.
 type Clients struct {
-	Identity  identityv1.IdentityServiceClient
-	Accounts  accountv1.AccountServiceClient
-	Txs       txv1.TransactionServiceClient
-	Pix       pixv1.PixServiceClient
-	Statement statementv1.StatementServiceClient
-	Cards     cardv1.CardServiceClient
-	Credit    creditv1.CreditServiceClient
-	Payments  paymentv1.PaymentServiceClient
+	Identity      identityv1.IdentityServiceClient
+	Accounts      accountv1.AccountServiceClient
+	Txs           txv1.TransactionServiceClient
+	Pix           pixv1.PixServiceClient
+	Statement     statementv1.StatementServiceClient
+	Cards         cardv1.CardServiceClient
+	Credit        creditv1.CreditServiceClient
+	Payments      paymentv1.PaymentServiceClient
+	Notifications notificationv1.NotificationServiceClient
 }
 
 type Options struct {
@@ -94,6 +96,11 @@ func (a *API) Handler() http.Handler {
 		mux.HandleFunc("POST /v1/sandbox/accounts/{id}/credit/cycle", a.authenticated(a.owned(a.advanceCreditCycle)))
 		mux.HandleFunc("POST /v1/sandbox/boletos", a.authenticated(a.issueSandboxBoleto))
 	}
+	mux.HandleFunc("GET /v1/notifications", a.authenticated(a.listNotifications))
+	mux.HandleFunc("POST /v1/notifications/read", a.authenticated(a.markNotificationsRead))
+	mux.HandleFunc("GET /v1/notifications/preferences", a.authenticated(a.notificationPreferences))
+	mux.HandleFunc("PUT /v1/notifications/preferences", a.authenticated(a.updateNotificationPreferences))
+	mux.HandleFunc("GET /v1/notifications/stream", a.authenticated(a.notificationStream))
 	mux.HandleFunc("POST /v1/boletos/lookup", a.authenticated(a.lookupBoleto))
 	mux.HandleFunc("POST /v1/accounts/{id}/boleto-payments", a.authenticated(a.owned(a.payBoleto)))
 	mux.HandleFunc("GET /v1/accounts/{id}/boleto-payments", a.authenticated(a.owned(a.listBoletoPayments)))

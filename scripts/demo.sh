@@ -109,4 +109,8 @@ step "Ana's statement (built asynchronously from Kafka events)"
 sleep 1
 call GET "/v1/accounts/$ANA_ACC/statement" "$ANA" | jq -r '.items[] | "\(.occurred_at[0:19])  \(.direction | .[0:1])  \(.amount.amount | (" " * (8 - length)) + .)  \(.type)  \(.counterparty_name)"'
 
+step "Ana's notifications (built from the events of everything above)"
+sleep 1
+call GET "/v1/notifications?limit=8" "$ANA" | jq -r '"\(.unread_count) unread", (.notifications[] | "  \(.title): \(.body)")'
+
 printf '\nTraces: http://127.0.0.1:16686  ·  Metrics: http://127.0.0.1:9090\n'

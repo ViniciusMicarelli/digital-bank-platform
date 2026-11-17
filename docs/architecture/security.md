@@ -28,9 +28,13 @@ Not yet: a KMS for the key-encryption keys, TLS for Postgres and Kafka, certific
 | Service | Allowed callers |
 |---|---|
 | ledger-service | account-service, transaction-service |
-| account-service | api-gateway, transaction-service, pix-service, card-service |
-| transaction-service | api-gateway, pix-service, card-service |
-| pix-service, statement-service, identity-service, card-service | api-gateway |
+| account-service | api-gateway, transaction-service, pix-service, card-service, credit-service, notification-service |
+| transaction-service | api-gateway, pix-service, card-service, credit-service, payment-service |
+| credit-service | api-gateway, card-service |
+| kms-service | identity-service, account-service, card-service, pix-service |
+| pix-service, statement-service, identity-service, card-service, payment-service, notification-service | api-gateway |
+
+Unary and streaming RPCs go through the same check (`mtls.Authorize` / `mtls.AuthorizeStream`); only the health service is open to every workload.
 
 `dev-client` (the e2e tests, `grpcurl`) is added to every list in docker compose only. `make certs` creates the development CA once and then only issues certificates for new workloads (`go run ./packages/go-platform/cmd/devcerts -force` starts over); production would use SPIRE, cert-manager or a cloud CA with short-lived certificates.
 

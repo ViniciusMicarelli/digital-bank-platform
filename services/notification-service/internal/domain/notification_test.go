@@ -1,0 +1,81 @@
+package domain
+
+import (
+	"encoding/json"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+func ev(t *testing.T, typ string, p map[string]any) Event {
+	raw, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return Event{ID: uuid.NewString(), Type: typ, Payload: raw}
+}
+
+func stale(e Event) Event {
+	e.OccurredAt = time.Now().Add(-MaxAge - time.Hour)
+	return e
+}
+
+func TestBRL(t *testing.T) {
+	for minor, want := range map[int64]string{5: "R$ 0,05", 1_234_56: "R$ 1.234,56", 1_000_000_00: "R$ 1.000.000,00", -15_00: "-R$ 15,00"} {
+		if got := BRL(minor); got != want {
+			t.Errorf("BRL(%d) = %s, want %s", minor, got, want)
+		}
+	}
+}
+
+func TestFromEvent(t *testing.T) {
+	acc := uuid.NewString()
+	cases := []struct {
+		typ     string
+		payload map[string]any
+		title   string
+		body    string
+	}{
+		{"pix.transfer.received", map[string]any{"account_id": acc, "amount_minor": 15050, "counterparty_name": "Bruno"},
+			"Pix recebido", "Você recebeu R$ 150,50 de Bruno."},
+		{"card.authorization.approved", map[string]any{"account_id": acc, "amount_minor": 4200, "merchant_name": "PADARIA", "function": "CREDIT"},
+			"Compra aprovada", "Compra de R$ 42,00 em PADARIA no crédito."},
+		{"credit.invoice.closed", map[string]any{"account_id": acc, "remaining": 25000, "due_date": "2026-12-20"},
+			"Sua fatura fechou", "Fatura de R$ 250,00 com vencimento em 20/12/2026."},
+		{"transaction.completed", map[string]any{"type": "INTERNAL_TRANSFER", "to_account_id": acc, "amount_minor": 1000, "metadata": map[string]string{}},
+			"Transferência recebida", "Você recebeu uma transferência de R$ 10,00."},
+	}
+	for _, c := range cases {
+		ds, err := FromEvent(ev(t, c.typ, c.payload), time.Now())
+		if err != nil || len(ds) != 1 || ds[0].Title != c.title || ds[0].Body != c.body || ds[0].AccountID.String() != acc {
+			t.Errorf("%s: %+v %v", c.typ, ds, err)
+		}
+	}
+	for _, skip := range []Event{
+		ev(t, "pix.transfer.completed", map[string]any{"account_id": acc, "direction": "INCOMING"}),
+		ev(t, "transaction.completed", map[string]any{"type": "INTERNAL_TRANSFER", "to_account_id": acc, "metadata": map[string]string{"end_to_end_id": "E1"}}),
+		ev(t, "transaction.completed", map[string]any{"type": "PIX_OUT", "from_account_id": acc}),
+		ev(t, "credit.invoice.closed", map[string]any{"account_id": acc, "remaining": 0}),
+		ev(t, "ledger.entry.posted", map[string]any{}),
+		ev(t, "card.authorization.approved", map[string]any{"amount_minor": 100}), // no account in old events
+		stale(ev(t, "pix.transfer.received", map[string]any{"account_id": acc})),
+	} {
+		if ds, err := FromEvent(skip, time.Now()); err != nil || len(ds) != 0 {
+			t.Errorf("%s should not notify: %+v %v", skip.Type, ds, err)
+		}
+	}
+}
+
+func TestChannels(t *testing.T) {
+	d := Draft{Important: true}
+	if ch := DefaultPreferences.Channels(d); len(ch) != 2 || ch[1] != Push {
+		t.Fatalf("default = %v", ch)
+	}
+	if ch := (Preferences{Push: false, Email: true}).Channels(d); len(ch) != 2 || ch[1] != Email {
+		t.Fatalf("email only = %v", ch)
+	}
+	if ch := (Preferences{Email: true}).Channels(Draft{}); len(ch) != 1 {
+		t.Fatalf("not important, no e-mail = %v", ch)
+	}
+}

@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package bank.notification.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// NotificationService keeps each customer's notifications (built from the
+// other services' events), their preferences, and streams new ones live.
+service NotificationService {
+  rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse);
+  // Marks the given notifications read, or all unread ones when ids is empty.
+  rpc MarkRead(MarkReadRequest) returns (MarkReadResponse);
+  rpc GetPreferences(GetPreferencesRequest) returns (GetPreferencesResponse);
+  rpc UpdatePreferences(UpdatePreferencesRequest) returns (UpdatePreferencesResponse);
+  // Streams notifications created after after_id (from now when empty)
+  // until the client goes away.
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
+}
+
+message Notification {
+  string id = 1;
+  string account_id = 2;
+  // PIX, TRANSFER, CARD, CREDIT, BOLETO, ACCOUNT.
+  string category = 3;
+  string title = 4;
+  string body = 5;
+  // IN_APP, PUSH, EMAIL.
+  repeated string channels = 6;
+  google.protobuf.Timestamp occurred_at = 7;
+  bool read = 8;
+}
+
+message Preferences {
+  bool push = 1;
+  // Only important notifications (bills, failures, security) go by e-mail.
+  bool email = 2;
+}
+
+message ListNotificationsRequest {
+  string customer_id = 1;
+  bool unread_only = 2;
+  // Page before this id (newest first).
+  string before_id = 3;
+  int32 limit = 4;
+}
+
+message ListNotificationsResponse {
+  repeated Notification notifications = 1;
+  int32 unread_count = 2;
+}
+
+message MarkReadRequest {
+  string customer_id = 1;
+  repeated string ids = 2;
+}
+
+message MarkReadResponse {
+  int32 marked = 1;
+}
+
+message GetPreferencesRequest {
+  string customer_id = 1;
+}
+
+message GetPreferencesResponse {
+  Preferences preferences = 1;
+}
+
+message UpdatePreferencesRequest {
+  string customer_id = 1;
+  Preferences preferences = 2;
+}
+
+message UpdatePreferencesResponse {
+  Preferences preferences = 1;
+}
+
+message SubscribeRequest {
+  string customer_id = 1;
+  string after_id = 2;
+}
+
+message SubscribeResponse {
+  Notification notification = 1;
+}

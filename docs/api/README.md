@@ -74,6 +74,10 @@
 | `DELETE` | `/v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}` | Delete it for good |
 | `POST` | `/v1/sandbox/card-network/authorizations` | *(sandbox)* Network authorization `{pan, expiry_month, expiry_year, cvv, amount, merchant_name, mcc, country, channel, function?}` (`function`: `DEBIT` default, or `CREDIT`) |
 | `POST` | `/v1/sandbox/card-network/authorizations/{id}/clear` · `/reverse` | *(sandbox)* Clearing `{amount?}` / merchant reversal |
+| `GET` | `/v1/notifications` | Inbox `?unread=true&before=<id>&limit=`, with `unread_count` |
+| `POST` | `/v1/notifications/read` | `{ids?}` mark read (all unread when empty) |
+| `GET` · `PUT` | `/v1/notifications/preferences` | `{push, email}` |
+| `GET` | `/v1/notifications/stream` | Live notifications as Server-Sent Events (`id`, `event: notification`, JSON `data`); send `Last-Event-ID` to resume |
 | `POST` | `/v1/boletos/lookup` | `{line}` → payee, due date, amount with charges if overdue |
 | `POST` | `/v1/accounts/{id}/boleto-payments` | Pay `{line, amount?, scheduled_for?}` (Idempotency-Key); refusals are 422 with the reason |
 | `GET` | `/v1/accounts/{id}/boleto-payments` | Payments, newest first |

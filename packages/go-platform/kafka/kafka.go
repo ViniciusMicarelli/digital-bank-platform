@@ -71,6 +71,10 @@ type ConsumerConfig struct {
 	Group       string
 	Topics      []string
 	MaxAttempts int // default 5
+	// NewGroupLookback makes a new group start from the events of the last
+	// NewGroupLookback instead of the oldest ones (consumers that react to
+	// what happens now, not to history). Zero: from the oldest.
+	NewGroupLookback time.Duration
 }
 
 // Consume runs a consumer group until ctx is cancelled. Offsets are committed
@@ -80,11 +84,15 @@ func Consume(ctx context.Context, cfg ConsumerConfig, log *slog.Logger, handle H
 	if cfg.MaxAttempts <= 0 {
 		cfg.MaxAttempts = 5
 	}
+	start := kgo.NewOffset().AtStart()
+	if cfg.NewGroupLookback > 0 {
+		start = kgo.NewOffset().AfterMilli(time.Now().Add(-cfg.NewGroupLookback).UnixMilli())
+	}
 	client, err := kgo.NewClient(
 		kgo.SeedBrokers(cfg.Brokers...),
 		kgo.ConsumerGroup(cfg.Group),
 		kgo.ConsumeTopics(cfg.Topics...),
-		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
+		kgo.ConsumeResetOffset(start),
 		kgo.DisableAutoCommit(),
 		// A crashed member is replaced after 10 s instead of the default 45 s.
 		kgo.SessionTimeout(10*time.Second),

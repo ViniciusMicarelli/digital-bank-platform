@@ -31,8 +31,9 @@ import (
 
 // Options customizes the server. Interceptors run after recovery and logging.
 type Options struct {
-	UnaryInterceptors []grpc.UnaryServerInterceptor
-	ServerOptions     []grpc.ServerOption
+	UnaryInterceptors  []grpc.UnaryServerInterceptor
+	StreamInterceptors []grpc.StreamServerInterceptor
+	ServerOptions      []grpc.ServerOption
 }
 
 // OptionsFromEnv enables mutual TLS and caller authorization when TLS_CERT is
@@ -47,8 +48,9 @@ func OptionsFromEnv() (Options, error) {
 		return Options{}, err
 	}
 	return Options{
-		ServerOptions:     []grpc.ServerOption{grpc.Creds(creds)},
-		UnaryInterceptors: []grpc.UnaryServerInterceptor{mtls.Authorize(mtls.AllowedCallersFromEnv())},
+		ServerOptions:      []grpc.ServerOption{grpc.Creds(creds)},
+		UnaryInterceptors:  []grpc.UnaryServerInterceptor{mtls.Authorize(mtls.AllowedCallersFromEnv())},
+		StreamInterceptors: []grpc.StreamServerInterceptor{mtls.AuthorizeStream(mtls.AllowedCallersFromEnv())},
 	}, nil
 }
 
@@ -64,7 +66,8 @@ func New(log *slog.Logger, opts Options) *grpc.Server {
 	}, opts.UnaryInterceptors...)
 	srv := grpc.NewServer(append(opts.ServerOptions,
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.ChainUnaryInterceptor(interceptors...))...)
+		grpc.ChainUnaryInterceptor(interceptors...),
+		grpc.ChainStreamInterceptor(append([]grpc.StreamServerInterceptor{recoverStream(log)}, opts.StreamInterceptors...)...))...)
 
 	hs := health.NewServer()
 	hs.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
@@ -157,6 +160,18 @@ func recoverUnary(log *slog.Logger) grpc.UnaryServerInterceptor {
 			}
 		}()
 		return handler(ctx, req)
+	}
+}
+
+func recoverStream(log *slog.Logger) grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.ErrorContext(ss.Context(), "panic in stream handler", "method", info.FullMethod, "panic", r, "stack", string(debug.Stack()))
+				err = status.Error(codes.Internal, "internal error")
+			}
+		}()
+		return handler(srv, ss)
 	}
 }
 
