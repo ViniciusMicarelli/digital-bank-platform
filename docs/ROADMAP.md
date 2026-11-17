@@ -23,7 +23,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 
 **Done when:** you can post entries over gRPC, and the invariant and concurrency tests pass against Postgres.
 
-## Phase 2 — Accounts
+## Phase 2 — Accounts ✅
 
 [account-service](services/account-service.md)
 

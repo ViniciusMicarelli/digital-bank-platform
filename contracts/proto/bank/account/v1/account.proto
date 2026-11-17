@@ -1,0 +1,168 @@
+syntax = "proto3";
+
+package bank.account.v1;
+
+import "bank/common/v1/money.proto";
+import "google/protobuf/timestamp.proto";
+
+// AccountService manages checking accounts: lifecycle, status and transaction
+// limits. Balances live in the ledger; GetBalance proxies to it.
+service AccountService {
+  // Opens an account and its ledger account. Idempotent on idempotency_key.
+  rpc OpenAccount(OpenAccountRequest) returns (OpenAccountResponse);
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+  rpc ListAccounts(ListAccountsRequest) returns (ListAccountsResponse);
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+
+  rpc BlockAccount(BlockAccountRequest) returns (BlockAccountResponse);
+  rpc UnblockAccount(UnblockAccountRequest) returns (UnblockAccountResponse);
+  // Closes the account. Requires a zero ledger balance and no pending holds.
+  rpc CloseAccount(CloseAccountRequest) returns (CloseAccountResponse);
+
+  rpc GetLimits(GetLimitsRequest) returns (GetLimitsResponse);
+  rpc UpdateLimits(UpdateLimitsRequest) returns (UpdateLimitsResponse);
+  // Atomically checks an outgoing amount against the limits and records the
+  // usage. Idempotent on transaction_id. Fails with FAILED_PRECONDITION and
+  // reason LIMIT_EXCEEDED or ACCOUNT_NOT_ACTIVE.
+  rpc ConsumeLimit(ConsumeLimitRequest) returns (ConsumeLimitResponse);
+  // Gives back the usage recorded for a transaction (saga compensation).
+  rpc RestoreLimit(RestoreLimitRequest) returns (RestoreLimitResponse);
+}
+
+enum AccountStatus {
+  ACCOUNT_STATUS_UNSPECIFIED = 0;
+  ACCOUNT_STATUS_ACTIVE = 1;
+  ACCOUNT_STATUS_BLOCKED = 2;
+  ACCOUNT_STATUS_CLOSED = 3;
+}
+
+message Account {
+  // Also the ledger account id.
+  string id = 1;
+  string customer_id = 2;
+  string holder_name = 3;
+  // CPF (11 digits).
+  string document = 4;
+  string branch = 5;
+  // Account number with check digit, e.g. "00001234-5".
+  string number = 6;
+  string currency = 7;
+  AccountStatus status = 8;
+  string status_reason = 9;
+  google.protobuf.Timestamp opened_at = 10;
+  google.protobuf.Timestamp closed_at = 11;
+}
+
+// Limits are maximum outgoing amounts in minor units.
+message Limits {
+  int64 per_transaction_minor_units = 1;
+  int64 daily_minor_units = 2;
+  // Total allowed during the night window (20:00-06:00, America/Sao_Paulo).
+  int64 nightly_minor_units = 3;
+}
+
+message LimitUsage {
+  int64 daily_used_minor_units = 1;
+  int64 nightly_used_minor_units = 2;
+}
+
+message OpenAccountRequest {
+  string idempotency_key = 1;
+  string customer_id = 2;
+  string holder_name = 3;
+  string document = 4;
+  // Defaults to BRL.
+  string currency = 5;
+}
+
+message OpenAccountResponse {
+  Account account = 1;
+}
+
+message GetAccountRequest {
+  string id = 1;
+}
+
+message GetAccountResponse {
+  Account account = 1;
+}
+
+message ListAccountsRequest {
+  string customer_id = 1;
+}
+
+message ListAccountsResponse {
+  repeated Account accounts = 1;
+}
+
+message GetBalanceRequest {
+  string account_id = 1;
+}
+
+message GetBalanceResponse {
+  bank.common.v1.Money posted = 1;
+  bank.common.v1.Money pending = 2;
+  bank.common.v1.Money available = 3;
+}
+
+message BlockAccountRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message BlockAccountResponse {
+  Account account = 1;
+}
+
+message UnblockAccountRequest {
+  string id = 1;
+}
+
+message UnblockAccountResponse {
+  Account account = 1;
+}
+
+message CloseAccountRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message CloseAccountResponse {
+  Account account = 1;
+}
+
+message GetLimitsRequest {
+  string account_id = 1;
+}
+
+message GetLimitsResponse {
+  Limits limits = 1;
+  LimitUsage usage = 2;
+}
+
+message UpdateLimitsRequest {
+  string account_id = 1;
+  Limits limits = 2;
+}
+
+message UpdateLimitsResponse {
+  Limits limits = 1;
+}
+
+message ConsumeLimitRequest {
+  string account_id = 1;
+  // Caller's transaction id; consuming twice with the same id is a no-op.
+  string transaction_id = 2;
+  bank.common.v1.Money amount = 3;
+}
+
+message ConsumeLimitResponse {
+  LimitUsage usage = 1;
+}
+
+message RestoreLimitRequest {
+  string account_id = 1;
+  string transaction_id = 2;
+}
+
+message RestoreLimitResponse {}

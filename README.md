@@ -48,7 +48,7 @@ make lint    # gofmt + go vet
 - [x] Architecture docs and ADRs
 - [x] `packages/go-common/money`: exact money type, no floats, overflow-checked
 - [x] **ledger-service**: journal entries, balanced postings, holds, reversals, idempotency (PostgreSQL + gRPC)
-- [ ] **account-service**: open/close accounts, linked to ledger accounts
+- [x] **account-service**: account lifecycle, CPF validation, per-transaction/daily/nightly limits
 - [ ] Local stack with Docker Compose + migrations + integration tests
 - [ ] Internal transfers end to end (account → ledger → statement)
 - [ ] Transactional outbox → Kafka

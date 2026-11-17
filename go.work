@@ -4,5 +4,6 @@ use (
 	./contracts
 	./packages/go-common
 	./packages/go-platform
+	./services/account-service
 	./services/ledger-service
 )
