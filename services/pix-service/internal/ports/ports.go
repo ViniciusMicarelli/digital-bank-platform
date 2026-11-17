@@ -32,9 +32,15 @@ type Store interface {
 	ClaimQRCode(ctx context.Context, txid string, transfer uuid.UUID) error
 	Transfer(ctx context.Context, id uuid.UUID) (domain.Transfer, error)
 	TransferByKey(ctx context.Context, idempotencyKey string) (domain.Transfer, error)
+	// Transfers lists an account's transfers, newest first, before the cursor
+	// (zero values: from the newest). direction "" means both.
+	Transfers(ctx context.Context, account uuid.UUID, direction domain.Direction, beforeAt time.Time, beforeID uuid.UUID, limit int) ([]domain.Transfer, error)
 	Acquire(ctx context.Context, id uuid.UUID, d time.Duration) (domain.Transfer, bool, error)
 	Release(ctx context.Context, id uuid.UUID) error
 	SaveTransfer(ctx context.Context, t domain.Transfer, events ...outbox.Message) error
+	// CompleteInternal saves a completed same-bank transfer and inserts the
+	// receiver's incoming record, in one transaction (idempotent).
+	CompleteInternal(ctx context.Context, t, incoming domain.Transfer, events ...outbox.Message) error
 	Unfinished(ctx context.Context, before time.Time, limit int) ([]uuid.UUID, error)
 }
 

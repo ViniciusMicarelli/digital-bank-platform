@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -410,6 +411,34 @@ func optionalBRL(w http.ResponseWriter, r *http.Request, s string) (*commonv1.Mo
 		return nil, true
 	}
 	return parseBRL(w, r, s)
+}
+
+func (a *API) listPix(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	dir := map[string]pixv1.TransferDirection{
+		"":         pixv1.TransferDirection_TRANSFER_DIRECTION_UNSPECIFIED,
+		"incoming": pixv1.TransferDirection_TRANSFER_DIRECTION_INCOMING,
+		"outgoing": pixv1.TransferDirection_TRANSFER_DIRECTION_OUTGOING,
+	}
+	d, ok := dir[r.URL.Query().Get("direction")]
+	if !ok {
+		writeError(w, r.Context(), http.StatusBadRequest, "INVALID_ARGUMENT", "direction must be incoming or outgoing")
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	resp, err := a.c.Pix.ListTransfers(r.Context(), &pixv1.ListTransfersRequest{
+		AccountId: acc.GetId(), Direction: d, PageSize: int32(min(max(limit, 0), 100)), PageToken: r.URL.Query().Get("cursor"),
+	})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	out := []map[string]any{}
+	for _, t := range resp.GetTransfers() {
+		item := pixTransferJSON(t)
+		item["direction"] = strings.ToLower(t.GetDirection().String()[len("TRANSFER_DIRECTION_"):])
+		out = append(out, item)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"transfers": out, "next_cursor": resp.GetNextPageToken()})
 }
 
 func (a *API) createQRCode(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {

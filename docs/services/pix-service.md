@@ -53,6 +53,8 @@ A completed incoming Pix can be refunded, fully or in parts, for 90 days. The re
 - The original row is locked while the refund is created, and its `refunded_amount` is increased in the same transaction. Concurrent refunds can never add up to more than was received; a `CHECK (refunded_amount <= amount)` constraint backs this up in the database.
 - A refund that fails gives its reservation back, atomically with its status change, so retries never release twice.
 - Refunds appear in the statement as `PIX_REFUND`.
+- **Same-bank Pix.** When a Pix between two of our customers completes, the receiver gets an incoming record (counterparty: the sender, ISPB of this bank) written in the same transaction, so it can be listed and refunded like any received Pix. Its refund is an internal transfer back to the payer. Money returned by a refund cannot itself be refunded.
+- The end-to-end id is unique per direction (`UNIQUE (end_to_end_id, direction)`): the sender's and the receiver's records of a same-bank Pix share it.
 
 ## Simulators
 
@@ -75,6 +77,7 @@ Defined in [`contracts/proto/bank/pix/v1/pix.proto`](../../contracts/proto/bank/
 | `LookupKey` | Resolve a key |
 | `CreateTransfer` | Send a Pix (idempotent on `idempotency_key`) |
 | `GetTransfer` | Transfer status |
+| `ListTransfers` | Sent and/or received Pix of an account, cursor-paginated |
 | `SimulateIncoming` | Simulated SPI delivery |
 | `CreateQrCode` / `DecodeQrCode` / `PayQrCode` | BR Code charges |
 | `RefundTransfer` | Refund a received Pix |

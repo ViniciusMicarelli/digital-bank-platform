@@ -17,6 +17,8 @@ service PixService {
   // Sends a Pix. Idempotent on idempotency_key.
   rpc CreateTransfer(CreateTransferRequest) returns (CreateTransferResponse);
   rpc GetTransfer(GetTransferRequest) returns (GetTransferResponse);
+  // Pix sent and/or received by an account, newest first.
+  rpc ListTransfers(ListTransfersRequest) returns (ListTransfersResponse);
 
   // Simulates the SPI delivering a Pix sent by another bank to one of our keys.
   rpc SimulateIncoming(SimulateIncomingRequest) returns (SimulateIncomingResponse);
@@ -226,4 +228,18 @@ message RefundTransferRequest {
 
 message RefundTransferResponse {
   Transfer transfer = 1;
+}
+
+message ListTransfersRequest {
+  string account_id = 1;
+  // UNSPECIFIED lists both directions.
+  TransferDirection direction = 2;
+  // Defaults to 20, maximum 100.
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+message ListTransfersResponse {
+  repeated Transfer transfers = 1;
+  string next_page_token = 2;
 }

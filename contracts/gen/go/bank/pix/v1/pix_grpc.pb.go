@@ -25,6 +25,7 @@ const (
 	PixService_LookupKey_FullMethodName        = "/bank.pix.v1.PixService/LookupKey"
 	PixService_CreateTransfer_FullMethodName   = "/bank.pix.v1.PixService/CreateTransfer"
 	PixService_GetTransfer_FullMethodName      = "/bank.pix.v1.PixService/GetTransfer"
+	PixService_ListTransfers_FullMethodName    = "/bank.pix.v1.PixService/ListTransfers"
 	PixService_SimulateIncoming_FullMethodName = "/bank.pix.v1.PixService/SimulateIncoming"
 	PixService_CreateQrCode_FullMethodName     = "/bank.pix.v1.PixService/CreateQrCode"
 	PixService_DecodeQrCode_FullMethodName     = "/bank.pix.v1.PixService/DecodeQrCode"
@@ -47,6 +48,8 @@ type PixServiceClient interface {
 	// Sends a Pix. Idempotent on idempotency_key.
 	CreateTransfer(ctx context.Context, in *CreateTransferRequest, opts ...grpc.CallOption) (*CreateTransferResponse, error)
 	GetTransfer(ctx context.Context, in *GetTransferRequest, opts ...grpc.CallOption) (*GetTransferResponse, error)
+	// Pix sent and/or received by an account, newest first.
+	ListTransfers(ctx context.Context, in *ListTransfersRequest, opts ...grpc.CallOption) (*ListTransfersResponse, error)
 	// Simulates the SPI delivering a Pix sent by another bank to one of our keys.
 	SimulateIncoming(ctx context.Context, in *SimulateIncomingRequest, opts ...grpc.CallOption) (*SimulateIncomingResponse, error)
 	// Issues a BR Code ("Pix copia e cola") for one of the account's keys.
@@ -127,6 +130,16 @@ func (c *pixServiceClient) GetTransfer(ctx context.Context, in *GetTransferReque
 	return out, nil
 }
 
+func (c *pixServiceClient) ListTransfers(ctx context.Context, in *ListTransfersRequest, opts ...grpc.CallOption) (*ListTransfersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTransfersResponse)
+	err := c.cc.Invoke(ctx, PixService_ListTransfers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *pixServiceClient) SimulateIncoming(ctx context.Context, in *SimulateIncomingRequest, opts ...grpc.CallOption) (*SimulateIncomingResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SimulateIncomingResponse)
@@ -192,6 +205,8 @@ type PixServiceServer interface {
 	// Sends a Pix. Idempotent on idempotency_key.
 	CreateTransfer(context.Context, *CreateTransferRequest) (*CreateTransferResponse, error)
 	GetTransfer(context.Context, *GetTransferRequest) (*GetTransferResponse, error)
+	// Pix sent and/or received by an account, newest first.
+	ListTransfers(context.Context, *ListTransfersRequest) (*ListTransfersResponse, error)
 	// Simulates the SPI delivering a Pix sent by another bank to one of our keys.
 	SimulateIncoming(context.Context, *SimulateIncomingRequest) (*SimulateIncomingResponse, error)
 	// Issues a BR Code ("Pix copia e cola") for one of the account's keys.
@@ -229,6 +244,9 @@ func (UnimplementedPixServiceServer) CreateTransfer(context.Context, *CreateTran
 }
 func (UnimplementedPixServiceServer) GetTransfer(context.Context, *GetTransferRequest) (*GetTransferResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTransfer not implemented")
+}
+func (UnimplementedPixServiceServer) ListTransfers(context.Context, *ListTransfersRequest) (*ListTransfersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTransfers not implemented")
 }
 func (UnimplementedPixServiceServer) SimulateIncoming(context.Context, *SimulateIncomingRequest) (*SimulateIncomingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SimulateIncoming not implemented")
@@ -374,6 +392,24 @@ func _PixService_GetTransfer_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PixService_ListTransfers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTransfersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).ListTransfers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_ListTransfers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).ListTransfers(ctx, req.(*ListTransfersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _PixService_SimulateIncoming_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SimulateIncomingRequest)
 	if err := dec(in); err != nil {
@@ -494,6 +530,10 @@ var PixService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTransfer",
 			Handler:    _PixService_GetTransfer_Handler,
+		},
+		{
+			MethodName: "ListTransfers",
+			Handler:    _PixService_ListTransfers_Handler,
 		},
 		{
 			MethodName: "SimulateIncoming",

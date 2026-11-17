@@ -48,6 +48,7 @@
 | `GET` / `POST` | `/v1/accounts/{id}/pix/keys` | List / register `{type: CPF\|EMAIL\|PHONE\|EVP, value}` |
 | `DELETE` | `/v1/accounts/{id}/pix/keys/{keyID}` | Delete a key |
 | `GET` | `/v1/pix/keys/{key}` | Look up a key before paying |
+| `GET` | `/v1/accounts/{id}/pix/transfers?direction=incoming\|outgoing` | Pix sent / received (use a received one's `id` to refund it) |
 | `POST` | `/v1/accounts/{id}/pix/transfers` | `{key, amount, description}` · Idempotency-Key |
 | `POST` | `/v1/accounts/{id}/pix/qr-codes` | Issue a BR Code `{key, amount?, description, one_time, expires_in_seconds}` → `{txid, payload}` |
 | `POST` | `/v1/pix/qr-codes/decode` | `{payload}` → receiver, amount, txid |

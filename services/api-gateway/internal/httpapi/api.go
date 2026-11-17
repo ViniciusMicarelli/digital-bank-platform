@@ -90,6 +90,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/accounts/{id}/pix/keys", a.authenticated(a.owned(a.registerKey)))
 	mux.HandleFunc("DELETE /v1/accounts/{id}/pix/keys/{keyID}", a.authenticated(a.owned(a.deleteKey)))
 	mux.HandleFunc("POST /v1/accounts/{id}/pix/transfers", a.authenticated(a.owned(a.sendPix)))
+	mux.HandleFunc("GET /v1/accounts/{id}/pix/transfers", a.authenticated(a.owned(a.listPix)))
 	mux.HandleFunc("GET /v1/pix/keys/{key}", a.authenticated(a.lookupKey))
 	mux.HandleFunc("POST /v1/accounts/{id}/pix/qr-codes", a.authenticated(a.owned(a.createQRCode)))
 	mux.HandleFunc("POST /v1/pix/qr-codes/decode", a.authenticated(a.decodeQRCode))

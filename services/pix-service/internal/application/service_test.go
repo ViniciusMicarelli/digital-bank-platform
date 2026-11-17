@@ -429,3 +429,45 @@ func TestConcurrentRefundsNeverExceedTheAmount(t *testing.T) {
 		t.Fatalf("refunded %d (completed %d) of 100, want 90 (three refunds of 30)", got.Refunded, completed)
 	}
 }
+
+func TestSameBankPixCanBeRefunded(t *testing.T) {
+	e := setup(t)
+	_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
+	sent, err := e.svc.Send(e.ctx, "s1", e.ana, "bruno@example.com", brl("60"), "aluguel")
+	if err != nil || sent.Status != domain.StatusCompleted {
+		t.Fatalf("send = %+v, %v", sent, err)
+	}
+
+	// Bruno now has a record of what he received, from Ana.
+	in, err := e.store.TransferByKey(e.ctx, "in-internal:"+sent.ID.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Direction != domain.Incoming || in.AccountID != e.bruno || in.InternalAccountID != e.ana ||
+		in.Counterparty.Name != "Ana Silva" || in.Counterparty.DocumentMasked != "***.982.247-**" || in.EndToEndID != sent.EndToEndID {
+		t.Fatalf("incoming record = %+v", in)
+	}
+
+	refund, err := e.svc.Refund(e.ctx, "r1", e.bruno, in.ID, brl("25"), "pagou a mais")
+	if err != nil || refund.Status != domain.StatusCompleted || !refund.Internal() || refund.InternalAccountID != e.ana {
+		t.Fatalf("refund = %+v, %v", refund, err)
+	}
+	if e.txs.balance[e.ana] != 100_00-60_00+25_00 || e.txs.balance[e.bruno] != 35_00 {
+		t.Fatalf("balances ana=%d bruno=%d", e.txs.balance[e.ana], e.txs.balance[e.bruno])
+	}
+	if e.txs.lastMetadata["refund_of"] != in.ID.String() {
+		t.Fatalf("refund metadata = %v", e.txs.lastMetadata)
+	}
+
+	// The money Ana got back is recorded, but it cannot be refunded again.
+	back, err := e.store.TransferByKey(e.ctx, "in-internal:"+refund.ID.String())
+	if err != nil || back.AccountID != e.ana || back.RefundOf != in.ID {
+		t.Fatalf("refund's incoming record = %+v, %v", back, err)
+	}
+	if _, err := e.svc.Refund(e.ctx, "r2", e.ana, back.ID, brl("1"), ""); !errors.Is(err, domain.ErrNotRefundable) {
+		t.Fatalf("refunding a refund err = %v", err)
+	}
+	if _, err := e.svc.Refund(e.ctx, "r3", e.bruno, in.ID, brl("35.01"), ""); !errors.Is(err, domain.ErrRefundTooLarge) {
+		t.Fatalf("over-refund err = %v", err)
+	}
+}

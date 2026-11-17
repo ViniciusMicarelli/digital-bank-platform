@@ -260,6 +260,25 @@ func (s *Store) TransferByKey(ctx context.Context, key string) (domain.Transfer,
 	return scanTransfer(s.pool.QueryRow(ctx, `SELECT `+transferCols+` FROM pix_transfers WHERE idempotency_key = $1`, key))
 }
 
+func (s *Store) Transfers(ctx context.Context, account uuid.UUID, direction domain.Direction, beforeAt time.Time, beforeID uuid.UUID, limit int) ([]domain.Transfer, error) {
+	rows, err := s.pool.Query(ctx, `SELECT `+transferCols+` FROM pix_transfers
+		WHERE account_id = $1 AND ($2 = '' OR direction = $2)
+		  AND ($3::TIMESTAMPTZ IS NULL OR (created_at, id) < ($3, $4))
+		ORDER BY created_at DESC, id DESC LIMIT $5`,
+		account, string(direction), nullableTime(beforeAt), beforeID, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (domain.Transfer, error) { return scanTransfer(r) })
+}
+
+func nullableTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
+}
+
 func (s *Store) Acquire(ctx context.Context, id uuid.UUID, d time.Duration) (domain.Transfer, bool, error) {
 	t, err := scanTransfer(s.pool.QueryRow(ctx, `
 		UPDATE pix_transfers SET locked_until = now() + $2::INTERVAL
@@ -282,7 +301,20 @@ func (s *Store) Release(ctx context.Context, id uuid.UUID) error {
 // one-time QR code's claim. Doing it here, atomically with the status change,
 // means retries can never release twice.
 func (s *Store) SaveTransfer(ctx context.Context, t domain.Transfer, events ...outbox.Message) error {
+	return s.save(ctx, t, nil, events)
+}
+
+func (s *Store) CompleteInternal(ctx context.Context, t, incoming domain.Transfer, events ...outbox.Message) error {
+	return s.save(ctx, t, &incoming, events)
+}
+
+func (s *Store) save(ctx context.Context, t domain.Transfer, incoming *domain.Transfer, events []outbox.Message) error {
 	return pg.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		if incoming != nil {
+			if _, _, err := insertTransfer(ctx, tx, *incoming); err != nil {
+				return err
+			}
+		}
 		var previous string
 		if err := tx.QueryRow(ctx, `SELECT status FROM pix_transfers WHERE id = $1 FOR UPDATE`, t.ID).Scan(&previous); err != nil {
 			return err

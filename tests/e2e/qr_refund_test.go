@@ -92,3 +92,48 @@ func TestQRCodeAndRefund(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 	}
 }
+
+func TestSameBankPixRefund(t *testing.T) {
+	ana := login(t, "ana-sb-"+uuid.NewString()[:8])
+	bruno := login(t, "bruno-sb-"+uuid.NewString()[:8])
+	_, a := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza", "document": "529.982.247-25"}, idem())
+	_, b := bruno.call("POST", "/v1/accounts", map[string]string{"holder_name": "Bruno Lima", "document": "111.444.777-35"}, idem())
+	anaID, brunoID := a["id"].(string), b["id"].(string)
+	anaKey := "ana." + uuid.NewString()[:8] + "@example.com"
+	brunoKey := "bruno." + uuid.NewString()[:8] + "@example.com"
+	ana.call("POST", "/v1/accounts/"+anaID+"/pix/keys", map[string]string{"type": "EMAIL", "value": anaKey}, nil)
+	bruno.call("POST", "/v1/accounts/"+brunoID+"/pix/keys", map[string]string{"type": "EMAIL", "value": brunoKey}, nil)
+	ana.call("POST", "/v1/sandbox/pix-in", map[string]string{"key": anaKey, "amount": "100.00"}, nil)
+
+	if status, body := ana.call("POST", "/v1/accounts/"+anaID+"/pix/transfers", map[string]string{"key": brunoKey, "amount": "60.00"}, idem()); status != 201 {
+		t.Fatalf("pix: %d %v", status, body)
+	}
+	// Bruno sees the Pix he received from Ana, and returns part of it.
+	status, list := bruno.call("GET", "/v1/accounts/"+brunoID+"/pix/transfers?direction=incoming", nil, nil)
+	transfers, _ := list["transfers"].([]any)
+	if status != 200 || len(transfers) != 1 {
+		t.Fatalf("incoming list: %d %v", status, list)
+	}
+	in := transfers[0].(map[string]any)
+	if in["counterparty"].(map[string]any)["name"] != "Ana Souza" || in["counterparty"].(map[string]any)["bank"] != "Digital Bank" {
+		t.Fatalf("incoming = %v", in)
+	}
+	status, r := bruno.call("POST", "/v1/accounts/"+brunoID+"/pix/transfers/"+in["id"].(string)+"/refunds", map[string]string{"amount": "25.00"}, idem())
+	if status != 201 || r["counterparty"].(map[string]any)["name"] != "Ana Souza" {
+		t.Fatalf("refund: %d %v", status, r)
+	}
+	_, balA := ana.call("GET", "/v1/accounts/"+anaID+"/balance", nil, nil)
+	_, balB := bruno.call("GET", "/v1/accounts/"+brunoID+"/balance", nil, nil)
+	if amountOf(balA["available"]) != "65.00" || amountOf(balB["available"]) != "35.00" {
+		t.Fatalf("balances ana=%v bruno=%v", balA, balB)
+	}
+	// What Ana got back is listed as received, but cannot be refunded again.
+	_, list = ana.call("GET", "/v1/accounts/"+anaID+"/pix/transfers?direction=incoming&limit=1", nil, nil)
+	back := list["transfers"].([]any)[0].(map[string]any)
+	if back["refund_of"] == nil {
+		t.Fatalf("returned money = %v", back)
+	}
+	if status, body := ana.call("POST", "/v1/accounts/"+anaID+"/pix/transfers/"+back["id"].(string)+"/refunds", map[string]string{"amount": "1.00"}, idem()); status != 422 || errorCode(body) != "NOT_REFUNDABLE" {
+		t.Fatalf("refunding a refund: %d %v", status, body)
+	}
+}

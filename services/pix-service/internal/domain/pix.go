@@ -209,6 +209,8 @@ func NewRefund(idemKey string, original Transfer, amount money.Money, reason str
 		return Transfer{}, fmt.Errorf("%w: idempotency key is required", ErrInvalidArgument)
 	case original.Direction != Incoming || original.Status != StatusCompleted:
 		return Transfer{}, fmt.Errorf("%w: only completed incoming transfers can be refunded", ErrNotRefundable)
+	case original.RefundOf != uuid.Nil:
+		return Transfer{}, fmt.Errorf("%w: money returned by a refund cannot be refunded", ErrNotRefundable)
 	case now.Sub(original.CreatedAt) > RefundWindow:
 		return Transfer{}, fmt.Errorf("%w: older than 90 days", ErrNotRefundable)
 	case !amount.IsPositive() || amount.Currency() != money.BRL:
@@ -230,10 +232,33 @@ func NewRefund(idemKey string, original Transfer, amount money.Money, reason str
 		AccountID:      original.AccountID,
 		Key:            "",
 		Counterparty:   original.Counterparty,
-		Amount:         amount,
-		Description:    reason,
-		RefundOf:       original.ID,
+		// Same-bank payer: the refund is an internal transfer back to them.
+		InternalAccountID: original.InternalAccountID,
+		Amount:            amount,
+		Description:       reason,
+		RefundOf:          original.ID,
 	}, nil
+}
+
+// IncomingMirror is the receiver's record of a completed same-bank Pix, so
+// the receiver sees it as received and can refund it. sender describes the
+// paying customer.
+func (t Transfer) IncomingMirror(sender Party) Transfer {
+	return Transfer{
+		ID:                uuid.Must(uuid.NewV7()),
+		IdempotencyKey:    "in-internal:" + t.ID.String(),
+		EndToEndID:        t.EndToEndID,
+		Direction:         Incoming,
+		Status:            StatusCompleted,
+		AccountID:         t.InternalAccountID,
+		Key:               t.Key,
+		Counterparty:      sender,
+		InternalAccountID: t.AccountID,
+		Amount:            t.Amount,
+		Description:       t.Description,
+		TransactionID:     t.TransactionID,
+		RefundOf:          t.RefundOf, // money coming back from a refund
+	}
 }
 
 // QRCode is a charge issued by one of our customers.

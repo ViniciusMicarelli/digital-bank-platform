@@ -355,6 +355,11 @@ func (s *Service) Receive(ctx context.Context, e2e, key string, amount money.Mon
 	return s.Process(ctx, t.ID)
 }
 
+// Transfers lists an account's Pix, newest first.
+func (s *Service) Transfers(ctx context.Context, account uuid.UUID, direction domain.Direction, beforeAt time.Time, beforeID uuid.UUID, limit int) ([]domain.Transfer, error) {
+	return s.store.Transfers(ctx, account, direction, beforeAt, beforeID, limit)
+}
+
 func (s *Service) Transfer(ctx context.Context, id uuid.UUID) (domain.Transfer, error) {
 	return s.store.Transfer(ctx, id)
 }
@@ -510,11 +515,32 @@ func (s *Service) finish(ctx context.Context, t *domain.Transfer, st domain.Stat
 	if err != nil {
 		return err
 	}
-	if err := s.store.SaveTransfer(ctx, *t, ev); err != nil {
+	if st == domain.StatusCompleted && t.Direction == domain.Outgoing && t.Internal() {
+		if err := s.completeInternal(ctx, t, ev); err != nil {
+			return err
+		}
+	} else if err := s.store.SaveTransfer(ctx, *t, ev); err != nil {
 		return err
 	}
 	telemetry.BusinessEvents.WithLabelValues(eventType, string(t.Status)).Inc()
 	return nil
+}
+
+// completeInternal also records the Pix as received by the other customer.
+func (s *Service) completeInternal(ctx context.Context, t *domain.Transfer, sent outbox.Message) error {
+	sender, err := s.accounts.Holder(ctx, t.AccountID)
+	if err != nil {
+		return fmt.Errorf("read sender: %w", err)
+	}
+	in := t.IncomingMirror(domain.Party{
+		Name: sender.Name, DocumentMasked: document.MaskCPF(sender.Document),
+		ISPB: domain.OurISPB, BankName: domain.OurBankName,
+	})
+	received, err := s.event(ctx, "pix.transfer.received", in.ID.String(), transferPayload(in))
+	if err != nil {
+		return err
+	}
+	return s.store.CompleteInternal(ctx, *t, in, sent, received)
 }
 
 // RecoverOnce resumes transfers left unfinished by crashes or outages.

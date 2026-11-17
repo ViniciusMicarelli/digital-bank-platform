@@ -4,6 +4,9 @@ package grpcapi
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -134,6 +137,49 @@ func (s *Server) SimulateIncoming(ctx context.Context, req *pixv1.SimulateIncomi
 		return nil, toStatus(err)
 	}
 	return &pixv1.SimulateIncomingResponse{Transfer: transferPB(t)}, nil
+}
+
+func (s *Server) ListTransfers(ctx context.Context, req *pixv1.ListTransfersRequest) (*pixv1.ListTransfersResponse, error) {
+	account, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	dir := map[pixv1.TransferDirection]domain.Direction{
+		pixv1.TransferDirection_TRANSFER_DIRECTION_OUTGOING: domain.Outgoing,
+		pixv1.TransferDirection_TRANSFER_DIRECTION_INCOMING: domain.Incoming,
+	}[req.GetDirection()]
+	size := int(req.GetPageSize())
+	if size <= 0 {
+		size = 20
+	}
+	size = min(size, 100)
+	var (
+		beforeAt time.Time
+		beforeID uuid.UUID
+	)
+	if tok := req.GetPageToken(); tok != "" {
+		at, id, ok := strings.Cut(tok, "_")
+		ns, err1 := strconv.ParseInt(at, 10, 64)
+		parsed, err2 := uuid.Parse(id)
+		if !ok || err1 != nil || err2 != nil {
+			return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", "invalid page_token")
+		}
+		beforeAt, beforeID = time.Unix(0, ns), parsed
+	}
+	list, err := s.app.Transfers(ctx, account, dir, beforeAt, beforeID, size+1)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	resp := &pixv1.ListTransfersResponse{}
+	if len(list) > size {
+		list = list[:size]
+		last := list[size-1]
+		resp.NextPageToken = fmt.Sprintf("%d_%s", last.CreatedAt.UnixNano(), last.ID)
+	}
+	for _, t := range list {
+		resp.Transfers = append(resp.Transfers, transferPB(t))
+	}
+	return resp, nil
 }
 
 func optionalMoney(m *commonv1.Money) (*money.Money, error) {
