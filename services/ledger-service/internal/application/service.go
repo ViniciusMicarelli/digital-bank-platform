@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/outbox"
@@ -289,6 +291,43 @@ func (s *Service) Postings(ctx context.Context, accountID uuid.UUID, before int6
 		return nil, err
 	}
 	return s.store.Postings(ctx, accountID, before, limit)
+}
+
+var invariantViolations = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "ledger_invariant_violations", Help: "Violations found by the last reconciliation, per invariant (should be 0).",
+}, []string{"invariant"})
+
+// Reconcile re-checks the ledger invariants (sum zero, balances match
+// postings and holds, floors respected, entries balanced) and exports the
+// result. Anything but zero pages someone.
+func (s *Service) Reconcile(ctx context.Context) (map[string]int64, error) {
+	res, err := s.store.CheckInvariants(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for name, n := range res {
+		invariantViolations.WithLabelValues(name).Set(float64(n))
+		if n > 0 {
+			s.log.ErrorContext(ctx, "ledger invariant violated", "invariant", name, "violations", n)
+		}
+	}
+	return res, nil
+}
+
+// RunReconciliation calls Reconcile every interval.
+func (s *Service) RunReconciliation(ctx context.Context, interval time.Duration) {
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		if _, err := s.Reconcile(ctx); err != nil && ctx.Err() == nil {
+			s.log.WarnContext(ctx, "reconciliation", "error", err)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
 }
 
 func (s *Service) publish(ctx context.Context, tx ports.Tx, eventType, key string, payload any) error {

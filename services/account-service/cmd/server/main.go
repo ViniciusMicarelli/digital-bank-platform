@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 	_ "time/tzdata" // limits use America/Sao_Paulo; the scratch image has no zoneinfo
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
@@ -13,8 +14,8 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kms"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
-	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/secretbox"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/adapters/grpcapi"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/adapters/ledger"
@@ -50,10 +51,10 @@ func main() {
 	}
 	defer ledgerConn.Close()
 
-	// Key-encryption key for CPFs at rest (ADR-0015). Production: from a KMS.
-	kek, err := secretbox.DecodeKey(config.String("ACCOUNT_KEK", ""))
+	// Data key for CPFs at rest (ADR-0015), unwrapped by kms-service.
+	kek, err := kms.MasterKey(ctx, log, pool, "account-service/documents", "ACCOUNT_KEK")
 	if err != nil {
-		log.Error("ACCOUNT_KEK", "error", err)
+		log.Error("data key", "error", err)
 		os.Exit(1)
 	}
 	store, err := pgstore.NewStore(pool, kek)
@@ -61,15 +62,13 @@ func main() {
 		log.Error("store", "error", err)
 		os.Exit(1)
 	}
-	if n, err := store.EncryptLegacyDocuments(ctx); err != nil {
-		log.Error("encrypt legacy documents", "error", err)
-		os.Exit(1)
-	} else if n > 0 {
-		log.Info("encrypted legacy documents", "count", n)
-	}
-
 	app := application.New(store, ledger.New(ledgerv1.NewLedgerServiceClient(ledgerConn)), nil)
 	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
+
+	// Delete published outbox rows, old inbox rows, expired data.
+	go postgres.RunRetention(ctx, pool, log, []postgres.RetentionRule{
+		postgres.OutboxRetention(7 * 24 * time.Hour),
+	}, time.Hour)
 
 	srvOpts, err := grpcserver.OptionsFromEnv()
 	if err != nil {

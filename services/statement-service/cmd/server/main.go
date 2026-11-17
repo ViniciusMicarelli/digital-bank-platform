@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
@@ -41,19 +42,19 @@ func main() {
 
 	p := projection.New(pool)
 	if brokers := kafka.Brokers(config.String("KAFKA_BROKERS", "")); len(brokers) > 0 {
-		go func() {
-			err := kafka.Consume(ctx, kafka.ConsumerConfig{
-				Brokers: brokers,
-				Group:   config.String("CONSUMER_GROUP", "statement-service"),
-				Topics:  []string{"bank.account.events", "bank.transaction.events"},
-			}, log, p.Handle)
-			if err != nil {
-				log.Error("consumer", "error", err)
-			}
-		}()
+		defer kafka.Start(ctx, kafka.ConsumerConfig{
+			Brokers: brokers,
+			Group:   config.String("CONSUMER_GROUP", "statement-service"),
+			Topics:  []string{"bank.account.events", "bank.transaction.events"},
+		}, log, p.Handle)()
 	} else {
 		log.Warn("KAFKA_BROKERS not set: the feed will not be updated")
 	}
+
+	// Delete published outbox rows, old inbox rows, expired data.
+	go postgres.RunRetention(ctx, pool, log, []postgres.RetentionRule{
+		postgres.InboxRetention(30 * 24 * time.Hour),
+	}, time.Hour)
 
 	srvOpts, err := grpcserver.OptionsFromEnv()
 	if err != nil {

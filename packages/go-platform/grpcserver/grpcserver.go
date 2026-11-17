@@ -12,11 +12,13 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/resolver/dns"
 	"google.golang.org/grpc/status"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -98,6 +100,13 @@ func Serve(ctx context.Context, log *slog.Logger, srv *grpc.Server, addr string)
 	return nil
 }
 
+func init() {
+	// Containers get a new IP when they restart. The default 30 s minimum
+	// between DNS re-resolutions would keep callers dialing the old address
+	// that long; 1 s makes a restarted service reachable almost at once.
+	dns.SetMinResolutionInterval(time.Second)
+}
+
 // Dial creates a client connection to another service, with mutual TLS when
 // TLS_CERT is set (the server name is the target's host).
 func Dial(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
@@ -110,13 +119,33 @@ func Dial(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	}
 	opts = append([]grpc.DialOption{
 		grpc.WithTransportCredentials(creds),
+		// Ride out restarts of the target (rolling deploys): wait for the
+		// connection instead of failing fast, reconnect quickly, and bound
+		// every call that has no deadline of its own.
+		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
+		grpc.WithConnectParams(grpc.ConnectParams{
+			Backoff:           backoff.Config{BaseDelay: 100 * time.Millisecond, Multiplier: 1.6, Jitter: 0.2, MaxDelay: 3 * time.Second},
+			MinConnectTimeout: 5 * time.Second,
+		}),
 		// No service config via DNS TXT records: the lookup times out on
 		// Docker's resolver and delayed every first call by ~8 s.
 		grpc.WithDisableServiceConfig(),
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		grpc.WithChainUnaryInterceptor(correlation.ClientInterceptor()),
+		grpc.WithChainUnaryInterceptor(defaultTimeout(10*time.Second), correlation.ClientInterceptor()),
 	}, opts...)
 	return grpc.NewClient(target, opts...)
+}
+
+// defaultTimeout bounds calls whose context has no deadline.
+func defaultTimeout(d time.Duration) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		if _, ok := ctx.Deadline(); !ok {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, d)
+			defer cancel()
+		}
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
 }
 
 func recoverUnary(log *slog.Logger) grpc.UnaryServerInterceptor {

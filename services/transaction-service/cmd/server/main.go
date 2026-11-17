@@ -73,6 +73,11 @@ func main() {
 
 	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
 
+	// Delete published outbox rows, old inbox rows, expired data.
+	go postgres.RunRetention(ctx, pool, log, []postgres.RetentionRule{
+		postgres.OutboxRetention(7 * 24 * time.Hour),
+	}, time.Hour)
+
 	srvOpts, err := grpcserver.OptionsFromEnv()
 	if err != nil {
 		log.Error("tls", "error", err)

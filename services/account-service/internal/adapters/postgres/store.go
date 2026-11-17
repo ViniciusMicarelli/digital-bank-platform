@@ -57,17 +57,16 @@ type querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-const accountCols = `id, idempotency_key, customer_id, holder_name, document, document_enc, branch, number,
+const accountCols = `id, idempotency_key, customer_id, holder_name, document_enc, branch, number,
 	currency, status, status_reason, opened_at, closed_at`
 
 func (c crypt) scanAccount(row pgx.Row) (domain.Account, error) {
 	var (
 		a                domain.Account
 		currency, status string
-		plain            *string
 		enc              []byte
 	)
-	err := row.Scan(&a.ID, &a.IdempotencyKey, &a.CustomerID, &a.HolderName, &plain, &enc, &a.Branch,
+	err := row.Scan(&a.ID, &a.IdempotencyKey, &a.CustomerID, &a.HolderName, &enc, &a.Branch,
 		&a.Number, &currency, &status, &a.StatusReason, &a.OpenedAt, &a.ClosedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Account{}, fmt.Errorf("%w: account", domain.ErrNotFound)
@@ -76,16 +75,11 @@ func (c crypt) scanAccount(row pgx.Row) (domain.Account, error) {
 		return domain.Account{}, err
 	}
 	a.Currency, a.Status = money.Currency(currency), domain.Status(status)
-	switch {
-	case enc != nil:
-		doc, err := c.box.Open(enc, documentAAD(a.ID))
-		if err != nil {
-			return domain.Account{}, fmt.Errorf("decrypt document of %s: %w", a.ID, err)
-		}
-		a.Document = string(doc)
-	case plain != nil: // legacy row not yet encrypted
-		a.Document = *plain
+	doc, err := c.box.Open(enc, documentAAD(a.ID))
+	if err != nil {
+		return domain.Account{}, fmt.Errorf("decrypt document of %s: %w", a.ID, err)
 	}
+	a.Document = string(doc)
 	return a, nil
 }
 
@@ -99,51 +93,6 @@ func (s *Store) AccountsByCustomer(ctx context.Context, customerID string) ([]do
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (domain.Account, error) { return s.scanAccount(r) })
-}
-
-// EncryptLegacyDocuments encrypts CPFs stored before migration 0002 and
-// clears the plaintext, in batches. Safe to run on every replica at once.
-func (s *Store) EncryptLegacyDocuments(ctx context.Context) (int, error) {
-	total := 0
-	for {
-		n := 0
-		err := pg.InTx(ctx, s.pool, func(tx pgx.Tx) error {
-			n = 0
-			rows, err := tx.Query(ctx, `SELECT id, document FROM accounts
-				WHERE document IS NOT NULL LIMIT 500 FOR UPDATE SKIP LOCKED`)
-			if err != nil {
-				return err
-			}
-			type legacy struct {
-				id  uuid.UUID
-				doc string
-			}
-			var batch []legacy
-			for rows.Next() {
-				var l legacy
-				if err := rows.Scan(&l.id, &l.doc); err != nil {
-					return err
-				}
-				batch = append(batch, l)
-			}
-			if err := rows.Err(); err != nil {
-				return err
-			}
-			for _, l := range batch {
-				enc, index := s.seal(l.id, l.doc)
-				if _, err := tx.Exec(ctx, `UPDATE accounts SET document_enc = $2, document_index = $3, document = NULL WHERE id = $1`,
-					l.id, enc, index); err != nil {
-					return err
-				}
-			}
-			n = len(batch)
-			return nil
-		})
-		if err != nil || n == 0 {
-			return total, err
-		}
-		total += n
-	}
 }
 
 func (s *Store) Limits(ctx context.Context, id uuid.UUID) (domain.Limits, error) {

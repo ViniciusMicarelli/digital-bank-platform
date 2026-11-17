@@ -48,6 +48,30 @@ services:
       timeout: 3s
       retries: 20
 
+  kms-service:
+    build: { context: ., args: { SERVICE: kms-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./infrastructure/certs:/certs:ro
+    environment:
+      TLS_CA: /certs/ca.pem
+      TLS_CERT: /certs/kms-service.pem
+      TLS_KEY: /certs/kms-service-key.pem
+      ALLOWED_CALLERS: identity-service,account-service,card-service,dev-client
+      KMS_OPERATORS: dev-client
+      DATABASE_URL: postgres://bank:bank@postgres:5432/kms?sslmode=disable
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      GRPC_ADDR: ":9008"
+      # Development root key. Production: an HSM that never exports it.
+      KMS_ROOT_KEY: nPl/UsZeBvOdBpqezdYwmNBqqvWttMcawFsXJ3boInM=
+    ports: ["9008:9008"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
   ledger-service:
     build: { context: ., args: { SERVICE: ledger-service } }
     healthcheck:
@@ -81,11 +105,10 @@ services:
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
+      KMS_ADDR: kms-service:9008
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/account-service.pem
       TLS_KEY: /certs/account-service-key.pem
-      # Development key-encryption key for CPFs. Production reads it from a KMS.
-      ACCOUNT_KEK: 8vw7TApbgElf6gJ33aCaHpoEXgwCXx1jwX/pW83osDo=
       ALLOWED_CALLERS: api-gateway,transaction-service,pix-service,card-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/account?sslmode=disable
       KAFKA_BROKERS: kafka:9092
@@ -94,6 +117,7 @@ services:
       LEDGER_ADDR: ledger-service:9001
     ports: ["9002:9002"]
     depends_on:
+      kms-service: { condition: service_healthy }
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
       ledger-service: { condition: service_healthy }
@@ -185,6 +209,7 @@ services:
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
+      KMS_ADDR: kms-service:9008
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/identity-service.pem
       TLS_KEY: /certs/identity-service-key.pem
@@ -193,10 +218,9 @@ services:
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
       GRPC_ADDR: ":9006"
-      # Development key-encryption key. Production reads it from a KMS.
-      IDENTITY_KEK: 2Vn1NRQQasSBGXSwvKtdiUW0raXtu5vzeBrtLQ6uhd8=
     ports: ["9006:9006"]
     depends_on:
+      kms-service: { condition: service_healthy }
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
 
@@ -210,6 +234,7 @@ services:
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
+      KMS_ADDR: kms-service:9008
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/card-service.pem
       TLS_KEY: /certs/card-service-key.pem
@@ -220,10 +245,9 @@ services:
       GRPC_ADDR: ":9007"
       ACCOUNT_ADDR: account-service:9002
       TRANSACTION_ADDR: transaction-service:9003
-      # Development vault key. Production keeps it in an HSM / KMS.
-      CARD_VAULT_KEK: arnm02dJX/XmjAE3DduObXTOQQ4+MUTZ5ToF+G3vFK8=
     ports: ["9007:9007"]
     depends_on:
+      kms-service: { condition: service_healthy }
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
       account-service: { condition: service_healthy }

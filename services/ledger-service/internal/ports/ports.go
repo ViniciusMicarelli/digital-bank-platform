@@ -27,6 +27,14 @@ type Store interface {
 	// Postings lists an account's postings, newest first, before the cursor
 	// (posting id; 0 means from the newest).
 	Postings(ctx context.Context, accountID uuid.UUID, before int64, limit int) ([]AccountPosting, error)
+	// CheckInvariants counts violations of each invariant in Invariants.
+	CheckInvariants(ctx context.Context) (map[string]int64, error)
+}
+
+// Invariant checks run by the reconciliation job; each counts violations.
+var Invariants = []string{
+	"global_sum_is_zero", "posted_matches_postings", "pending_matches_holds",
+	"customer_above_floor", "entries_balanced",
 }
 
 // AccountPosting is a posting seen from one account's perspective.

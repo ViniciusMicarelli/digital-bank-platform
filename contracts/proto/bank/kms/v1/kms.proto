@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package bank.kms.v1;
+
+// KmsService does envelope encryption. Services never hold master keys: they
+// keep a data key wrapped by the KMS and ask it to unwrap the key at startup.
+// A caller may only use keys under its own mTLS identity ("<service>/<name>").
+service KmsService {
+  // Creates a random 32-byte data key; returns it in clear and wrapped.
+  rpc GenerateDataKey(GenerateDataKeyRequest) returns (GenerateDataKeyResponse);
+  // Wraps an existing key (to import keys created before the KMS).
+  rpc Encrypt(EncryptRequest) returns (EncryptResponse);
+  rpc Decrypt(DecryptRequest) returns (DecryptResponse);
+  // Re-wraps under the current master key version (after a rotation).
+  rpc ReEncrypt(ReEncryptRequest) returns (ReEncryptResponse);
+  // Starts a new master key version. Operator only.
+  rpc RotateKey(RotateKeyRequest) returns (RotateKeyResponse);
+}
+
+message GenerateDataKeyRequest {
+  string key_name = 1;
+}
+
+message GenerateDataKeyResponse {
+  bytes plaintext = 1;
+  bytes wrapped = 2;
+  int32 key_version = 3;
+}
+
+message EncryptRequest {
+  string key_name = 1;
+  bytes plaintext = 2;
+}
+
+message EncryptResponse {
+  bytes wrapped = 1;
+  int32 key_version = 2;
+}
+
+message DecryptRequest {
+  string key_name = 1;
+  bytes wrapped = 2;
+}
+
+message DecryptResponse {
+  bytes plaintext = 1;
+}
+
+message ReEncryptRequest {
+  string key_name = 1;
+  bytes wrapped = 2;
+}
+
+message ReEncryptResponse {
+  bytes wrapped = 1;
+  int32 key_version = 2;
+  // False when it was already under the current version.
+  bool changed = 3;
+}
+
+message RotateKeyRequest {
+  string key_name = 1;
+}
+
+message RotateKeyResponse {
+  int32 key_version = 1;
+}

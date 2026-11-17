@@ -390,3 +390,27 @@ func TestRandomOperationsKeepInvariants(t *testing.T) {
 		}
 	}
 }
+
+func TestReconciliationDetectsCorruption(t *testing.T) {
+	svc, pool := newService(t)
+	ctx := context.Background()
+	a := customer(t, svc, 0)
+	fund(t, svc, a, "10")
+	res, err := svc.Reconcile(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, n := range res {
+		if n != 0 {
+			t.Fatalf("clean ledger reports %s = %d", name, n)
+		}
+	}
+	// Someone edits a balance by hand (the snapshot is the only mutable table).
+	if _, err := pool.Exec(ctx, `UPDATE balances SET posted = posted + 1 WHERE account_id = $1`, a); err != nil {
+		t.Fatal(err)
+	}
+	res, _ = svc.Reconcile(ctx)
+	if res["posted_matches_postings"] != 1 {
+		t.Fatalf("corruption not detected: %v", res)
+	}
+}

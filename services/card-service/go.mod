@@ -3,7 +3,7 @@ module github.com/ViniciusMicarelli/digital-bank-platform/services/card-service
 go 1.26.0
 
 require (
-	github.com/ViniciusMicarelli/digital-bank-platform/contracts v0.0.0-00010101000000-000000000000
+	github.com/ViniciusMicarelli/digital-bank-platform/contracts v0.0.0
 	github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common v0.0.0
 	github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform v0.0.0-00010101000000-000000000000
 	github.com/google/uuid v1.6.0

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	ledgerv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/ledger/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
@@ -41,6 +42,10 @@ func main() {
 
 	app := application.New(pgstore.NewStore(pool), log)
 	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
+	go app.RunReconciliation(ctx, config.Duration("RECONCILE_INTERVAL", 5*time.Minute))
+	go postgres.RunRetention(ctx, pool, log, []postgres.RetentionRule{
+		postgres.OutboxRetention(config.Duration("OUTBOX_RETENTION", 7*24*time.Hour)),
+	}, time.Hour)
 
 	srvOpts, err := grpcserver.OptionsFromEnv()
 	if err != nil {

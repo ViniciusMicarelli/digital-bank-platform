@@ -16,8 +16,8 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kms"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
-	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/secretbox"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/card-service/internal/adapters/clients"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/card-service/internal/adapters/grpcapi"
@@ -59,11 +59,11 @@ func main() {
 	}
 	defer txConn.Close()
 
-	// Vault master key: PAN encryption, PAN index and the CVV key derive from
-	// it. Production keeps it in an HSM / KMS.
-	master, err := secretbox.DecodeKey(config.String("CARD_VAULT_KEK", ""))
+	// Vault master key (PAN encryption, PAN index and CVV keys derive from
+	// it), unwrapped by kms-service.
+	master, err := kms.MasterKey(ctx, log, pool, "card-service/vault", "CARD_VAULT_KEK")
 	if err != nil {
-		log.Error("CARD_VAULT_KEK", "error", err)
+		log.Error("data key", "error", err)
 		os.Exit(1)
 	}
 	keys, err := application.NewKeys(master)
@@ -80,16 +80,17 @@ func main() {
 	brokers := kafka.Brokers(config.String("KAFKA_BROKERS", ""))
 	go kafka.RunOutboxRelay(ctx, pool, log, brokers)
 	if len(brokers) > 0 {
-		go func() {
-			err := kafka.Consume(ctx, kafka.ConsumerConfig{
-				Brokers: brokers, Group: "card-service", Topics: []string{"bank.account.events"},
-			}, log, store.HandleAccountEvent)
-			if err != nil {
-				log.Error("account events consumer", "error", err)
-			}
-		}()
+		defer kafka.Start(ctx, kafka.ConsumerConfig{
+			Brokers: brokers, Group: "card-service", Topics: []string{"bank.account.events"},
+		}, log, store.HandleAccountEvent)()
 	}
 	go app.RunRecovery(ctx, config.Duration("RECOVERY_INTERVAL", 5*time.Second), config.Duration("RECOVERY_STALE_AFTER", 10*time.Second))
+
+	// Delete published outbox rows, old inbox rows, expired data.
+	go postgres.RunRetention(ctx, pool, log, []postgres.RetentionRule{
+		postgres.OutboxRetention(7 * 24 * time.Hour),
+		postgres.InboxRetention(30 * 24 * time.Hour),
+	}, time.Hour)
 
 	srvOpts, err := grpcserver.OptionsFromEnv()
 	if err != nil {

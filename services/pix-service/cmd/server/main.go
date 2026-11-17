@@ -67,16 +67,17 @@ func main() {
 	brokers := kafka.Brokers(config.String("KAFKA_BROKERS", ""))
 	go kafka.RunOutboxRelay(ctx, pool, log, brokers)
 	if len(brokers) > 0 {
-		go func() {
-			err := kafka.Consume(ctx, kafka.ConsumerConfig{
-				Brokers: brokers, Group: "pix-service", Topics: []string{"bank.account.events"},
-			}, log, store.HandleAccountEvent)
-			if err != nil {
-				log.Error("account events consumer", "error", err)
-			}
-		}()
+		defer kafka.Start(ctx, kafka.ConsumerConfig{
+			Brokers: brokers, Group: "pix-service", Topics: []string{"bank.account.events"},
+		}, log, store.HandleAccountEvent)()
 	}
 	go app.RunRecovery(ctx, config.Duration("RECOVERY_INTERVAL", 5*time.Second), config.Duration("RECOVERY_STALE_AFTER", 10*time.Second))
+
+	// Delete published outbox rows, old inbox rows, expired data.
+	go postgres.RunRetention(ctx, pool, log, []postgres.RetentionRule{
+		postgres.OutboxRetention(7 * 24 * time.Hour),
+		postgres.InboxRetention(30 * 24 * time.Hour),
+	}, time.Hour)
 
 	srvOpts, err := grpcserver.OptionsFromEnv()
 	if err != nil {

@@ -18,6 +18,12 @@ groups:
         annotations:
           summary: "Ledger write p99 above 200 ms"
 
+      - alert: LedgerInvariantViolated
+        expr: max by (invariant) (ledger_invariant_violations) > 0
+        labels: { severity: page }
+        annotations:
+          summary: "Ledger reconciliation found violations of {{ $labels.invariant }}"
+
       - alert: OutboxRelayFailing
         expr: increase(outbox_publish_errors_total[5m]) > 0
         for: 5m

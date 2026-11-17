@@ -17,9 +17,11 @@ import (
 
 func main() {
 	out := flag.String("out", "infrastructure/certs", "output directory")
-	names := flag.String("names", "api-gateway,identity-service,account-service,ledger-service,transaction-service,pix-service,statement-service,card-service,dev-client",
+	names := flag.String("names", "api-gateway,identity-service,account-service,ledger-service,transaction-service,pix-service,statement-service,card-service,kms-service,dev-client",
 		"comma-separated workload identities")
 	force := flag.Bool("force", false, "create a new CA and reissue every certificate")
+	reissue := flag.Bool("reissue", false, "keep the CA, reissue every workload certificate (rotation; services reload them)")
+	validity := flag.Duration("validity", 90*24*time.Hour, "workload certificate lifetime")
 	flag.Parse()
 
 	if err := os.MkdirAll(*out, 0o755); err != nil {
@@ -45,17 +47,19 @@ func main() {
 		certPath := filepath.Join(*out, n+".pem")
 		// With an existing CA, keep existing certificates: running services
 		// keep working and only new workloads get one.
-		if _, err := os.Stat(certPath); err == nil && reused {
+		if _, err := os.Stat(certPath); err == nil && reused && !*reissue {
 			continue
 		}
-		cert, key, err := ca.Issue(n, 90*24*time.Hour)
+		cert, key, err := ca.Issue(n, *validity)
 		if err != nil {
 			fail(err)
 		}
-		write(certPath, cert)
+		// Key first, then certificate: a service that reloads in between sees
+		// a mismatched pair, fails to load it and keeps its previous one.
 		// World-readable on purpose: containers run as an unprivileged user
 		// and mount these files. Never do this with real keys.
 		write(filepath.Join(*out, n+"-key.pem"), key)
+		write(certPath, cert)
 		issued++
 	}
 	if reused {

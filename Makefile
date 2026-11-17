@@ -7,13 +7,16 @@ BUF_VERSION          := v1.75.0
 PROTOC_GEN_GO        := v1.36.12
 PROTOC_GEN_GO_GRPC   := v1.6.2
 
-.PHONY: help certs up up-obs demo down test test-unit e2e cover lint fmt tidy generate tools run-%
+.PHONY: help certs rotate-certs up up-obs demo down test test-unit e2e cover lint fmt tidy generate tools run-%
 
 help: ## List available targets
 	@grep -E '^[a-z%-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
 
 certs: ## Generate the development CA and mTLS certificates (infrastructure/certs)
 	go run ./packages/go-platform/cmd/devcerts -out infrastructure/certs
+
+rotate-certs: ## Reissue every workload certificate (running services reload them, no restart)
+	go run ./packages/go-platform/cmd/devcerts -out infrastructure/certs -reissue
 
 infrastructure/certs/ca.pem:
 	$(MAKE) certs

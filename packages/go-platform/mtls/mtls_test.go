@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/mtls"
@@ -92,5 +93,46 @@ func TestMutualTLSAndAuthorization(t *testing.T) {
 	rogueCreds, _ := rogue.ClientCredentials(addr)
 	if err := call(t, addr, rogueCreds, "list"); err == nil {
 		t.Fatal("certificate from another CA accepted")
+	}
+}
+
+func TestCertificateRotationWithoutRestart(t *testing.T) {
+	mtls.ReloadInterval = 0 // check the files on every handshake
+	t.Cleanup(func() { mtls.ReloadInterval = 5 * time.Second })
+	dir := t.TempDir()
+	ca, _ := mtls.NewAuthority(time.Hour)
+	ledger := workload(t, ca, dir, "ledger-service")
+	account := workload(t, ca, dir, "account-service")
+
+	serverCreds, _ := ledger.ServerCredentials()
+	srv := grpc.NewServer(grpc.Creds(serverCreds))
+	healthpb.RegisterHealthServer(srv, health.NewServer())
+	lis, _ := net.Listen("tcp", "127.0.0.1:0")
+	go func() { _ = srv.Serve(lis) }()
+	t.Cleanup(srv.Stop)
+	addr := lis.Addr().String()
+
+	serial := func() string {
+		creds, _ := account.ClientCredentials(addr)
+		conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(creds))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		var p peer.Peer
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		if _, err := healthpb.NewHealthClient(conn).Check(ctx, &healthpb.HealthCheckRequest{}, grpc.Peer(&p)); err != nil {
+			t.Fatal(err)
+		}
+		return p.AuthInfo.(credentials.TLSInfo).State.PeerCertificates[0].SerialNumber.String()
+	}
+	before := serial()
+
+	// Reissue the server's certificate in place (what `make rotate-certs` does).
+	time.Sleep(10 * time.Millisecond) // a distinct modification time
+	workload(t, ca, dir, "ledger-service")
+	if after := serial(); after == before {
+		t.Fatal("the server kept presenting the old certificate")
 	}
 }

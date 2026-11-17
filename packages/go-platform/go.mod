@@ -2,6 +2,10 @@ module github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform
 
 go 1.26.0
 
+require github.com/ViniciusMicarelli/digital-bank-platform/contracts v0.0.0
+
+replace github.com/ViniciusMicarelli/digital-bank-platform/contracts => ../../contracts
+
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.13.0

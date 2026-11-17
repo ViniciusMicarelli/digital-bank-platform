@@ -12,6 +12,7 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kms"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/secretbox"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
@@ -29,14 +30,6 @@ func main() {
 	defer telemetry.SetupTracing(ctx, "identity-service", log)()
 	go telemetry.ServeMetrics(ctx, config.String("METRICS_ADDR", ":9106"), log)
 
-	// Key-encryption key for signing keys and TOTP seeds: 32 random bytes,
-	// base64. In production it comes from a KMS / secret manager.
-	box, err := secretbox.FromBase64(config.String("IDENTITY_KEK", ""))
-	if err != nil {
-		log.Error("IDENTITY_KEK", "error", err)
-		os.Exit(1)
-	}
-
 	pool, err := postgres.Connect(ctx, config.String("DATABASE_URL",
 		"postgres://bank:bank@localhost:54329/identity?sslmode=disable"))
 	if err != nil {
@@ -49,6 +42,17 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Data key for signing keys and TOTP seeds, unwrapped by kms-service.
+	key, err := kms.MasterKey(ctx, log, pool, "identity-service/secrets", "IDENTITY_KEK")
+	if err != nil {
+		log.Error("data key", "error", err)
+		os.Exit(1)
+	}
+	box, err := secretbox.New(key)
+	if err != nil {
+		log.Error("data key", "error", err)
+		os.Exit(1)
+	}
 	app := application.New(pgstore.NewStore(pool), box, log)
 	if err := app.EnsureSigningKey(ctx); err != nil {
 		log.Error("signing key", "error", err)
@@ -56,6 +60,12 @@ func main() {
 	}
 	go app.RunKeyRotation(ctx, config.Duration("SIGNING_KEY_MAX_AGE", 30*24*time.Hour))
 	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
+
+	// Delete published outbox rows, old inbox rows, expired data.
+	go postgres.RunRetention(ctx, pool, log, []postgres.RetentionRule{
+		postgres.OutboxRetention(7 * 24 * time.Hour),
+		{Name: "refresh_tokens", Table: "refresh_tokens", Where: "expires_at < $1", Keep: 24 * time.Hour},
+	}, time.Hour)
 
 	srvOpts, err := grpcserver.OptionsFromEnv()
 	if err != nil {

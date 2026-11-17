@@ -100,6 +100,34 @@ func (s *Store) Postings(ctx context.Context, accountID uuid.UUID, before int64,
 	})
 }
 
+var invariantSQL = map[string]string{
+	"global_sum_is_zero": `SELECT CASE WHEN COALESCE(SUM(amount), 0) = 0 THEN 0 ELSE 1 END FROM postings`,
+	"posted_matches_postings": `SELECT count(*) FROM balances b
+		WHERE b.posted <> (SELECT COALESCE(SUM(amount), 0) FROM postings p WHERE p.account_id = b.account_id)`,
+	"pending_matches_holds": `SELECT count(*) FROM balances b
+		WHERE b.pending <> (SELECT COALESCE(SUM(amount), 0) FROM holds h WHERE h.account_id = b.account_id AND h.status = 'ACTIVE')`,
+	"customer_above_floor": `SELECT count(*) FROM balances b JOIN ledger_accounts a ON a.id = b.account_id
+		WHERE a.kind = 'CUSTOMER' AND b.posted - b.pending < -a.overdraft_limit`,
+	"entries_balanced": `SELECT count(*) FROM (SELECT entry_id FROM postings GROUP BY entry_id HAVING SUM(amount) <> 0) x`,
+}
+
+// CheckInvariants runs every check in one repeatable-read snapshot, so
+// concurrent postings cannot produce false positives.
+func (s *Store) CheckInvariants(ctx context.Context) (map[string]int64, error) {
+	out := map[string]int64{}
+	err := pgx.BeginTxFunc(ctx, s.pool, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly}, func(tx pgx.Tx) error {
+		for _, name := range ports.Invariants {
+			var n int64
+			if err := tx.QueryRow(ctx, invariantSQL[name]).Scan(&n); err != nil {
+				return fmt.Errorf("%s: %w", name, err)
+			}
+			out[name] = n
+		}
+		return nil
+	})
+	return out, err
+}
+
 // loadEntry reads an entry and its postings. where filters journal_entries e.
 func loadEntry(ctx context.Context, q querier, where string, args ...any) (domain.Entry, error) {
 	var (

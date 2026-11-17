@@ -86,6 +86,8 @@ func Consume(ctx context.Context, cfg ConsumerConfig, log *slog.Logger, handle H
 		kgo.ConsumeTopics(cfg.Topics...),
 		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
 		kgo.DisableAutoCommit(),
+		// A crashed member is replaced after 10 s instead of the default 45 s.
+		kgo.SessionTimeout(10*time.Second),
 		kgo.AllowAutoTopicCreation(),
 		kgo.RequiredAcks(kgo.AllISRAcks()),
 	)
@@ -155,6 +157,27 @@ func deadLetter(ctx context.Context, client *kgo.Client, rec *kgo.Record, cause 
 		return errors.Join(cause, err)
 	}
 	return nil
+}
+
+// Start runs Consume in the background and returns a function that waits
+// (up to 5 s) for it to stop. Call it on shutdown, after cancelling ctx, so
+// the consumer leaves its group cleanly and partitions move to the other
+// members at once instead of after a session timeout.
+func Start(ctx context.Context, cfg ConsumerConfig, log *slog.Logger, handle Handler) (wait func()) {
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		if err := Consume(ctx, cfg, log, handle); err != nil {
+			log.Error("kafka consumer", "group", cfg.Group, "error", err)
+		}
+	}()
+	return func() {
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			log.Warn("kafka consumer did not stop in time", "group", cfg.Group)
+		}
+	}
 }
 
 // RunOutboxRelay publishes the service's outbox to Kafka until ctx ends. With

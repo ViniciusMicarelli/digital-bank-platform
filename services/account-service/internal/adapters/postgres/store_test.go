@@ -3,10 +3,13 @@ package postgres_test
 import (
 	"bytes"
 	"context"
+	"io/fs"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/pgtest"
+	pg "github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
 	pgstore "github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/adapters/postgres"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/domain"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/ports"
@@ -64,30 +67,29 @@ func TestDocumentIsEncryptedAtRest(t *testing.T) {
 	}
 }
 
-func TestLegacyRowsAreEncrypted(t *testing.T) {
-	pool := pgtest.NewDB(t, migrations.FS, ".")
-	store, _ := pgstore.NewStore(pool, bytes.Repeat([]byte{3}, 32))
+// The contract migration must refuse to drop the plaintext column while a
+// row would lose its only copy of the CPF.
+func TestContractMigrationIsGuarded(t *testing.T) {
+	upTo0002 := fstest.MapFS{}
+	for _, name := range []string{"0001_init.up.sql", "0002_encrypt_document.up.sql"} {
+		data, err := fs.ReadFile(migrations.FS, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upTo0002[name] = &fstest.MapFile{Data: data}
+	}
+	pool := pgtest.NewDB(t, upTo0002, ".")
 	ctx := context.Background()
-	// A row written before migration 0002: plaintext document, no ciphertext.
-	_, err := pool.Exec(ctx, `INSERT INTO accounts (id, idempotency_key, customer_id, holder_name, document, branch, number, currency, status)
-		VALUES (gen_random_uuid(), 'legacy', 'cust', 'Ana Souza', $1, '0001', '00000001-0', 'BRL', 'ACTIVE')`, cpf)
-	if err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO accounts (id, idempotency_key, customer_id, holder_name, document, branch, number, currency, status)
+		VALUES (gen_random_uuid(), 'legacy', 'cust', 'Ana Souza', $1, '0001', '00000001-0', 'BRL', 'ACTIVE')`, cpf); err != nil {
 		t.Fatal(err)
 	}
-	if n, err := store.EncryptLegacyDocuments(ctx); err != nil || n != 1 {
-		t.Fatalf("backfill = %d, %v", n, err)
+	if err := pg.Migrate(ctx, pool, migrations.FS, "."); err == nil {
+		t.Fatal("0003 dropped a column holding the only copy of a CPF")
 	}
-	if n, _ := store.EncryptLegacyDocuments(ctx); n != 0 {
-		t.Fatal("backfill must be idempotent")
-	}
-	var plain *string
-	var id string
-	_ = pool.QueryRow(ctx, `SELECT id::text, document FROM accounts WHERE idempotency_key = 'legacy'`).Scan(&id, &plain)
-	if plain != nil {
-		t.Fatal("plaintext not cleared")
-	}
-	list, err := store.AccountsByCustomer(ctx, "cust")
-	if err != nil || len(list) != 1 || list[0].Document != cpf {
-		t.Fatalf("read after backfill = %+v, %v", list, err)
+	var exists bool
+	_ = pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'accounts' AND column_name = 'document')`).Scan(&exists)
+	if !exists {
+		t.Fatal("the failed migration must leave the column in place")
 	}
 }

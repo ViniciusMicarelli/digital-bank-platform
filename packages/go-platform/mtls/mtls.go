@@ -21,6 +21,8 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -49,40 +51,82 @@ func FromEnv() Config {
 
 func (c Config) Enabled() bool { return c.CertFile != "" }
 
-func (c Config) load() (tls.Certificate, *x509.CertPool, error) {
-	cert, err := tls.LoadX509KeyPair(c.CertFile, c.KeyFile)
+// ReloadInterval bounds how often the certificate files are checked for
+// changes, so rotated certificates are picked up without a restart.
+var ReloadInterval = 5 * time.Second
+
+// keyPair serves the certificate in CertFile/KeyFile, reloading it when the
+// files change on disk (certificate rotation without restarts).
+type keyPair struct {
+	cfg       Config
+	mu        sync.Mutex
+	cert      *tls.Certificate
+	modTime   time.Time
+	checkedAt time.Time
+}
+
+func (k *keyPair) get() (*tls.Certificate, error) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.cert != nil && time.Since(k.checkedAt) < ReloadInterval {
+		return k.cert, nil
+	}
+	k.checkedAt = time.Now()
+	info, err := os.Stat(k.cfg.CertFile)
 	if err != nil {
-		return tls.Certificate{}, nil, fmt.Errorf("mtls: load key pair: %w", err)
+		if k.cert != nil {
+			return k.cert, nil // keep serving the last good certificate
+		}
+		return nil, err
+	}
+	if k.cert != nil && !info.ModTime().After(k.modTime) {
+		return k.cert, nil
+	}
+	cert, err := tls.LoadX509KeyPair(k.cfg.CertFile, k.cfg.KeyFile)
+	if err != nil {
+		if k.cert != nil {
+			return k.cert, nil // half-written files: retry on the next check
+		}
+		return nil, fmt.Errorf("mtls: load key pair: %w", err)
+	}
+	k.cert, k.modTime = &cert, info.ModTime()
+	return k.cert, nil
+}
+
+func (c Config) load() (*keyPair, *x509.CertPool, error) {
+	kp := &keyPair{cfg: c}
+	if _, err := kp.get(); err != nil {
+		return nil, nil, err
 	}
 	caPEM, err := os.ReadFile(c.CAFile)
 	if err != nil {
-		return tls.Certificate{}, nil, fmt.Errorf("mtls: read CA: %w", err)
+		return nil, nil, fmt.Errorf("mtls: read CA: %w", err)
 	}
 	pool := x509.NewCertPool()
 	if !pool.AppendCertsFromPEM(caPEM) {
-		return tls.Certificate{}, nil, errors.New("mtls: no CA certificate found")
+		return nil, nil, errors.New("mtls: no CA certificate found")
 	}
-	return cert, pool, nil
+	return kp, pool, nil
 }
 
 // ServerCredentials require a client certificate signed by the CA.
 func (c Config) ServerCredentials() (credentials.TransportCredentials, error) {
-	cert, pool, err := c.load()
+	kp, pool, err := c.load()
 	if err != nil {
 		return nil, err
 	}
 	return credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{cert},
-		ClientCAs:    pool,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		MinVersion:   tls.VersionTLS13,
+		GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) { return kp.get() },
+		ClientCAs:      pool,
+		ClientAuth:     tls.RequireAndVerifyClientCert,
+		MinVersion:     tls.VersionTLS13,
 	}), nil
 }
 
 // ClientCredentials present our certificate and verify the server against
 // the CA and the target host name.
 func (c Config) ClientCredentials(target string) (credentials.TransportCredentials, error) {
-	cert, pool, err := c.load()
+	kp, pool, err := c.load()
 	if err != nil {
 		return nil, err
 	}
@@ -91,10 +135,10 @@ func (c Config) ClientCredentials(target string) (credentials.TransportCredentia
 		host = h
 	}
 	return credentials.NewTLS(&tls.Config{
-		Certificates: []tls.Certificate{cert},
-		RootCAs:      pool,
-		ServerName:   host,
-		MinVersion:   tls.VersionTLS13,
+		GetClientCertificate: func(*tls.CertificateRequestInfo) (*tls.Certificate, error) { return kp.get() },
+		RootCAs:              pool,
+		ServerName:           host,
+		MinVersion:           tls.VersionTLS13,
 	}), nil
 }
 
