@@ -22,6 +22,9 @@ flowchart LR
     GW -->|gRPC| PIX[pix-service]
     GW -->|gRPC| STM[statement-service]
     GW -->|gRPC| CRD[card-service]
+    GW -->|gRPC| CRE[credit-service]
+    CRD -->|gRPC: credit purchases| CRE
+    CRE -->|gRPC| TRX
     CRD -->|gRPC| TRX
     CRD -->|gRPC| ACC
     PIX -->|gRPC| TRX
@@ -45,7 +48,8 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 | [account-service](docs/services/account-service.md) | Account lifecycle, CPF validation, per-transaction/daily/nightly limits |
 | [transaction-service](docs/services/transaction-service.md) | Orchestrated sagas: transfers, two-phase Pix out, Pix in, recovery worker |
 | [pix-service](docs/services/pix-service.md) | Pix keys, lookup, same-bank and cross-bank Pix, incoming Pix, BR Code QR codes, refunds |
-| [card-service](docs/services/card-service.md) | Debit cards: vault with encrypted PANs, derived CVVs, real-time authorization, clearing, reversal |
+| [card-service](docs/services/card-service.md) | Debit and credit cards: vault with encrypted PANs, derived CVVs, wallet tokens, real-time authorization, clearing, reversal |
+| [credit-service](docs/services/credit-service.md) | Credit lines, holds for credit purchases, monthly invoices, payments, fines and interest |
 | [statement-service](docs/services/statement-service.md) | CQRS read side: customer feed projected from Kafka |
 | [identity-service](docs/services/identity-service.md) | Sign-up, login with argon2id + TOTP MFA, Ed25519 tokens via JWKS, rotating refresh tokens |
 | [api-gateway](docs/services/api-gateway.md) | Public REST API: token verification, ownership checks, idempotency keys, rate limits |

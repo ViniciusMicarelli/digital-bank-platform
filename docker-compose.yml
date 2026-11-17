@@ -109,7 +109,7 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/account-service.pem
       TLS_KEY: /certs/account-service-key.pem
-      ALLOWED_CALLERS: api-gateway,transaction-service,pix-service,card-service,dev-client
+      ALLOWED_CALLERS: api-gateway,transaction-service,pix-service,card-service,credit-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/account?sslmode=disable
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -135,7 +135,7 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/transaction-service.pem
       TLS_KEY: /certs/transaction-service-key.pem
-      ALLOWED_CALLERS: api-gateway,pix-service,card-service,dev-client
+      ALLOWED_CALLERS: api-gateway,pix-service,card-service,credit-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/transaction?sslmode=disable
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -249,9 +249,39 @@ services:
       GRPC_ADDR: ":9007"
       ACCOUNT_ADDR: account-service:9002
       TRANSACTION_ADDR: transaction-service:9003
+      CREDIT_ADDR: credit-service:9009
     ports: ["9007:9007"]
     depends_on:
       kms-service: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      account-service: { condition: service_healthy }
+      transaction-service: { condition: service_healthy }
+      credit-service: { condition: service_healthy }
+
+  credit-service:
+    build: { context: ., args: { SERVICE: credit-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./infrastructure/certs:/certs:ro
+    environment:
+      TLS_CA: /certs/ca.pem
+      TLS_CERT: /certs/credit-service.pem
+      TLS_KEY: /certs/credit-service-key.pem
+      ALLOWED_CALLERS: api-gateway,card-service,dev-client
+      DATABASE_URL: postgres://bank:bank@postgres:5432/credit?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      GRPC_ADDR: ":9009"
+      ACCOUNT_ADDR: account-service:9002
+      TRANSACTION_ADDR: transaction-service:9003
+      CYCLE_INTERVAL: 5s
+    ports: ["9009:9009"]
+    depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
       account-service: { condition: service_healthy }
@@ -281,6 +311,7 @@ services:
       PIX_ADDR: pix-service:9004
       STATEMENT_ADDR: statement-service:9005
       CARD_ADDR: card-service:9007
+      CREDIT_ADDR: credit-service:9009
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     ports: ["8000:8080"]
     depends_on:
@@ -291,6 +322,7 @@ services:
       pix-service: { condition: service_healthy }
       statement-service: { condition: service_healthy }
       card-service: { condition: service_healthy }
+      credit-service: { condition: service_healthy }
 
   jaeger:
     image: jaegertracing/jaeger:2.11.0

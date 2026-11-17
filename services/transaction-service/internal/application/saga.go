@@ -48,6 +48,16 @@ func (s *Service) Transfer(ctx context.Context, key string, from, to uuid.UUID, 
 	return s.start(ctx, key, domain.TypeInternalTransfer, from, to, amount, description, metadata)
 }
 
+// Post moves money in one step for the credit card types.
+func (s *Service) Post(ctx context.Context, key string, typ domain.Type, from, to uuid.UUID, amount money.Money, description string, metadata map[string]string) (domain.Transaction, error) {
+	switch typ {
+	case domain.TypeInternalTransfer, domain.TypeCreditPurchase, domain.TypeCreditInvoicePayment, domain.TypeCreditCharges:
+	default:
+		return domain.Transaction{}, fmt.Errorf("%w: %s is not a one-step type", domain.ErrInvalidArgument, typ)
+	}
+	return s.start(ctx, key, typ, from, to, amount, description, metadata)
+}
+
 // ReserveOutgoing consumes the limit and holds the funds; the transaction
 // stays RESERVED until Complete or Compensate.
 func (s *Service) ReserveOutgoing(ctx context.Context, key string, typ domain.Type, from, to uuid.UUID, amount money.Money, description string, metadata map[string]string) (domain.Transaction, error) {
@@ -203,6 +213,12 @@ func (s *Service) forward(ctx context.Context, t *domain.Transaction) error {
 	if t.CreditsCustomer() && !t.LimitConsumed && t.HoldID == uuid.Nil && t.EntryID == uuid.Nil {
 		if err := s.accounts.EnsureActive(ctx, t.To); err != nil {
 			return s.stepFailed(ctx, t, "check_destination", err)
+		}
+	}
+
+	if t.DebitsCustomerWithoutLimit() && t.EntryID == uuid.Nil {
+		if err := s.accounts.EnsureActive(ctx, t.From); err != nil {
+			return s.stepFailed(ctx, t, "check_source", err)
 		}
 	}
 

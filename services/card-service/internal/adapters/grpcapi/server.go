@@ -72,7 +72,10 @@ func authPB(a domain.Authorization) *cardv1.Authorization {
 		Amount:        &commonv1.Money{MinorUnits: a.Purchase.Amount.Minor(), Currency: string(a.Purchase.Amount.Currency())},
 		ClearedAmount: &commonv1.Money{MinorUnits: a.Cleared, Currency: string(a.Purchase.Amount.Currency())},
 		MerchantName:  a.Purchase.MerchantName, Mcc: a.Purchase.MCC, Country: a.Purchase.Country,
-		CreatedAt: timestamppb.New(a.CreatedAt),
+		CreatedAt: timestamppb.New(a.CreatedAt), Function: cardv1.Function_FUNCTION_DEBIT,
+	}
+	if a.Purchase.Function == domain.Credit {
+		out.Function = cardv1.Function_FUNCTION_CREDIT
 	}
 	if a.CardID != uuid.Nil {
 		out.CardId = a.CardID.String()
@@ -235,6 +238,7 @@ func (s *Server) Authorize(ctx context.Context, req *cardv1.AuthorizeRequest) (*
 		NetworkReference: req.GetNetworkReference(), ExpiryMonth: int(req.GetExpiryMonth()), ExpiryYear: int(req.GetExpiryYear()),
 		CVV: req.GetCvv(), Amount: amount, MerchantName: req.GetMerchantName(), MCC: req.GetMcc(),
 		Country: req.GetCountry(), Channel: channels[req.GetChannel()],
+		Function: map[cardv1.Function]domain.Function{cardv1.Function_FUNCTION_CREDIT: domain.Credit}[req.GetFunction()],
 	})
 	if err != nil {
 		return nil, toStatus(err)

@@ -24,6 +24,10 @@ var (
 	BankFundingAccountID   = uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	PixSettlementAccountID = uuid.MustParse("00000000-0000-0000-0000-000000000002")
 	CardClearingAccountID  = uuid.MustParse("00000000-0000-0000-0000-000000000003")
+	// CreditReceivablesAccountID goes negative by what customers owe on
+	// credit card invoices; CreditRevenueAccountID collects fines and interest.
+	CreditReceivablesAccountID = uuid.MustParse("00000000-0000-0000-0000-000000000004")
+	CreditRevenueAccountID     = uuid.MustParse("00000000-0000-0000-0000-000000000005")
 )
 
 // Account is a bucket of value in the ledger.

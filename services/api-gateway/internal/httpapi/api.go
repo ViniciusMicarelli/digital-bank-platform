@@ -17,6 +17,7 @@ import (
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	cardv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/card/v1"
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
+	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
@@ -36,6 +37,7 @@ type Clients struct {
 	Pix       pixv1.PixServiceClient
 	Statement statementv1.StatementServiceClient
 	Cards     cardv1.CardServiceClient
+	Credit    creditv1.CreditServiceClient
 }
 
 type Options struct {
@@ -87,7 +89,13 @@ func (a *API) Handler() http.Handler {
 		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations", a.authenticated(a.networkAuthorize))
 		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations/{authID}/clear", a.authenticated(a.networkClear))
 		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations/{authID}/reverse", a.authenticated(a.networkReverse))
+		mux.HandleFunc("POST /v1/sandbox/accounts/{id}/credit/cycle", a.authenticated(a.owned(a.advanceCreditCycle)))
 	}
+	mux.HandleFunc("POST /v1/accounts/{id}/credit", a.authenticated(a.owned(a.openCreditLine)))
+	mux.HandleFunc("GET /v1/accounts/{id}/credit", a.authenticated(a.owned(a.getCreditLine)))
+	mux.HandleFunc("GET /v1/accounts/{id}/credit/invoices", a.authenticated(a.owned(a.listInvoices)))
+	mux.HandleFunc("GET /v1/accounts/{id}/credit/invoices/{invoiceID}", a.authenticated(a.owned(a.ownedInvoice(a.getInvoice))))
+	mux.HandleFunc("POST /v1/accounts/{id}/credit/invoices/{invoiceID}/payments", a.authenticated(a.owned(a.ownedInvoice(a.payInvoice))))
 	mux.HandleFunc("POST /v1/accounts/{id}/cards", a.authenticated(a.owned(a.issueCard)))
 	mux.HandleFunc("GET /v1/accounts/{id}/cards", a.authenticated(a.owned(a.listCards)))
 	mux.HandleFunc("POST /v1/accounts/{id}/cards/{cardID}/block", a.authenticated(a.owned(a.ownedCard(a.blockCard))))

@@ -31,6 +31,12 @@ enum TransactionType {
   TRANSACTION_TYPE_PIX_OUT = 2;
   TRANSACTION_TYPE_PIX_IN = 3;
   TRANSACTION_TYPE_DEBIT_CARD_PURCHASE = 4;
+  // Credit card clearing: credit-receivables -> card clearing.
+  TRANSACTION_TYPE_CREDIT_CARD_PURCHASE = 5;
+  // Invoice payment: customer account -> credit-receivables.
+  TRANSACTION_TYPE_CREDIT_INVOICE_PAYMENT = 6;
+  // Fines and interest: credit-receivables -> credit-revenue.
+  TRANSACTION_TYPE_CREDIT_CHARGES = 7;
 }
 
 enum TransactionStatus {
@@ -66,6 +72,8 @@ message CreateTransferRequest {
   bank.common.v1.Money amount = 4;
   string description = 5;
   map<string, string> metadata = 6;
+  // One-step types: INTERNAL_TRANSFER (default) or a CREDIT_* type.
+  TransactionType type = 7;
 }
 
 message CreateTransferResponse {

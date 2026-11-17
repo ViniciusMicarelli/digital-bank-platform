@@ -76,6 +76,16 @@ call POST /v1/sandbox/card-network/authorizations "$ANA" "$(jq -nc --arg pan "$(
 call POST "/v1/sandbox/card-network/authorizations/$(echo "$AUTH" | jq -r .id)/clear" "$ANA" '{"amount":"40.00"}' | jq -c '{status, cleared_amount}'
 call POST /v1/sandbox/card-network/authorizations "$ANA" "$(echo "$DETAILS" | jq -c '{pan, expiry_month, expiry_year, cvv, amount: "10.00", merchant_name: "NYC STORE", mcc: "5311", country: "US", channel: "ONLINE"}')" | jq -c '{international_purchase: .status, response_code, reason}'
 
+step "Ana opens a credit line and buys a TV on credit; the invoice closes and she pays part of it"
+call POST "/v1/accounts/$ANA_ACC/credit" "$ANA" '{"closing_day":10}' "$(uuid)" | jq -c '{limit: .limit.amount, available: .available.amount, closing_day}'
+CREDIT_AUTH=$(call POST /v1/sandbox/card-network/authorizations "$ANA" "$(echo "$DETAILS" | jq -c '{pan, expiry_month, expiry_year, cvv, amount: "300.00", merchant_name: "LOJA DE TV", mcc: "5732", country: "BR", channel: "ONLINE", function: "CREDIT"}')")
+echo "$CREDIT_AUTH" | jq -c '{credit_purchase: .status, function, response_code}'
+call POST "/v1/sandbox/card-network/authorizations/$(echo "$CREDIT_AUTH" | jq -r .id)/clear" "$ANA" '{}' >/dev/null
+call POST "/v1/sandbox/accounts/$ANA_ACC/credit/cycle" "$ANA" '{"action":"CLOSE"}'
+INVOICE_ID=$(call GET "/v1/accounts/$ANA_ACC/credit/invoices" "$ANA" | jq -r '.invoices[1].id')
+call POST "/v1/accounts/$ANA_ACC/credit/invoices/$INVOICE_ID/payments" "$ANA" '{"amount":"100.00"}' "$(uuid)" | jq -c '{payment: .status, amount: .amount.amount}'
+call GET "/v1/accounts/$ANA_ACC/credit/invoices/$INVOICE_ID" "$ANA" | jq -c '{status, total: .total.amount, paid: .paid.amount, remaining: .remaining.amount, due_date}'
+
 step "A Pix the receiving bank rejects: the money comes back"
 call POST "/v1/accounts/$ANA_ACC/pix/transfers" "$ANA" '{"key":"recusa@outrobanco.com.br","amount":"10.00"}' "$(uuid)" | jq -c .
 

@@ -60,6 +60,7 @@ Envelope encryption: identity-service (signing keys, TOTP seeds), account-servic
 | Saga recovery | transaction-service | 5 s | Resumes stuck sagas; compensates reservations past their timeout (Pix 15 min, cards 7 days) |
 | Pix recovery | pix-service | 5 s | Resumes transfers stuck mid-flow |
 | Orphan reservations | card-service | 5 s | Releases reservations of authorizations answered `91` |
+| Invoice cycle | credit-service | 30 s | Closes invoices, moves unpaid ones to the next with charges, posts charges, expires holds, settles stuck payments |
 | Ledger reconciliation | ledger-service | 5 min | Re-checks every invariant; `ledger_invariant_violations` must stay 0 |
 | Retention | every service | 1 h | Deletes published outbox rows (7 d), processed inbox rows (30 d), expired refresh tokens |
 | Key rotation | identity-service | daily check | Rotates the JWT signing key after 30 days |

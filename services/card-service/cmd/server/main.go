@@ -12,6 +12,7 @@ import (
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	cardv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/card/v1"
+	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
@@ -58,6 +59,12 @@ func main() {
 		os.Exit(1)
 	}
 	defer txConn.Close()
+	creditConn, err := grpcserver.Dial(config.String("CREDIT_ADDR", "127.0.0.1:9009"))
+	if err != nil {
+		log.Error("dial credit", "error", err)
+		os.Exit(1)
+	}
+	defer creditConn.Close()
 
 	// Vault master key (PAN encryption, PAN index and CVV keys derive from
 	// it), unwrapped by kms-service.
@@ -75,6 +82,7 @@ func main() {
 	app := application.New(store,
 		clients.NewAccounts(accountv1.NewAccountServiceClient(accountConn)),
 		clients.NewTransactions(txv1.NewTransactionServiceClient(txConn)),
+		clients.NewCredit(creditv1.NewCreditServiceClient(creditConn)),
 		keys, log)
 
 	brokers := kafka.Brokers(config.String("KAFKA_BROKERS", ""))

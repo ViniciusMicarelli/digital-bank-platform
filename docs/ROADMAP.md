@@ -124,7 +124,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Step-up authentication: revealing card data requires a fresh password (+ TOTP when enabled) confirmation, proven by a short-lived step-up token.
 - Tokenization: device tokens (a different card number per wallet) mapped to the card in the vault, suspendable on their own; authorizations by token resolve to the card.
 
-## Phase 15 — Credit
+## Phase 15 — Credit ✅
 
 - credit-service: credit limits, credit-function authorizations against the limit, monthly invoices (closing and due dates), invoice payment from the checking account, late interest.
 - card-service: the card gains a credit function; the network chooses debit or credit.

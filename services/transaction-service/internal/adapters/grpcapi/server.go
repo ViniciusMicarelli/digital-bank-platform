@@ -26,10 +26,13 @@ type Server struct {
 func NewServer(app *application.Service) *Server { return &Server{app: app} }
 
 var types = map[txv1.TransactionType]domain.Type{
-	txv1.TransactionType_TRANSACTION_TYPE_INTERNAL_TRANSFER:   domain.TypeInternalTransfer,
-	txv1.TransactionType_TRANSACTION_TYPE_PIX_OUT:             domain.TypePixOut,
-	txv1.TransactionType_TRANSACTION_TYPE_PIX_IN:              domain.TypePixIn,
-	txv1.TransactionType_TRANSACTION_TYPE_DEBIT_CARD_PURCHASE: domain.TypeDebitCard,
+	txv1.TransactionType_TRANSACTION_TYPE_INTERNAL_TRANSFER:      domain.TypeInternalTransfer,
+	txv1.TransactionType_TRANSACTION_TYPE_PIX_OUT:                domain.TypePixOut,
+	txv1.TransactionType_TRANSACTION_TYPE_PIX_IN:                 domain.TypePixIn,
+	txv1.TransactionType_TRANSACTION_TYPE_DEBIT_CARD_PURCHASE:    domain.TypeDebitCard,
+	txv1.TransactionType_TRANSACTION_TYPE_CREDIT_CARD_PURCHASE:   domain.TypeCreditPurchase,
+	txv1.TransactionType_TRANSACTION_TYPE_CREDIT_INVOICE_PAYMENT: domain.TypeCreditInvoicePayment,
+	txv1.TransactionType_TRANSACTION_TYPE_CREDIT_CHARGES:         domain.TypeCreditCharges,
 }
 
 func (s *Server) CreateTransfer(ctx context.Context, req *txv1.CreateTransferRequest) (*txv1.CreateTransferResponse, error) {
@@ -37,7 +40,11 @@ func (s *Server) CreateTransfer(ctx context.Context, req *txv1.CreateTransferReq
 	if err != nil {
 		return nil, err
 	}
-	t, err := s.app.Transfer(ctx, req.GetIdempotencyKey(), from, to, amount, req.GetDescription(), req.GetMetadata())
+	typ := domain.TypeInternalTransfer
+	if req.GetType() != txv1.TransactionType_TRANSACTION_TYPE_UNSPECIFIED {
+		typ = types[req.GetType()]
+	}
+	t, err := s.app.Post(ctx, req.GetIdempotencyKey(), typ, from, to, amount, req.GetDescription(), req.GetMetadata())
 	return respond(t, err, func(p *txv1.Transaction) *txv1.CreateTransferResponse {
 		return &txv1.CreateTransferResponse{Transaction: p}
 	})

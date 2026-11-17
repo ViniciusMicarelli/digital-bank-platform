@@ -10,6 +10,7 @@ import (
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
+	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/card-service/internal/domain"
@@ -72,6 +73,44 @@ func (c *Transactions) Complete(ctx context.Context, id uuid.UUID, amount *money
 	}
 	resp, err := c.c.CompleteTransaction(ctx, req)
 	return result(resp.GetTransaction(), err)
+}
+
+// Credit reserves credit purchases on the credit line (credit-service),
+// with the transaction-service reserve / complete / compensate contract.
+type Credit struct{ c creditv1.CreditServiceClient }
+
+func NewCredit(c creditv1.CreditServiceClient) *Credit { return &Credit{c: c} }
+
+func hold(h *creditv1.Hold, err error) (ports.TxResult, error) {
+	if err != nil {
+		return ports.TxResult{}, err
+	}
+	id, err := uuid.Parse(h.GetId())
+	if err != nil {
+		return ports.TxResult{}, err
+	}
+	st := map[string]string{"RESERVED": "RESERVED", "CAPTURED": "COMPLETED", "RELEASED": "FAILED", "FAILED": "FAILED"}[h.GetStatus()]
+	return ports.TxResult{ID: id, Status: st, FailureReason: h.GetFailureReason()}, nil
+}
+
+func (c *Credit) Reserve(ctx context.Context, key string, account uuid.UUID, amount money.Money, description string, md map[string]string) (ports.TxResult, error) {
+	resp, err := c.c.ReserveCredit(ctx, &creditv1.ReserveCreditRequest{IdempotencyKey: key, AccountId: account.String(),
+		Amount: moneyPB(amount), Description: description, Metadata: md})
+	return hold(resp.GetHold(), err)
+}
+
+func (c *Credit) Complete(ctx context.Context, id uuid.UUID, amount *money.Money) (ports.TxResult, error) {
+	req := &creditv1.CaptureCreditRequest{HoldId: id.String()}
+	if amount != nil {
+		req.Amount = moneyPB(*amount)
+	}
+	resp, err := c.c.CaptureCredit(ctx, req)
+	return hold(resp.GetHold(), err)
+}
+
+func (c *Credit) Compensate(ctx context.Context, id uuid.UUID, reason string) (ports.TxResult, error) {
+	resp, err := c.c.ReleaseCredit(ctx, &creditv1.ReleaseCreditRequest{HoldId: id.String(), Reason: reason})
+	return hold(resp.GetHold(), err)
 }
 
 func (c *Transactions) Compensate(ctx context.Context, id uuid.UUID, reason string) (ports.TxResult, error) {

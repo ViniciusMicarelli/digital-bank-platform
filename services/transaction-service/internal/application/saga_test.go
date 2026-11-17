@@ -204,6 +204,28 @@ func events(t *testing.T, pool *pgxpool.Pool, id uuid.UUID) []string {
 	return out
 }
 
+func TestCreditTypes(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	receivables, revenue := uuid.New(), uuid.New()
+	e.ledger.balances[receivables] = 1_000_00
+	// An invoice payment needs an active payer but does not use its limit.
+	tx, err := e.svc.Post(ctx, "pay", domain.TypeCreditInvoicePayment, e.alice, receivables, brl("200"), "invoice", nil)
+	if err != nil || tx.Status != domain.StatusCompleted || len(e.accounts.usage) != 0 {
+		t.Fatalf("invoice payment = %+v %v (limit usage %v)", tx, err, e.accounts.usage)
+	}
+	e.accounts.inactive[e.alice] = true
+	if tx, _ := e.svc.Post(ctx, "pay2", domain.TypeCreditInvoicePayment, e.alice, receivables, brl("1"), "", nil); tx.FailureReason != "DESTINATION_NOT_ACTIVE" {
+		t.Fatalf("payment from an inactive account = %+v", tx)
+	}
+	if tx, err := e.svc.Post(ctx, "fee", domain.TypeCreditCharges, receivables, revenue, brl("3"), "", nil); err != nil || tx.Status != domain.StatusCompleted {
+		t.Fatalf("charges = %+v %v", tx, err)
+	}
+	if _, err := e.svc.Post(ctx, "x", domain.TypePixOut, e.alice, e.bob, brl("1"), "", nil); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatal("two-phase types are not posted in one step")
+	}
+}
+
 func TestTransferCompletes(t *testing.T) {
 	e := setup(t)
 	tx, err := e.svc.Transfer(context.Background(), "k1", e.alice, e.bob, brl("100"), "rent", nil)

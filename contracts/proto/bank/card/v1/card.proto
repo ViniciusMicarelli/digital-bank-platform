@@ -138,6 +138,14 @@ enum Channel {
   CHANNEL_CONTACTLESS = 3;
 }
 
+// Which account the network charges: the checking account (debit) or the
+// credit line (credit, through credit-service).
+enum Function {
+  FUNCTION_UNSPECIFIED = 0;
+  FUNCTION_DEBIT = 1;
+  FUNCTION_CREDIT = 2;
+}
+
 enum AuthorizationStatus {
   AUTHORIZATION_STATUS_UNSPECIFIED = 0;
   AUTHORIZATION_STATUS_APPROVED = 1;
@@ -163,6 +171,7 @@ message Authorization {
   google.protobuf.Timestamp created_at = 13;
   // Set when the purchase was made with a token.
   string token_id = 14;
+  Function function = 15;
 }
 
 message AuthorizeRequest {
@@ -179,6 +188,8 @@ message AuthorizeRequest {
   // ISO 3166 alpha-2.
   string country = 9;
   Channel channel = 10;
+  // Debit by default.
+  Function function = 11;
 }
 
 message AuthorizeResponse {

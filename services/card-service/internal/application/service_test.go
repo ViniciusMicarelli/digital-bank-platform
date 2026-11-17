@@ -103,12 +103,13 @@ func (f *fakeTxs) Compensate(_ context.Context, id uuid.UUID, _ string) (ports.T
 }
 
 type env struct {
-	svc   *application.Service
-	store *pgstore.Store
-	pool  *pgxpool.Pool
-	txs   *fakeTxs
-	accs  *fakeAccounts
-	ctx   context.Context
+	svc    *application.Service
+	store  *pgstore.Store
+	pool   *pgxpool.Pool
+	txs    *fakeTxs
+	credit *fakeTxs // the credit line, with the same contract
+	accs   *fakeAccounts
+	ctx    context.Context
 }
 
 func setup(t *testing.T) env {
@@ -122,8 +123,9 @@ func setup(t *testing.T) env {
 	txs.balance[account] = 100_00
 	accs := &fakeAccounts{active: map[uuid.UUID]bool{account: true}}
 	store := pgstore.NewStore(pool)
-	svc := application.New(store, accs, txs, keys, slog.New(slog.NewTextHandler(io.Discard, nil)))
-	return env{svc: svc, store: store, pool: pool, txs: txs, accs: accs, ctx: context.Background()}
+	credit := newTxs()
+	svc := application.New(store, accs, txs, credit, keys, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	return env{svc: svc, store: store, pool: pool, txs: txs, credit: credit, accs: accs, ctx: context.Background()}
 }
 
 func (e env) issue(t *testing.T) (domain.Card, application.Details) {
@@ -298,5 +300,31 @@ func TestTokenPurchases(t *testing.T) {
 	_ = e.pool.QueryRow(e.ctx, `SELECT row_to_json(t)::text FROM card_tokens t WHERE id = $1`, tok.ID).Scan(&dump)
 	if strings.Contains(dump, tokenPAN) {
 		t.Fatal("token number stored in clear text")
+	}
+}
+
+func TestCreditFunction(t *testing.T) {
+	e := setup(t)
+	_, d := e.issue(t)
+	e.txs.balance[account] = 0 // no money in checking: credit must not touch it
+	p := purchase(d, "300")
+	p.Function = domain.Credit
+	e.credit.balance[account] = 500_00 // the available limit
+	a, err := e.svc.Authorize(e.ctx, d.PAN, p)
+	if err != nil || a.Status != domain.Approved || a.Purchase.Function != domain.Credit {
+		t.Fatalf("credit purchase = %+v %v", a, err)
+	}
+	if e.credit.balance[account] != 200_00 || e.txs.reserves != 0 {
+		t.Fatalf("limit left %d, debit reserves %d", e.credit.balance[account], e.txs.reserves)
+	}
+	if a, err = e.svc.Clear(e.ctx, a.ID, nil); err != nil || a.Status != domain.Cleared {
+		t.Fatalf("clear = %+v %v", a, err)
+	}
+	if st := e.credit.byKey[a.TransactionKey()].Status; st != "COMPLETED" {
+		t.Fatalf("credit hold after clearing = %s", st)
+	}
+	p.NetworkReference = uuid.NewString()
+	if a, _ := e.svc.Authorize(e.ctx, d.PAN, p); a.Code != domain.CodeInsufficientFunds {
+		t.Fatalf("over the credit limit = %+v", a)
 	}
 }

@@ -2,18 +2,48 @@
 
 ## Responsibility
 
-Credit card credit: limits, monthly **invoices**, installments and interest.
+Credit card credit: the **credit line** (limit), holds for card authorizations, monthly **invoices**, invoice payments from the checking account and the charges on unpaid balances.
 
 ## Capabilities
 
-- Credit line with total, used and available limit
-- Limit reservation for card authorizations (and release on cancellation)
-- Purchases in installments (`parcelado`): future installments are reserved against the limit
-- Monthly invoice cycle: open → closed → paid / overdue
-- Configurable due date
-- Partial payment and minimum payment, with revolving interest (rotativo)
-- Invoice payment from the checking account
-- Late fees and interest (calculated with `NUMERIC`, rounded to cents)
+| Capability | Status |
+|---|---|
+| One credit line per active account (default limit R$ 1.000,00, `CREDIT_DEFAULT_LIMIT_CENTS`), closing day 1–28, due 10 days after closing | ✅ |
+| Holds for card authorizations (`ReserveCredit` / `CaptureCredit` / `ReleaseCredit`), idempotent on the authorization key, same contract card-service uses for debit; refusals `INSUFFICIENT_LIMIT` (→ ISO `51`), `NO_CREDIT_LINE` (`57`), `CREDIT_LINE_BLOCKED` (`62`) | ✅ |
+| Partial capture: only the captured amount stays on the limit and goes into the open invoice | ✅ |
+| Holds never cleared expire after 7 days | ✅ |
+| Invoice cycle on São Paulo dates: OPEN → CLOSED (or PAID if nothing to pay) at the closing date, the next invoice opens | ✅ |
+| Payments of an open (in advance) or closed invoice, total or partial, from the checking account; payments in flight count against what is left, so concurrent payments can never overpay | ✅ |
+| Past the due date the unpaid balance moves to the next invoice with a 2% fine and a month of interest (8% a month by default); the overdue invoice is no longer payable | ✅ |
+| Sandbox: close the open invoice now / make the closed one overdue (`AdvanceCycle`) | ✅ |
+| Installments (`parcelado`), minimum payment, limit changes, blocking the line with the account | planned |
+
+## Money in the Ledger
+
+credit-service never holds money; it posts one-step movements through transaction-service between bank-internal ledger accounts:
+
+| When | Type | From → To |
+|---|---|---|
+| A credit purchase clears | `CREDIT_CARD_PURCHASE` | `credit-receivables` → `card-clearing` |
+| The customer pays an invoice | `CREDIT_INVOICE_PAYMENT` | customer account → `credit-receivables` |
+| Fine and interest are charged | `CREDIT_CHARGES` | `credit-receivables` → `credit-revenue` |
+
+So the balance of `credit-receivables` is always minus what customers owe (`used` of every line without the open holds). The application tests check this after every step of a full cycle.
+
+```mermaid
+sequenceDiagram
+    participant N as Card network
+    participant CRD as card-service
+    participant CRE as credit-service
+    participant TRX as transaction-service
+    N->>CRD: Authorize (function CREDIT)
+    CRD->>CRE: ReserveCredit(key card:<auth>)
+    CRE-->>CRD: RESERVED (or FAILED + reason)
+    N->>CRD: Clear
+    CRD->>CRE: CaptureCredit
+    CRE->>TRX: CREDIT_CARD_PURCHASE (idempotent)
+    CRE->>CRE: purchase → open invoice
+```
 
 ## Invoice Lifecycle
 
@@ -21,43 +51,47 @@ Credit card credit: limits, monthly **invoices**, installments and interest.
 stateDiagram-v2
     [*] --> OPEN
     OPEN --> CLOSED: closing date
-    CLOSED --> PAID: full payment
-    CLOSED --> PARTIALLY_PAID: partial payment
-    CLOSED --> OVERDUE: due date passed, unpaid
-    PARTIALLY_PAID --> OVERDUE
-    OVERDUE --> PAID
+    OPEN --> PAID: closing date, nothing left to pay
+    CLOSED --> PAID: paid in full
+    CLOSED --> OVERDUE: due date passed, unpaid (balance + fine + interest move to the next invoice)
     PAID --> [*]
+    OVERDUE --> [*]
 ```
+
+## Consistency
+
+- Every change runs in one database transaction with row locks taken line first, then invoice (no deadlocks).
+- Network calls happen outside transactions, with idempotency keys derived from ids (`credit-capture:<hold>`, `credit-payment:<payment>`, `credit-charges:<invoice>`), so a retry never moves money twice.
+- A payment is stored `PENDING` before the transfer; if the answer is lost, the worker settles it with the same key.
+- Overdue charges are recorded first (`charges_posted = false`) and posted to the ledger afterwards by the worker, until it succeeds.
 
 ## gRPC API
 
+Defined in [`contracts/proto/bank/credit/v1/credit.proto`](../../contracts/proto/bank/credit/v1/credit.proto). Callers: api-gateway, card-service.
+
 | Method | Description |
 |---|---|
-| `GetCreditLine` | Limits |
-| `ReserveLimit` / `ReleaseLimit` | Used by `card-service` during authorization |
-| `ListInvoices` / `GetInvoice` | Invoices and items |
+| `OpenCreditLine` / `GetCreditLine` | Open (idempotent) and read the line |
+| `ListInvoices` / `GetInvoice` | Invoices and their items |
 | `PayInvoice` | Pay from the checking account |
-| `SimulateInstallments` | Simulate an installment plan |
-| `ChangeDueDate` | Change the billing cycle |
+| `ReserveCredit` / `CaptureCredit` / `ReleaseCredit` | Used by card-service |
+| `AdvanceCycle` | Sandbox only |
 
 ## Events
 
-| Publishes | Consumes |
+| Publishes (`bank.credit.events`) | Consumes |
 |---|---|
-| `credit.limit.changed` | `card.authorization.approved` (add to invoice) |
-| `credit.invoice.closed` | `card.purchase.cleared` |
-| `credit.invoice.paid` | `account.closed` |
-| `credit.invoice.overdue` | |
+| `credit.line.opened`, `credit.purchase.captured`, `credit.invoice.closed`, `credit.invoice.overdue`, `credit.invoice.payment.completed`, `credit.invoice.payment.failed` | — |
 
 ## Background Jobs
 
-- **Invoice closer**: closes invoices on their closing date and opens the next cycle.
-- **Overdue checker**: flags overdue invoices and applies interest and fees.
+One worker (`CYCLE_INTERVAL`, 30 s by default): closes due invoices, makes unpaid ones overdue, posts pending charges, releases expired holds and settles stuck payments.
 
 ## Dependencies
 
-- `transaction-service` (invoice payment)
+- `account-service` (the account must be active to open a line)
+- `transaction-service` (all money movements)
 
 ## Data
 
-`credit_lines`, `invoices`, `invoice_items`, `installments`, `limit_reservations`, `outbox`, `inbox`.
+`credit_lines`, `invoices`, `invoice_items`, `holds`, `payments`, `outbox`, `inbox`.

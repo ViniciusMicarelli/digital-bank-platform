@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ledger-service, account-service, transaction-service, pix-service, statement-service, identity-service, card-service, kms-service, api-gateway]
+        service: [ledger-service, account-service, transaction-service, pix-service, statement-service, identity-service, card-service, credit-service, kms-service, api-gateway]
     steps:
       - uses: actions/checkout@v4
       - run: docker build --build-arg SERVICE=${{ matrix.service }} -t ${{ matrix.service }} .

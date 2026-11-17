@@ -213,7 +213,16 @@ type Purchase struct {
 	MCC              string
 	Country          string
 	Channel          Channel
+	Function         Function
 }
+
+// Function is what the purchase is charged to.
+type Function string
+
+const (
+	Debit  Function = "DEBIT"
+	Credit Function = "CREDIT"
+)
 
 // Validate checks the request is well formed.
 func (p Purchase) Validate() error {
@@ -226,6 +235,8 @@ func (p Purchase) Validate() error {
 		return fmt.Errorf("%w: merchant name, 4-digit MCC and 2-letter country are required", ErrInvalidArgument)
 	case p.Channel != Online && p.Channel != Chip && p.Channel != Contactless:
 		return fmt.Errorf("%w: unknown channel", ErrInvalidArgument)
+	case p.Function != Debit && p.Function != Credit:
+		return fmt.Errorf("%w: function must be DEBIT or CREDIT", ErrInvalidArgument)
 	}
 	return nil
 }
@@ -294,8 +305,12 @@ func DeclineCodeFor(reason string) string {
 		return CodeInsufficientFunds
 	case "LIMIT_EXCEEDED":
 		return CodeExceedsLimit
-	case "ACCOUNT_NOT_ACTIVE":
+	case "ACCOUNT_NOT_ACTIVE", "CREDIT_LINE_BLOCKED":
 		return CodeRestrictedCard
+	case "INSUFFICIENT_LIMIT":
+		return CodeInsufficientFunds
+	case "NO_CREDIT_LINE":
+		return CodeNotPermitted
 	}
 	return CodeDoNotHonor
 }

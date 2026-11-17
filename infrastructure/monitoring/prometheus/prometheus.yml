@@ -16,4 +16,5 @@ scrape_configs:
           - statement-service:9105
           - identity-service:9106
           - card-service:9107
+          - credit-service:9109
           - kms-service:9108

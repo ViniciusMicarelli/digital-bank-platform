@@ -57,13 +57,25 @@ type Service struct {
 	store    ports.Store
 	accounts ports.Accounts
 	txs      ports.Transactions
+	credit   ports.Transactions
 	keys     Keys
 	log      *slog.Logger
 	now      func() time.Time
 }
 
-func New(store ports.Store, accounts ports.Accounts, txs ports.Transactions, keys Keys, log *slog.Logger) *Service {
-	return &Service{store: store, accounts: accounts, txs: txs, keys: keys, log: log, now: time.Now}
+// New wires the service. txs reserves debit purchases on the checking
+// account; credit reserves credit purchases on the credit line, with the same
+// reserve / complete / compensate contract.
+func New(store ports.Store, accounts ports.Accounts, txs, credit ports.Transactions, keys Keys, log *slog.Logger) *Service {
+	return &Service{store: store, accounts: accounts, txs: txs, credit: credit, keys: keys, log: log, now: time.Now}
+}
+
+// funds is where the authorization's money is reserved.
+func (s *Service) funds(a domain.Authorization) ports.Transactions {
+	if a.Purchase.Function == domain.Credit {
+		return s.credit
+	}
+	return s.txs
 }
 
 // SetClock replaces the clock (tests).
@@ -190,6 +202,9 @@ func (s *Service) Reveal(ctx context.Context, id uuid.UUID) (Details, error) {
 func (s *Service) Authorize(ctx context.Context, pan string, p domain.Purchase) (domain.Authorization, error) {
 	start := time.Now()
 	defer func() { authLatency.Observe(time.Since(start).Seconds()) }()
+	if p.Function == "" {
+		p.Function = domain.Debit
+	}
 	if err := p.Validate(); err != nil {
 		return domain.Authorization{}, err
 	}
@@ -227,7 +242,7 @@ func (s *Service) Authorize(ctx context.Context, pan string, p domain.Purchase) 
 		return s.decide(ctx, a, domain.Declined, d.Code, d.Reason)
 	}
 
-	res, err := s.txs.Reserve(ctx, a.TransactionKey(), card.AccountID, p.Amount, p.MerchantName, s.metadata(a, card))
+	res, err := s.funds(a).Reserve(ctx, a.TransactionKey(), card.AccountID, p.Amount, p.MerchantName, s.metadata(a, card))
 	if err != nil {
 		s.log.WarnContext(ctx, "reservation failed, declining with 91", "authorization_id", a.ID, "error", err)
 		authResults.WithLabelValues(domain.CodeIssuerUnavailable).Inc()
@@ -344,7 +359,7 @@ func (s *Service) Clear(ctx context.Context, id uuid.UUID, amount *money.Money) 
 	if amount != nil && (amount.Currency() != money.BRL || !amount.IsPositive() || amount.Minor() > a.Purchase.Amount.Minor()) {
 		return domain.Authorization{}, fmt.Errorf("%w: cleared amount must be positive and at most %s", domain.ErrInvalidArgument, a.Purchase.Amount.Decimal())
 	}
-	if _, err := s.txs.Complete(ctx, a.TransactionID, amount); err != nil {
+	if _, err := s.funds(a).Complete(ctx, a.TransactionID, amount); err != nil {
 		return domain.Authorization{}, err
 	}
 	a.Status, a.Cleared = domain.Cleared, a.Purchase.Amount.Minor()
@@ -371,7 +386,7 @@ func (s *Service) Reverse(ctx context.Context, id uuid.UUID) (domain.Authorizati
 	default:
 		return domain.Authorization{}, fmt.Errorf("%w: cannot reverse a %s authorization", domain.ErrInvalidState, a.Status)
 	}
-	if _, err := s.txs.Compensate(ctx, a.TransactionID, "MERCHANT_REVERSAL"); err != nil {
+	if _, err := s.funds(a).Compensate(ctx, a.TransactionID, "MERCHANT_REVERSAL"); err != nil {
 		return domain.Authorization{}, err
 	}
 	a.Status = domain.Reversed
@@ -412,13 +427,14 @@ func (s *Service) reverseOrphan(ctx context.Context, id uuid.UUID) error {
 		if err != nil {
 			return err
 		}
-		res, err := s.txs.Reserve(ctx, a.TransactionKey(), card.AccountID, a.Purchase.Amount, a.Purchase.MerchantName, s.metadata(a, card))
+		funds := s.funds(a)
+		res, err := funds.Reserve(ctx, a.TransactionKey(), card.AccountID, a.Purchase.Amount, a.Purchase.MerchantName, s.metadata(a, card))
 		if err != nil {
 			return err
 		}
 		a.TransactionID = res.ID
 		if res.Status == "RESERVED" {
-			if _, err := s.txs.Compensate(ctx, res.ID, "ISSUER_TIMEOUT"); err != nil {
+			if _, err := funds.Compensate(ctx, res.ID, "ISSUER_TIMEOUT"); err != nil {
 				return err
 			}
 		}
@@ -459,6 +475,7 @@ func authPayload(a domain.Authorization) map[string]any {
 		"authorization_id": a.ID.String(), "card_id": a.CardID.String(), "status": string(a.Status),
 		"response_code": a.Code, "reason": a.Reason, "amount_minor": a.Purchase.Amount.Minor(),
 		"cleared_minor": a.Cleared, "merchant_name": a.Purchase.MerchantName, "mcc": a.Purchase.MCC,
-		"country": a.Purchase.Country, "channel": string(a.Purchase.Channel),
+		"country": a.Purchase.Country, "channel": string(a.Purchase.Channel), "function": string(a.Purchase.Function),
+		"account_id": a.AccountID.String(),
 	}
 }

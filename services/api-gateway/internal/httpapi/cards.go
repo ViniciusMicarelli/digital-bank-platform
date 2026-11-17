@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -188,6 +189,7 @@ func authorizationJSON(a *cardv1.Authorization) map[string]any {
 		"status": a.GetStatus().String()[len("AUTHORIZATION_STATUS_"):], "response_code": a.GetResponseCode(),
 		"reason": a.GetReason(), "amount": moneyJSON(a.GetAmount()), "cleared_amount": moneyJSON(a.GetClearedAmount()),
 		"merchant_name": a.GetMerchantName(), "card_id": a.GetCardId(), "token_id": a.GetTokenId(),
+		"function": strings.TrimPrefix(a.GetFunction().String(), "FUNCTION_"),
 	}
 }
 
@@ -203,6 +205,8 @@ func (a *API) networkAuthorize(w http.ResponseWriter, r *http.Request) {
 		MCC              string `json:"mcc"`
 		Country          string `json:"country"`
 		Channel          string `json:"channel"`
+		// DEBIT (default) or CREDIT.
+		Function string `json:"function"`
 	}
 	if !decode(w, r, &req) {
 		return
@@ -219,6 +223,7 @@ func (a *API) networkAuthorize(w http.ResponseWriter, r *http.Request) {
 	resp, err := a.c.Cards.Authorize(r.Context(), &cardv1.AuthorizeRequest{
 		NetworkReference: req.NetworkReference, Pan: req.PAN, ExpiryMonth: req.ExpiryMonth, ExpiryYear: req.ExpiryYear,
 		Cvv: req.CVV, Amount: amount, MerchantName: req.MerchantName, Mcc: req.MCC, Country: req.Country, Channel: channel,
+		Function: map[string]cardv1.Function{"CREDIT": cardv1.Function_FUNCTION_CREDIT}[req.Function],
 	})
 	if err != nil {
 		writeGRPCError(w, r.Context(), err)

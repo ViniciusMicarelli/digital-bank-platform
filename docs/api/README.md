@@ -22,7 +22,7 @@
 | 403 | Sensitive action without a fresh step-up token | `STEP_UP_REQUIRED` |
 | 404 | Not found, or not yours | `NOT_FOUND` |
 | 409 | Same key, different request; or still processing | `IDEMPOTENCY_CONFLICT`, `IN_PROGRESS` |
-| 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS`, `QR_CODE_UNAVAILABLE`, `REFUND_TOO_LARGE`, `NOT_REFUNDABLE`, `CHARGE_NOT_ALLOWED`, `MANDATE_NOT_ACTIVE` |
+| 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS`, `QR_CODE_UNAVAILABLE`, `REFUND_TOO_LARGE`, `NOT_REFUNDABLE`, `CHARGE_NOT_ALLOWED`, `MANDATE_NOT_ACTIVE`, `CREDIT_LINE_EXISTS`, `PAYMENT_TOO_LARGE`, `INVOICE_NOT_PAYABLE` |
 | 429 | Rate limited | `RATE_LIMITED` |
 | 503 | A dependency is down; retry with the same key | `RETRY_LATER` |
 
@@ -72,8 +72,14 @@
 | `POST` | `/v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}/suspend` | Suspend one device |
 | `POST` | `/v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}/resume` | 🔐 Resume it |
 | `DELETE` | `/v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}` | Delete it for good |
-| `POST` | `/v1/sandbox/card-network/authorizations` | *(sandbox)* Network authorization `{pan, expiry_month, expiry_year, cvv, amount, merchant_name, mcc, country, channel}` |
+| `POST` | `/v1/sandbox/card-network/authorizations` | *(sandbox)* Network authorization `{pan, expiry_month, expiry_year, cvv, amount, merchant_name, mcc, country, channel, function?}` (`function`: `DEBIT` default, or `CREDIT`) |
 | `POST` | `/v1/sandbox/card-network/authorizations/{id}/clear` · `/reverse` | *(sandbox)* Clearing `{amount?}` / merchant reversal |
+| `POST` | `/v1/accounts/{id}/credit` | Open the credit line `{closing_day?}` (Idempotency-Key) |
+| `GET` | `/v1/accounts/{id}/credit` | Limit, used, available |
+| `GET` | `/v1/accounts/{id}/credit/invoices` | Invoices, newest first |
+| `GET` | `/v1/accounts/{id}/credit/invoices/{invoiceID}` | Invoice with its items |
+| `POST` | `/v1/accounts/{id}/credit/invoices/{invoiceID}/payments` | Pay `{amount}` from the account (Idempotency-Key) |
+| `POST` | `/v1/sandbox/accounts/{id}/credit/cycle` | *(sandbox)* `{action: CLOSE \| EXPIRE}` close the invoice now / make it overdue |
 | `POST` | `/v1/sandbox/pix-in` | *(sandbox only)* Simulate an incoming Pix `{key, amount, payer_name}` |
 | `GET` | `/healthz`, `/metrics` | Health and Prometheus metrics |
 

@@ -18,6 +18,7 @@ import (
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	cardv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/card/v1"
+	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
@@ -69,6 +70,7 @@ func main() {
 	pix := dial("PIX_ADDR", "127.0.0.1:9004")
 	statement := dial("STATEMENT_ADDR", "127.0.0.1:9005")
 	cards := dial("CARD_ADDR", "127.0.0.1:9007")
+	credit := dial("CREDIT_ADDR", "127.0.0.1:9009")
 
 	identityClient := identityv1.NewIdentityServiceClient(identity)
 	verifier := auth.NewVerifier(func(ctx context.Context) ([]auth.JWK, error) {
@@ -90,6 +92,7 @@ func main() {
 		Pix:       pixv1.NewPixServiceClient(pix),
 		Statement: statementv1.NewStatementServiceClient(statement),
 		Cards:     cardv1.NewCardServiceClient(cards),
+		Credit:    creditv1.NewCreditServiceClient(credit),
 	}, verifier, log, limiters(log))
 
 	mux := http.NewServeMux()

@@ -1,0 +1,172 @@
+syntax = "proto3";
+
+package bank.credit.v1;
+
+import "bank/common/v1/money.proto";
+import "google/protobuf/timestamp.proto";
+
+// CreditService runs credit card lines: the limit, purchase holds made by
+// card-service, monthly invoices, payments from the checking account and the
+// charges on unpaid balances.
+service CreditService {
+  // Opens the credit line of an active account. Idempotent: one line per account.
+  rpc OpenCreditLine(OpenCreditLineRequest) returns (OpenCreditLineResponse);
+  rpc GetCreditLine(GetCreditLineRequest) returns (GetCreditLineResponse);
+  rpc ListInvoices(ListInvoicesRequest) returns (ListInvoicesResponse);
+  rpc GetInvoice(GetInvoiceRequest) returns (GetInvoiceResponse);
+  // Pays (part of) an open or closed invoice from the line's checking account.
+  rpc PayInvoice(PayInvoiceRequest) returns (PayInvoiceResponse);
+
+  // Card-facing: hold the limit for an authorization (idempotent on the key);
+  // a refusal is a FAILED hold with a failure_reason, not an error.
+  rpc ReserveCredit(ReserveCreditRequest) returns (ReserveCreditResponse);
+  // Clearing: the purchase goes into the open invoice.
+  rpc CaptureCredit(CaptureCreditRequest) returns (CaptureCreditResponse);
+  rpc ReleaseCredit(ReleaseCreditRequest) returns (ReleaseCreditResponse);
+
+  // Sandbox: close the open invoice now, or make the closed one overdue.
+  rpc AdvanceCycle(AdvanceCycleRequest) returns (AdvanceCycleResponse);
+}
+
+message CreditLine {
+  string id = 1;
+  string account_id = 2;
+  // ACTIVE, BLOCKED.
+  string status = 3;
+  bank.common.v1.Money limit = 4;
+  bank.common.v1.Money used = 5;
+  bank.common.v1.Money available = 6;
+  int32 closing_day = 7;
+  // Monthly interest on unpaid balances, in basis points (800 = 8% a month).
+  int32 interest_rate_bp = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+
+message Invoice {
+  string id = 1;
+  string line_id = 2;
+  // OPEN (receiving purchases), CLOSED (to be paid), PAID, OVERDUE (the
+  // unpaid balance moved to the next invoice with a fine and interest).
+  string status = 3;
+  // YYYY-MM-DD, São Paulo.
+  string closing_date = 4;
+  string due_date = 5;
+  bank.common.v1.Money total = 6;
+  bank.common.v1.Money paid = 7;
+  bank.common.v1.Money remaining = 8;
+}
+
+message InvoiceItem {
+  string id = 1;
+  // PURCHASE, PAYMENT, BALANCE_CARRIED, FINE, INTEREST.
+  string kind = 2;
+  bank.common.v1.Money amount = 3;
+  string description = 4;
+  google.protobuf.Timestamp occurred_at = 5;
+}
+
+message Hold {
+  string id = 1;
+  // RESERVED, CAPTURED, RELEASED, FAILED.
+  string status = 2;
+  // INSUFFICIENT_LIMIT, NO_CREDIT_LINE, CREDIT_LINE_BLOCKED.
+  string failure_reason = 3;
+  bank.common.v1.Money amount = 4;
+  bank.common.v1.Money captured = 5;
+}
+
+message Payment {
+  string id = 1;
+  string invoice_id = 2;
+  // PENDING, COMPLETED, FAILED.
+  string status = 3;
+  string failure_reason = 4;
+  bank.common.v1.Money amount = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message OpenCreditLineRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  // 1-28; the invoice is due 10 days after closing.
+  int32 closing_day = 3;
+}
+
+message OpenCreditLineResponse {
+  CreditLine line = 1;
+}
+
+message GetCreditLineRequest {
+  string account_id = 1;
+}
+
+message GetCreditLineResponse {
+  CreditLine line = 1;
+}
+
+message ListInvoicesRequest {
+  string account_id = 1;
+}
+
+message ListInvoicesResponse {
+  repeated Invoice invoices = 1;
+}
+
+message GetInvoiceRequest {
+  string id = 1;
+}
+
+message GetInvoiceResponse {
+  Invoice invoice = 1;
+  string account_id = 2;
+  repeated InvoiceItem items = 3;
+}
+
+message PayInvoiceRequest {
+  string idempotency_key = 1;
+  string invoice_id = 2;
+  bank.common.v1.Money amount = 3;
+}
+
+message PayInvoiceResponse {
+  Payment payment = 1;
+}
+
+message ReserveCreditRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  bank.common.v1.Money amount = 3;
+  string description = 4;
+  map<string, string> metadata = 5;
+}
+
+message ReserveCreditResponse {
+  Hold hold = 1;
+}
+
+message CaptureCreditRequest {
+  string hold_id = 1;
+  // Optional: capture less than was held.
+  bank.common.v1.Money amount = 2;
+}
+
+message CaptureCreditResponse {
+  Hold hold = 1;
+}
+
+message ReleaseCreditRequest {
+  string hold_id = 1;
+  string reason = 2;
+}
+
+message ReleaseCreditResponse {
+  Hold hold = 1;
+}
+
+message AdvanceCycleRequest {
+  string account_id = 1;
+  // CLOSE or EXPIRE.
+  string action = 2;
+}
+
+message AdvanceCycleResponse {}

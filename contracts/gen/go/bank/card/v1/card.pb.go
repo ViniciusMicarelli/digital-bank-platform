@@ -177,6 +177,57 @@ func (Channel) EnumDescriptor() ([]byte, []int) {
 	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{2}
 }
 
+// Which account the network charges: the checking account (debit) or the
+// credit line (credit, through credit-service).
+type Function int32
+
+const (
+	Function_FUNCTION_UNSPECIFIED Function = 0
+	Function_FUNCTION_DEBIT       Function = 1
+	Function_FUNCTION_CREDIT      Function = 2
+)
+
+// Enum value maps for Function.
+var (
+	Function_name = map[int32]string{
+		0: "FUNCTION_UNSPECIFIED",
+		1: "FUNCTION_DEBIT",
+		2: "FUNCTION_CREDIT",
+	}
+	Function_value = map[string]int32{
+		"FUNCTION_UNSPECIFIED": 0,
+		"FUNCTION_DEBIT":       1,
+		"FUNCTION_CREDIT":      2,
+	}
+)
+
+func (x Function) Enum() *Function {
+	p := new(Function)
+	*p = x
+	return p
+}
+
+func (x Function) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Function) Descriptor() protoreflect.EnumDescriptor {
+	return file_bank_card_v1_card_proto_enumTypes[3].Descriptor()
+}
+
+func (Function) Type() protoreflect.EnumType {
+	return &file_bank_card_v1_card_proto_enumTypes[3]
+}
+
+func (x Function) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Function.Descriptor instead.
+func (Function) EnumDescriptor() ([]byte, []int) {
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{3}
+}
+
 type AuthorizationStatus int32
 
 const (
@@ -216,11 +267,11 @@ func (x AuthorizationStatus) String() string {
 }
 
 func (AuthorizationStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_bank_card_v1_card_proto_enumTypes[3].Descriptor()
+	return file_bank_card_v1_card_proto_enumTypes[4].Descriptor()
 }
 
 func (AuthorizationStatus) Type() protoreflect.EnumType {
-	return &file_bank_card_v1_card_proto_enumTypes[3]
+	return &file_bank_card_v1_card_proto_enumTypes[4]
 }
 
 func (x AuthorizationStatus) Number() protoreflect.EnumNumber {
@@ -229,7 +280,7 @@ func (x AuthorizationStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AuthorizationStatus.Descriptor instead.
 func (AuthorizationStatus) EnumDescriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{3}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{4}
 }
 
 type Controls struct {
@@ -1105,7 +1156,8 @@ type Authorization struct {
 	Channel       Channel                `protobuf:"varint,12,opt,name=channel,proto3,enum=bank.card.v1.Channel" json:"channel,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	// Set when the purchase was made with a token.
-	TokenId       string `protobuf:"bytes,14,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty"`
+	TokenId       string   `protobuf:"bytes,14,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty"`
+	Function      Function `protobuf:"varint,15,opt,name=function,proto3,enum=bank.card.v1.Function" json:"function,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1238,6 +1290,13 @@ func (x *Authorization) GetTokenId() string {
 	return ""
 }
 
+func (x *Authorization) GetFunction() Function {
+	if x != nil {
+		return x.Function
+	}
+	return Function_FUNCTION_UNSPECIFIED
+}
+
 type AuthorizeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Unique id from the network; retries reuse it.
@@ -1251,8 +1310,10 @@ type AuthorizeRequest struct {
 	// Merchant category code (ISO 18245).
 	Mcc string `protobuf:"bytes,8,opt,name=mcc,proto3" json:"mcc,omitempty"`
 	// ISO 3166 alpha-2.
-	Country       string  `protobuf:"bytes,9,opt,name=country,proto3" json:"country,omitempty"`
-	Channel       Channel `protobuf:"varint,10,opt,name=channel,proto3,enum=bank.card.v1.Channel" json:"channel,omitempty"`
+	Country string  `protobuf:"bytes,9,opt,name=country,proto3" json:"country,omitempty"`
+	Channel Channel `protobuf:"varint,10,opt,name=channel,proto3,enum=bank.card.v1.Channel" json:"channel,omitempty"`
+	// Debit by default.
+	Function      Function `protobuf:"varint,11,opt,name=function,proto3,enum=bank.card.v1.Function" json:"function,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1355,6 +1416,13 @@ func (x *AuthorizeRequest) GetChannel() Channel {
 		return x.Channel
 	}
 	return Channel_CHANNEL_UNSPECIFIED
+}
+
+func (x *AuthorizeRequest) GetFunction() Function {
+	if x != nil {
+		return x.Function
+	}
+	return Function_FUNCTION_UNSPECIFIED
 }
 
 type AuthorizeResponse struct {
@@ -2048,7 +2116,7 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\fexpiry_month\x18\x02 \x01(\x05R\vexpiryMonth\x12\x1f\n" +
 	"\vexpiry_year\x18\x03 \x01(\x05R\n" +
 	"expiryYear\x12\x10\n" +
-	"\x03cvv\x18\x04 \x01(\tR\x03cvv\"\xa2\x04\n" +
+	"\x03cvv\x18\x04 \x01(\tR\x03cvv\"\xd6\x04\n" +
 	"\rAuthorization\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
 	"\x11network_reference\x18\x02 \x01(\tR\x10networkReference\x12\x17\n" +
@@ -2065,7 +2133,8 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\achannel\x18\f \x01(\x0e2\x15.bank.card.v1.ChannelR\achannel\x129\n" +
 	"\n" +
 	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x19\n" +
-	"\btoken_id\x18\x0e \x01(\tR\atokenId\"\xd8\x02\n" +
+	"\btoken_id\x18\x0e \x01(\tR\atokenId\x122\n" +
+	"\bfunction\x18\x0f \x01(\x0e2\x16.bank.card.v1.FunctionR\bfunction\"\x8c\x03\n" +
 	"\x10AuthorizeRequest\x12+\n" +
 	"\x11network_reference\x18\x01 \x01(\tR\x10networkReference\x12\x10\n" +
 	"\x03pan\x18\x02 \x01(\tR\x03pan\x12!\n" +
@@ -2078,7 +2147,8 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\x03mcc\x18\b \x01(\tR\x03mcc\x12\x18\n" +
 	"\acountry\x18\t \x01(\tR\acountry\x12/\n" +
 	"\achannel\x18\n" +
-	" \x01(\x0e2\x15.bank.card.v1.ChannelR\achannel\"V\n" +
+	" \x01(\x0e2\x15.bank.card.v1.ChannelR\achannel\x122\n" +
+	"\bfunction\x18\v \x01(\x0e2\x16.bank.card.v1.FunctionR\bfunction\"V\n" +
 	"\x11AuthorizeResponse\x12A\n" +
 	"\rauthorization\x18\x01 \x01(\v2\x1b.bank.card.v1.AuthorizationR\rauthorization\"h\n" +
 	"\fClearRequest\x12)\n" +
@@ -2132,7 +2202,11 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\x13CHANNEL_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eCHANNEL_ONLINE\x10\x01\x12\x10\n" +
 	"\fCHANNEL_CHIP\x10\x02\x12\x17\n" +
-	"\x13CHANNEL_CONTACTLESS\x10\x03*\xc6\x01\n" +
+	"\x13CHANNEL_CONTACTLESS\x10\x03*M\n" +
+	"\bFunction\x12\x18\n" +
+	"\x14FUNCTION_UNSPECIFIED\x10\x00\x12\x12\n" +
+	"\x0eFUNCTION_DEBIT\x10\x01\x12\x13\n" +
+	"\x0fFUNCTION_CREDIT\x10\x02*\xc6\x01\n" +
 	"\x13AuthorizationStatus\x12$\n" +
 	" AUTHORIZATION_STATUS_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dAUTHORIZATION_STATUS_APPROVED\x10\x01\x12!\n" +
@@ -2168,105 +2242,108 @@ func file_bank_card_v1_card_proto_rawDescGZIP() []byte {
 	return file_bank_card_v1_card_proto_rawDescData
 }
 
-var file_bank_card_v1_card_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_bank_card_v1_card_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
 var file_bank_card_v1_card_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_bank_card_v1_card_proto_goTypes = []any{
 	(CardKind)(0),                     // 0: bank.card.v1.CardKind
 	(CardStatus)(0),                   // 1: bank.card.v1.CardStatus
 	(Channel)(0),                      // 2: bank.card.v1.Channel
-	(AuthorizationStatus)(0),          // 3: bank.card.v1.AuthorizationStatus
-	(*Controls)(nil),                  // 4: bank.card.v1.Controls
-	(*Card)(nil),                      // 5: bank.card.v1.Card
-	(*IssueCardRequest)(nil),          // 6: bank.card.v1.IssueCardRequest
-	(*IssueCardResponse)(nil),         // 7: bank.card.v1.IssueCardResponse
-	(*GetCardRequest)(nil),            // 8: bank.card.v1.GetCardRequest
-	(*GetCardResponse)(nil),           // 9: bank.card.v1.GetCardResponse
-	(*ListCardsRequest)(nil),          // 10: bank.card.v1.ListCardsRequest
-	(*ListCardsResponse)(nil),         // 11: bank.card.v1.ListCardsResponse
-	(*BlockCardRequest)(nil),          // 12: bank.card.v1.BlockCardRequest
-	(*BlockCardResponse)(nil),         // 13: bank.card.v1.BlockCardResponse
-	(*UnblockCardRequest)(nil),        // 14: bank.card.v1.UnblockCardRequest
-	(*UnblockCardResponse)(nil),       // 15: bank.card.v1.UnblockCardResponse
-	(*UpdateControlsRequest)(nil),     // 16: bank.card.v1.UpdateControlsRequest
-	(*UpdateControlsResponse)(nil),    // 17: bank.card.v1.UpdateControlsResponse
-	(*RevealCardDetailsRequest)(nil),  // 18: bank.card.v1.RevealCardDetailsRequest
-	(*RevealCardDetailsResponse)(nil), // 19: bank.card.v1.RevealCardDetailsResponse
-	(*Authorization)(nil),             // 20: bank.card.v1.Authorization
-	(*AuthorizeRequest)(nil),          // 21: bank.card.v1.AuthorizeRequest
-	(*AuthorizeResponse)(nil),         // 22: bank.card.v1.AuthorizeResponse
-	(*ClearRequest)(nil),              // 23: bank.card.v1.ClearRequest
-	(*ClearResponse)(nil),             // 24: bank.card.v1.ClearResponse
-	(*ReverseRequest)(nil),            // 25: bank.card.v1.ReverseRequest
-	(*ReverseResponse)(nil),           // 26: bank.card.v1.ReverseResponse
-	(*CardToken)(nil),                 // 27: bank.card.v1.CardToken
-	(*TokenizeCardRequest)(nil),       // 28: bank.card.v1.TokenizeCardRequest
-	(*TokenizeCardResponse)(nil),      // 29: bank.card.v1.TokenizeCardResponse
-	(*ListTokensRequest)(nil),         // 30: bank.card.v1.ListTokensRequest
-	(*ListTokensResponse)(nil),        // 31: bank.card.v1.ListTokensResponse
-	(*UpdateTokenRequest)(nil),        // 32: bank.card.v1.UpdateTokenRequest
-	(*UpdateTokenResponse)(nil),       // 33: bank.card.v1.UpdateTokenResponse
-	(*timestamppb.Timestamp)(nil),     // 34: google.protobuf.Timestamp
-	(*v1.Money)(nil),                  // 35: bank.common.v1.Money
+	(Function)(0),                     // 3: bank.card.v1.Function
+	(AuthorizationStatus)(0),          // 4: bank.card.v1.AuthorizationStatus
+	(*Controls)(nil),                  // 5: bank.card.v1.Controls
+	(*Card)(nil),                      // 6: bank.card.v1.Card
+	(*IssueCardRequest)(nil),          // 7: bank.card.v1.IssueCardRequest
+	(*IssueCardResponse)(nil),         // 8: bank.card.v1.IssueCardResponse
+	(*GetCardRequest)(nil),            // 9: bank.card.v1.GetCardRequest
+	(*GetCardResponse)(nil),           // 10: bank.card.v1.GetCardResponse
+	(*ListCardsRequest)(nil),          // 11: bank.card.v1.ListCardsRequest
+	(*ListCardsResponse)(nil),         // 12: bank.card.v1.ListCardsResponse
+	(*BlockCardRequest)(nil),          // 13: bank.card.v1.BlockCardRequest
+	(*BlockCardResponse)(nil),         // 14: bank.card.v1.BlockCardResponse
+	(*UnblockCardRequest)(nil),        // 15: bank.card.v1.UnblockCardRequest
+	(*UnblockCardResponse)(nil),       // 16: bank.card.v1.UnblockCardResponse
+	(*UpdateControlsRequest)(nil),     // 17: bank.card.v1.UpdateControlsRequest
+	(*UpdateControlsResponse)(nil),    // 18: bank.card.v1.UpdateControlsResponse
+	(*RevealCardDetailsRequest)(nil),  // 19: bank.card.v1.RevealCardDetailsRequest
+	(*RevealCardDetailsResponse)(nil), // 20: bank.card.v1.RevealCardDetailsResponse
+	(*Authorization)(nil),             // 21: bank.card.v1.Authorization
+	(*AuthorizeRequest)(nil),          // 22: bank.card.v1.AuthorizeRequest
+	(*AuthorizeResponse)(nil),         // 23: bank.card.v1.AuthorizeResponse
+	(*ClearRequest)(nil),              // 24: bank.card.v1.ClearRequest
+	(*ClearResponse)(nil),             // 25: bank.card.v1.ClearResponse
+	(*ReverseRequest)(nil),            // 26: bank.card.v1.ReverseRequest
+	(*ReverseResponse)(nil),           // 27: bank.card.v1.ReverseResponse
+	(*CardToken)(nil),                 // 28: bank.card.v1.CardToken
+	(*TokenizeCardRequest)(nil),       // 29: bank.card.v1.TokenizeCardRequest
+	(*TokenizeCardResponse)(nil),      // 30: bank.card.v1.TokenizeCardResponse
+	(*ListTokensRequest)(nil),         // 31: bank.card.v1.ListTokensRequest
+	(*ListTokensResponse)(nil),        // 32: bank.card.v1.ListTokensResponse
+	(*UpdateTokenRequest)(nil),        // 33: bank.card.v1.UpdateTokenRequest
+	(*UpdateTokenResponse)(nil),       // 34: bank.card.v1.UpdateTokenResponse
+	(*timestamppb.Timestamp)(nil),     // 35: google.protobuf.Timestamp
+	(*v1.Money)(nil),                  // 36: bank.common.v1.Money
 }
 var file_bank_card_v1_card_proto_depIdxs = []int32{
 	0,  // 0: bank.card.v1.Card.kind:type_name -> bank.card.v1.CardKind
 	1,  // 1: bank.card.v1.Card.status:type_name -> bank.card.v1.CardStatus
-	4,  // 2: bank.card.v1.Card.controls:type_name -> bank.card.v1.Controls
-	34, // 3: bank.card.v1.Card.created_at:type_name -> google.protobuf.Timestamp
+	5,  // 2: bank.card.v1.Card.controls:type_name -> bank.card.v1.Controls
+	35, // 3: bank.card.v1.Card.created_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: bank.card.v1.IssueCardRequest.kind:type_name -> bank.card.v1.CardKind
-	5,  // 5: bank.card.v1.IssueCardResponse.card:type_name -> bank.card.v1.Card
-	5,  // 6: bank.card.v1.GetCardResponse.card:type_name -> bank.card.v1.Card
-	5,  // 7: bank.card.v1.ListCardsResponse.cards:type_name -> bank.card.v1.Card
-	5,  // 8: bank.card.v1.BlockCardResponse.card:type_name -> bank.card.v1.Card
-	5,  // 9: bank.card.v1.UnblockCardResponse.card:type_name -> bank.card.v1.Card
-	4,  // 10: bank.card.v1.UpdateControlsRequest.controls:type_name -> bank.card.v1.Controls
-	5,  // 11: bank.card.v1.UpdateControlsResponse.card:type_name -> bank.card.v1.Card
-	3,  // 12: bank.card.v1.Authorization.status:type_name -> bank.card.v1.AuthorizationStatus
-	35, // 13: bank.card.v1.Authorization.amount:type_name -> bank.common.v1.Money
-	35, // 14: bank.card.v1.Authorization.cleared_amount:type_name -> bank.common.v1.Money
+	6,  // 5: bank.card.v1.IssueCardResponse.card:type_name -> bank.card.v1.Card
+	6,  // 6: bank.card.v1.GetCardResponse.card:type_name -> bank.card.v1.Card
+	6,  // 7: bank.card.v1.ListCardsResponse.cards:type_name -> bank.card.v1.Card
+	6,  // 8: bank.card.v1.BlockCardResponse.card:type_name -> bank.card.v1.Card
+	6,  // 9: bank.card.v1.UnblockCardResponse.card:type_name -> bank.card.v1.Card
+	5,  // 10: bank.card.v1.UpdateControlsRequest.controls:type_name -> bank.card.v1.Controls
+	6,  // 11: bank.card.v1.UpdateControlsResponse.card:type_name -> bank.card.v1.Card
+	4,  // 12: bank.card.v1.Authorization.status:type_name -> bank.card.v1.AuthorizationStatus
+	36, // 13: bank.card.v1.Authorization.amount:type_name -> bank.common.v1.Money
+	36, // 14: bank.card.v1.Authorization.cleared_amount:type_name -> bank.common.v1.Money
 	2,  // 15: bank.card.v1.Authorization.channel:type_name -> bank.card.v1.Channel
-	34, // 16: bank.card.v1.Authorization.created_at:type_name -> google.protobuf.Timestamp
-	35, // 17: bank.card.v1.AuthorizeRequest.amount:type_name -> bank.common.v1.Money
-	2,  // 18: bank.card.v1.AuthorizeRequest.channel:type_name -> bank.card.v1.Channel
-	20, // 19: bank.card.v1.AuthorizeResponse.authorization:type_name -> bank.card.v1.Authorization
-	35, // 20: bank.card.v1.ClearRequest.amount:type_name -> bank.common.v1.Money
-	20, // 21: bank.card.v1.ClearResponse.authorization:type_name -> bank.card.v1.Authorization
-	20, // 22: bank.card.v1.ReverseResponse.authorization:type_name -> bank.card.v1.Authorization
-	34, // 23: bank.card.v1.CardToken.created_at:type_name -> google.protobuf.Timestamp
-	27, // 24: bank.card.v1.TokenizeCardResponse.token:type_name -> bank.card.v1.CardToken
-	27, // 25: bank.card.v1.ListTokensResponse.tokens:type_name -> bank.card.v1.CardToken
-	27, // 26: bank.card.v1.UpdateTokenResponse.token:type_name -> bank.card.v1.CardToken
-	6,  // 27: bank.card.v1.CardService.IssueCard:input_type -> bank.card.v1.IssueCardRequest
-	8,  // 28: bank.card.v1.CardService.GetCard:input_type -> bank.card.v1.GetCardRequest
-	10, // 29: bank.card.v1.CardService.ListCards:input_type -> bank.card.v1.ListCardsRequest
-	12, // 30: bank.card.v1.CardService.BlockCard:input_type -> bank.card.v1.BlockCardRequest
-	14, // 31: bank.card.v1.CardService.UnblockCard:input_type -> bank.card.v1.UnblockCardRequest
-	16, // 32: bank.card.v1.CardService.UpdateControls:input_type -> bank.card.v1.UpdateControlsRequest
-	18, // 33: bank.card.v1.CardService.RevealCardDetails:input_type -> bank.card.v1.RevealCardDetailsRequest
-	28, // 34: bank.card.v1.CardService.TokenizeCard:input_type -> bank.card.v1.TokenizeCardRequest
-	30, // 35: bank.card.v1.CardService.ListTokens:input_type -> bank.card.v1.ListTokensRequest
-	32, // 36: bank.card.v1.CardService.UpdateToken:input_type -> bank.card.v1.UpdateTokenRequest
-	21, // 37: bank.card.v1.CardService.Authorize:input_type -> bank.card.v1.AuthorizeRequest
-	23, // 38: bank.card.v1.CardService.Clear:input_type -> bank.card.v1.ClearRequest
-	25, // 39: bank.card.v1.CardService.Reverse:input_type -> bank.card.v1.ReverseRequest
-	7,  // 40: bank.card.v1.CardService.IssueCard:output_type -> bank.card.v1.IssueCardResponse
-	9,  // 41: bank.card.v1.CardService.GetCard:output_type -> bank.card.v1.GetCardResponse
-	11, // 42: bank.card.v1.CardService.ListCards:output_type -> bank.card.v1.ListCardsResponse
-	13, // 43: bank.card.v1.CardService.BlockCard:output_type -> bank.card.v1.BlockCardResponse
-	15, // 44: bank.card.v1.CardService.UnblockCard:output_type -> bank.card.v1.UnblockCardResponse
-	17, // 45: bank.card.v1.CardService.UpdateControls:output_type -> bank.card.v1.UpdateControlsResponse
-	19, // 46: bank.card.v1.CardService.RevealCardDetails:output_type -> bank.card.v1.RevealCardDetailsResponse
-	29, // 47: bank.card.v1.CardService.TokenizeCard:output_type -> bank.card.v1.TokenizeCardResponse
-	31, // 48: bank.card.v1.CardService.ListTokens:output_type -> bank.card.v1.ListTokensResponse
-	33, // 49: bank.card.v1.CardService.UpdateToken:output_type -> bank.card.v1.UpdateTokenResponse
-	22, // 50: bank.card.v1.CardService.Authorize:output_type -> bank.card.v1.AuthorizeResponse
-	24, // 51: bank.card.v1.CardService.Clear:output_type -> bank.card.v1.ClearResponse
-	26, // 52: bank.card.v1.CardService.Reverse:output_type -> bank.card.v1.ReverseResponse
-	40, // [40:53] is the sub-list for method output_type
-	27, // [27:40] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	35, // 16: bank.card.v1.Authorization.created_at:type_name -> google.protobuf.Timestamp
+	3,  // 17: bank.card.v1.Authorization.function:type_name -> bank.card.v1.Function
+	36, // 18: bank.card.v1.AuthorizeRequest.amount:type_name -> bank.common.v1.Money
+	2,  // 19: bank.card.v1.AuthorizeRequest.channel:type_name -> bank.card.v1.Channel
+	3,  // 20: bank.card.v1.AuthorizeRequest.function:type_name -> bank.card.v1.Function
+	21, // 21: bank.card.v1.AuthorizeResponse.authorization:type_name -> bank.card.v1.Authorization
+	36, // 22: bank.card.v1.ClearRequest.amount:type_name -> bank.common.v1.Money
+	21, // 23: bank.card.v1.ClearResponse.authorization:type_name -> bank.card.v1.Authorization
+	21, // 24: bank.card.v1.ReverseResponse.authorization:type_name -> bank.card.v1.Authorization
+	35, // 25: bank.card.v1.CardToken.created_at:type_name -> google.protobuf.Timestamp
+	28, // 26: bank.card.v1.TokenizeCardResponse.token:type_name -> bank.card.v1.CardToken
+	28, // 27: bank.card.v1.ListTokensResponse.tokens:type_name -> bank.card.v1.CardToken
+	28, // 28: bank.card.v1.UpdateTokenResponse.token:type_name -> bank.card.v1.CardToken
+	7,  // 29: bank.card.v1.CardService.IssueCard:input_type -> bank.card.v1.IssueCardRequest
+	9,  // 30: bank.card.v1.CardService.GetCard:input_type -> bank.card.v1.GetCardRequest
+	11, // 31: bank.card.v1.CardService.ListCards:input_type -> bank.card.v1.ListCardsRequest
+	13, // 32: bank.card.v1.CardService.BlockCard:input_type -> bank.card.v1.BlockCardRequest
+	15, // 33: bank.card.v1.CardService.UnblockCard:input_type -> bank.card.v1.UnblockCardRequest
+	17, // 34: bank.card.v1.CardService.UpdateControls:input_type -> bank.card.v1.UpdateControlsRequest
+	19, // 35: bank.card.v1.CardService.RevealCardDetails:input_type -> bank.card.v1.RevealCardDetailsRequest
+	29, // 36: bank.card.v1.CardService.TokenizeCard:input_type -> bank.card.v1.TokenizeCardRequest
+	31, // 37: bank.card.v1.CardService.ListTokens:input_type -> bank.card.v1.ListTokensRequest
+	33, // 38: bank.card.v1.CardService.UpdateToken:input_type -> bank.card.v1.UpdateTokenRequest
+	22, // 39: bank.card.v1.CardService.Authorize:input_type -> bank.card.v1.AuthorizeRequest
+	24, // 40: bank.card.v1.CardService.Clear:input_type -> bank.card.v1.ClearRequest
+	26, // 41: bank.card.v1.CardService.Reverse:input_type -> bank.card.v1.ReverseRequest
+	8,  // 42: bank.card.v1.CardService.IssueCard:output_type -> bank.card.v1.IssueCardResponse
+	10, // 43: bank.card.v1.CardService.GetCard:output_type -> bank.card.v1.GetCardResponse
+	12, // 44: bank.card.v1.CardService.ListCards:output_type -> bank.card.v1.ListCardsResponse
+	14, // 45: bank.card.v1.CardService.BlockCard:output_type -> bank.card.v1.BlockCardResponse
+	16, // 46: bank.card.v1.CardService.UnblockCard:output_type -> bank.card.v1.UnblockCardResponse
+	18, // 47: bank.card.v1.CardService.UpdateControls:output_type -> bank.card.v1.UpdateControlsResponse
+	20, // 48: bank.card.v1.CardService.RevealCardDetails:output_type -> bank.card.v1.RevealCardDetailsResponse
+	30, // 49: bank.card.v1.CardService.TokenizeCard:output_type -> bank.card.v1.TokenizeCardResponse
+	32, // 50: bank.card.v1.CardService.ListTokens:output_type -> bank.card.v1.ListTokensResponse
+	34, // 51: bank.card.v1.CardService.UpdateToken:output_type -> bank.card.v1.UpdateTokenResponse
+	23, // 52: bank.card.v1.CardService.Authorize:output_type -> bank.card.v1.AuthorizeResponse
+	25, // 53: bank.card.v1.CardService.Clear:output_type -> bank.card.v1.ClearResponse
+	27, // 54: bank.card.v1.CardService.Reverse:output_type -> bank.card.v1.ReverseResponse
+	42, // [42:55] is the sub-list for method output_type
+	29, // [29:42] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_bank_card_v1_card_proto_init() }
@@ -2279,7 +2356,7 @@ func file_bank_card_v1_card_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_card_v1_card_proto_rawDesc), len(file_bank_card_v1_card_proto_rawDesc)),
-			NumEnums:      4,
+			NumEnums:      5,
 			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   1,

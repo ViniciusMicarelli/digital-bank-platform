@@ -163,17 +163,18 @@ func (s *Store) SaveToken(ctx context.Context, t domain.Token, ev outbox.Message
 }
 
 const authCols = `id, network_reference, card_id, token_id, status, response_code, reason, amount, currency, cleared_amount,
-	merchant_name, mcc, country, channel, transaction_id, created_at`
+	merchant_name, mcc, country, channel, transaction_id, created_at, function`
 
 func scanAuth(row pgx.Row) (domain.Authorization, error) {
 	var (
 		a                         domain.Authorization
 		card, token, txID         *uuid.UUID
 		status, currency, channel string
+		function                  string
 		amount                    int64
 	)
 	err := row.Scan(&a.ID, &a.NetworkReference, &card, &token, &status, &a.Code, &a.Reason, &amount, &currency, &a.Cleared,
-		&a.Purchase.MerchantName, &a.Purchase.MCC, &a.Purchase.Country, &channel, &txID, &a.CreatedAt)
+		&a.Purchase.MerchantName, &a.Purchase.MCC, &a.Purchase.Country, &channel, &txID, &a.CreatedAt, &function)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return a, fmt.Errorf("%w: authorization", domain.ErrNotFound)
 	}
@@ -181,6 +182,7 @@ func scanAuth(row pgx.Row) (domain.Authorization, error) {
 		return a, err
 	}
 	a.Status, a.Purchase.Channel, a.Purchase.NetworkReference = domain.AuthStatus(status), domain.Channel(channel), a.NetworkReference
+	a.Purchase.Function = domain.Function(function)
 	if card != nil {
 		a.CardID = *card
 	}
@@ -204,10 +206,10 @@ func nullable(id uuid.UUID) *uuid.UUID {
 func (s *Store) ClaimAuthorization(ctx context.Context, a domain.Authorization) (*domain.Authorization, error) {
 	p := a.Purchase
 	tag, err := s.pool.Exec(ctx, `INSERT INTO authorizations (id, network_reference, card_id, token_id, status, response_code, reason,
-		amount, currency, merchant_name, mcc, country, channel)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) ON CONFLICT (network_reference) DO NOTHING`,
+		amount, currency, merchant_name, mcc, country, channel, function)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (network_reference) DO NOTHING`,
 		a.ID, a.NetworkReference, nullable(a.CardID), nullable(a.TokenID), a.Status, a.Code, a.Reason, p.Amount.Minor(), string(p.Amount.Currency()),
-		p.MerchantName, p.MCC, p.Country, p.Channel)
+		p.MerchantName, p.MCC, p.Country, p.Channel, p.Function)
 	if err != nil || tag.RowsAffected() == 1 {
 		return nil, err
 	}

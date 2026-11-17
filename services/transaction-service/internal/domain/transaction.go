@@ -51,7 +51,14 @@ const (
 	TypePixOut           Type = "PIX_OUT"
 	TypePixIn            Type = "PIX_IN"
 	TypeDebitCard        Type = "DEBIT_CARD_PURCHASE"
+	// Credit card movements, posted by credit-service in one step.
+	TypeCreditPurchase       Type = "CREDIT_CARD_PURCHASE"
+	TypeCreditInvoicePayment Type = "CREDIT_INVOICE_PAYMENT"
+	TypeCreditCharges        Type = "CREDIT_CHARGES"
 )
+
+var validTypes = []Type{TypeInternalTransfer, TypePixOut, TypePixIn, TypeDebitCard,
+	TypeCreditPurchase, TypeCreditInvoicePayment, TypeCreditCharges}
 
 type Status string
 
@@ -89,7 +96,7 @@ func New(key string, typ Type, from, to uuid.UUID, amount money.Money, descripti
 	switch {
 	case key == "":
 		return Transaction{}, fmt.Errorf("%w: idempotency key is required", ErrInvalidArgument)
-	case typ != TypeInternalTransfer && typ != TypePixOut && typ != TypePixIn && typ != TypeDebitCard:
+	case !slices.Contains(validTypes, typ):
 		return Transaction{}, fmt.Errorf("%w: unknown type %q", ErrInvalidArgument, typ)
 	case from == uuid.Nil || to == uuid.Nil:
 		return Transaction{}, fmt.Errorf("%w: from and to accounts are required", ErrInvalidArgument)
@@ -116,8 +123,16 @@ func New(key string, typ Type, from, to uuid.UUID, amount money.Money, descripti
 	}, nil
 }
 
-// ConsumesLimit reports whether the debited account's limits apply.
-func (t Transaction) ConsumesLimit() bool { return t.Type != TypePixIn }
+// ConsumesLimit reports whether the debited account's limits apply. Paying a
+// credit card invoice does not count against transfer limits, and the other
+// credit types move money between bank-internal accounts.
+func (t Transaction) ConsumesLimit() bool {
+	return t.Type == TypeInternalTransfer || t.Type == TypePixOut || t.Type == TypeDebitCard
+}
+
+// DebitsCustomerWithoutLimit reports whether the debited side is a customer
+// account that must be active although no limit is consumed.
+func (t Transaction) DebitsCustomerWithoutLimit() bool { return t.Type == TypeCreditInvoicePayment }
 
 // CreditsCustomer reports whether the receiving side is a customer account
 // (which must exist and be active), rather than a bank-internal account such
