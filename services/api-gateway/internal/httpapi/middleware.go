@@ -1,0 +1,134 @@
+package httpapi
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+	"regexp"
+	"runtime/debug"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/time/rate"
+
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/correlation"
+)
+
+var (
+	httpRequests = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "http_requests_total", Help: "HTTP requests by route and status.",
+	}, []string{"route", "status"})
+	httpDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "http_request_duration_seconds", Help: "HTTP request latency by route.",
+		Buckets: []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5},
+	}, []string{"route"})
+)
+
+var correlationRE = regexp.MustCompile(`^[A-Za-z0-9_\-.]{1,64}$`)
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
+
+// observe adds a correlation id, recovers panics, logs and records metrics.
+func observe(log *slog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		// Accept a caller's id only if it is short and safe to log.
+		id := r.Header.Get("X-Correlation-ID")
+		if !correlationRE.MatchString(id) {
+			id = uuid.NewString()
+		}
+		w.Header().Set("X-Correlation-ID", id)
+		ctx := correlation.WithID(r.Context(), id)
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		// The mux sets Pattern on the request it routes, so keep that copy.
+		req := r.WithContext(ctx)
+
+		defer func() {
+			if p := recover(); p != nil {
+				log.ErrorContext(ctx, "panic", "panic", p, "stack", string(debug.Stack()))
+				writeError(rec, ctx, http.StatusInternalServerError, "INTERNAL", "internal error")
+			}
+			route := req.Pattern
+			if route == "" {
+				route = "unmatched"
+			}
+			trace.SpanFromContext(ctx).SetName(route)
+			httpRequests.WithLabelValues(route, strconv.Itoa(rec.status)).Inc()
+			httpDuration.WithLabelValues(route).Observe(time.Since(start).Seconds())
+			level := slog.LevelInfo
+			if rec.status >= 500 {
+				level = slog.LevelError
+			}
+			log.Log(ctx, level, "http request", "method", r.Method, "route", route, "status", rec.status,
+				"duration_ms", time.Since(start).Milliseconds(), "correlation_id", id)
+		}()
+		next.ServeHTTP(rec, req)
+	})
+}
+
+type customerKey struct{}
+
+func customerID(ctx context.Context) string {
+	id, _ := ctx.Value(customerKey{}).(string)
+	return id
+}
+
+// authenticated requires a valid bearer token and applies the per-customer rate limit.
+func (a *API) authenticated(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !ok {
+			writeError(w, r.Context(), http.StatusUnauthorized, "UNAUTHENTICATED", "missing bearer token")
+			return
+		}
+		customer, err := a.auth.Verify(token)
+		if err != nil {
+			writeError(w, r.Context(), http.StatusUnauthorized, "UNAUTHENTICATED", err.Error())
+			return
+		}
+		if !a.limiter.allow(customer) {
+			w.Header().Set("Retry-After", "1")
+			writeError(w, r.Context(), http.StatusTooManyRequests, "RATE_LIMITED", "too many requests")
+			return
+		}
+		next(w, r.WithContext(context.WithValue(r.Context(), customerKey{}, customer)))
+	}
+}
+
+// limiter is a token bucket per customer. In-memory, so per gateway replica;
+// a shared limiter (Redis) is the next step when running several replicas.
+type limiter struct {
+	mu      sync.Mutex
+	buckets map[string]*rate.Limiter
+	rps     rate.Limit
+	burst   int
+}
+
+func newLimiter(rps float64, burst int) *limiter {
+	return &limiter{buckets: map[string]*rate.Limiter{}, rps: rate.Limit(rps), burst: burst}
+}
+
+func (l *limiter) allow(key string) bool {
+	l.mu.Lock()
+	b, ok := l.buckets[key]
+	if !ok {
+		b = rate.NewLimiter(l.rps, l.burst)
+		l.buckets[key] = b
+	}
+	l.mu.Unlock()
+	return b.Allow()
+}

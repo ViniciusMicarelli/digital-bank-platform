@@ -19,7 +19,11 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/correlation"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 )
 
 // Options customizes the server. Interceptors run after recovery and logging.
@@ -28,15 +32,19 @@ type Options struct {
 	ServerOptions     []grpc.ServerOption
 }
 
-// New builds a server with correlation, recovery and logging interceptors, the standard
-// health service and reflection (for grpcurl).
+// New builds a server with tracing (OpenTelemetry), correlation IDs, panic
+// recovery, Prometheus metrics and request logging, plus the standard health
+// service and reflection (for grpcurl).
 func New(log *slog.Logger, opts Options) *grpc.Server {
 	interceptors := append([]grpc.UnaryServerInterceptor{
 		correlation.ServerInterceptor(),
 		recoverUnary(log),
+		metricsUnary(),
 		logUnary(log),
 	}, opts.UnaryInterceptors...)
-	srv := grpc.NewServer(append(opts.ServerOptions, grpc.ChainUnaryInterceptor(interceptors...))...)
+	srv := grpc.NewServer(append(opts.ServerOptions,
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.ChainUnaryInterceptor(interceptors...))...)
 
 	hs := health.NewServer()
 	hs.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
@@ -77,6 +85,10 @@ func Serve(ctx context.Context, log *slog.Logger, srv *grpc.Server, addr string)
 func Dial(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
 	opts = append([]grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		// No service config via DNS TXT records: the lookup times out on
+		// Docker's resolver and delayed every first call by ~8 s.
+		grpc.WithDisableServiceConfig(),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		grpc.WithChainUnaryInterceptor(correlation.ClientInterceptor()),
 	}, opts...)
 	return grpc.NewClient(target, opts...)
@@ -94,6 +106,16 @@ func recoverUnary(log *slog.Logger) grpc.UnaryServerInterceptor {
 	}
 }
 
+func metricsUnary() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		start := time.Now()
+		resp, err := handler(ctx, req)
+		telemetry.RPCHandled.WithLabelValues(info.FullMethod, status.Code(err).String()).Inc()
+		telemetry.RPCDuration.WithLabelValues(info.FullMethod).Observe(time.Since(start).Seconds())
+		return resp, err
+	}
+}
+
 func logUnary(log *slog.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		start := time.Now()
@@ -107,6 +129,9 @@ func logUnary(log *slog.Logger) grpc.UnaryServerInterceptor {
 		}
 		attrs := []any{"method", info.FullMethod, "code", code.String(), "duration_ms", time.Since(start).Milliseconds(),
 			"correlation_id", correlation.ID(ctx)}
+		if sc := trace.SpanContextFromContext(ctx); sc.HasTraceID() {
+			attrs = append(attrs, "trace_id", sc.TraceID().String())
+		}
 		if err != nil {
 			attrs = append(attrs, "error", status.Convert(err).Message())
 		}

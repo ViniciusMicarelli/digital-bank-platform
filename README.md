@@ -1,60 +1,115 @@
 # Digital Bank Platform
 
-A cloud-native digital banking platform built in **Go** with a microservices architecture: checking accounts, a double-entry ledger, Pix instant payments, cards, bill payments and statements.
+A digital bank built in **Go** as event-driven microservices: checking accounts, a double-entry ledger, transfers, **Pix** (Brazil's instant payments) and a customer statement. It focuses on the parts that make money software hard: exact amounts, idempotency, concurrency, distributed consistency and observability.
 
-![Status](https://img.shields.io/badge/status-work%20in%20progress-yellow)
 ![Go](https://img.shields.io/badge/go-1.26+-00ADD8?logo=go)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
-> **Status:** in progress. The code is built one vertical slice at a time, following the [phased roadmap](docs/ROADMAP.md).
-
-## Architecture at a glance
-
-- **Double-entry ledger as the source of truth.** Balances are derived from immutable, balanced postings ([ADR-0005](docs/decisions/0005-double-entry-ledger.md)).
-- **Database per service**, with no shared tables ([ADR-0003](docs/decisions/0003-database-per-service.md)).
-- **Events over Kafka**, published through a transactional outbox ([ADR-0004](docs/decisions/0004-kafka-for-events.md), [ADR-0007](docs/decisions/0007-transactional-outbox.md)).
-- **Orchestrated sagas** for multi-step money movements like Pix ([ADR-0008](docs/decisions/0008-orchestrated-sagas.md)).
-- **gRPC inside, REST at the edge** ([ADR-0006](docs/decisions/0006-grpc-internal-rest-external.md)).
-- **Hexagonal services**: `domain` → `application` → `ports` → `adapters`.
-
-Full documentation: [docs/README.md](docs/README.md). Decisions: [docs/decisions](docs/decisions/README.md).
-
-## Repository layout
-
-```
-.
-├── services/        # one Go module per bounded context (hexagonal layout)
-├── packages/        # shared Go libraries
-│   └── go-common/   #   money: exact, currency-aware amounts in minor units
-├── contracts/       # protobuf, OpenAPI and event schemas
-├── infrastructure/  # docker, kubernetes, terraform, monitoring
-├── apps/            # web and mobile clients
-├── docs/            # architecture, services, ADRs
-└── go.work          # ties all Go modules together
+```bash
+make up     # Postgres, Kafka, 6 services, Jaeger, Prometheus
+make demo   # a customer journey through the REST API
+make e2e    # end-to-end tests against the running stack
 ```
 
-## Getting started
+## Architecture
 
-Requirements: Go 1.26+, Docker.
+```mermaid
+flowchart LR
+    C([Client]) -->|REST + JWT| GW[api-gateway]
+    GW -->|gRPC| ACC[account-service]
+    GW -->|gRPC| TRX[transaction-service]
+    GW -->|gRPC| PIX[pix-service]
+    GW -->|gRPC| STM[statement-service]
+    PIX -->|gRPC| TRX
+    PIX -->|gRPC| ACC
+    PIX -.->|DICT / SPI| BCB[(Central Bank<br/>simulated)]
+    TRX -->|gRPC| ACC
+    TRX -->|gRPC| LED[ledger-service]
+    ACC -->|gRPC| LED
+
+    LED & ACC & TRX & PIX -.->|outbox relay| K[(Kafka)]
+    K -.->|account.*, transaction.*| STM
+    K -.->|account.closed| PIX
+```
+
+Each service owns its PostgreSQL database and follows a hexagonal layout (`domain` → `application` → `ports` → `adapters`).
+
+| Service | Responsibility |
+|---|---|
+| [ledger-service](docs/services/ledger-service.md) | Source of truth for money: balanced journal entries, holds, reversals |
+| [account-service](docs/services/account-service.md) | Account lifecycle, CPF validation, per-transaction/daily/nightly limits |
+| [transaction-service](docs/services/transaction-service.md) | Orchestrated sagas: transfers, two-phase Pix out, Pix in, recovery worker |
+| [pix-service](docs/services/pix-service.md) | Pix keys, lookup, same-bank and cross-bank Pix, incoming Pix |
+| [statement-service](docs/services/statement-service.md) | CQRS read side: customer feed projected from Kafka |
+| [api-gateway](docs/services/api-gateway.md) | Public REST API: JWT, ownership checks, idempotency keys, rate limits |
+
+## What Is Interesting Here
+
+**Money is exact.** Amounts are `int64` minor units with overflow and currency checks; floats never appear, not even in JSON (`"amount": "10.50"`). → [`packages/go-common/money`](packages/go-common/money/money.go)
+
+**The ledger cannot be wrong quietly.** Entries must sum to zero, checked in Go *and* by a deferred Postgres constraint trigger. Postings are append-only (enforced by triggers); corrections are reversals. Balance rows are locked with `SELECT … FOR UPDATE` in a fixed order, so concurrent transfers cannot deadlock or overdraw. A randomized concurrent test checks every invariant afterwards. Removing the row lock makes it fail. → [ledger tests](services/ledger-service/internal/application/service_test.go)
+
+**Every retry is safe.** Each money-moving call carries an idempotency key plus a request fingerprint ([ADR-0016](docs/decisions/0016-idempotency.md)). The same key with a different request is rejected, not silently accepted.
+
+**Sagas that recover.** Business refusals (insufficient funds, limit exceeded) compensate; technical failures (a service down) leave the saga in place, and a worker resumes it. A `PENDING` saga is never compensated from outside, because its last step may have succeeded with the response lost. Leases stop two runners from executing one saga. → [saga](services/transaction-service/internal/application/saga.go)
+
+**Events without dual writes.** State and its event commit in one transaction (outbox). A relay publishes to Kafka with `FOR UPDATE SKIP LOCKED`. Consumers deduplicate with an inbox table in the same transaction as their effects, retry with backoff and dead-letter poison messages. → [events](docs/events/README.md)
+
+**Pix, end to end.** Keys with real validation (CPF check digits, E.164 phones), lookup with masked documents, E2E IDs, cross-bank payments that reserve funds, record the SPI intent before calling it, then capture or release. The Central Bank systems are simulated behind ports.
+
+**Observable.** One request is one trace across all services (OpenTelemetry → Jaeger). Correlation IDs travel through gRPC metadata and Kafka events. Prometheus metrics with low-cardinality labels, business counters, alert rules and a Grafana dashboard. → [observability](docs/architecture/observability.md)
+
+## Getting Started
+
+Requirements: Docker, Go 1.26+, `jq` for the demo.
 
 ```bash
-make help    # list targets
-make test    # run all tests with the race detector
-make lint    # gofmt + go vet
+make up      # build and start everything
+make demo    # walk through the public API
 ```
 
-## Roadmap
+```text
+▶ Ana's statement (built asynchronously from Kafka events)
+2026-11-17T16:56:09  D     80.00  PIX_OUT  Maria Oliveira
+2026-11-17T16:56:09  D    120.00  INTERNAL_TRANSFER  Bruno Lima
+2026-11-17T16:56:09  C    500.00  PIX_IN  Empresa X
+```
 
-- [x] Architecture docs and ADRs
-- [x] `packages/go-common/money`: exact money type, no floats, overflow-checked
-- [x] **ledger-service**: journal entries, balanced postings, holds, reversals, idempotency (PostgreSQL + gRPC)
-- [x] **account-service**: account lifecycle, CPF validation, per-transaction/daily/nightly limits
-- [x] Local stack with Docker Compose + migrations + integration tests
-- [x] **transaction-service**: orchestrated sagas (internal transfer, two-phase Pix out, Pix in) with recovery worker
-- [x] Transactional outbox → Kafka relay, consumer groups with DLQ, inbox deduplication
-- [x] **pix-service**: keys, lookup, same-bank and cross-bank Pix (simulated DICT/SPI), incoming Pix
-- [x] **statement-service**: CQRS feed projected from Kafka
-- [ ] API gateway, identity and observability (OpenTelemetry)
+| URL | |
+|---|---|
+| http://127.0.0.1:8000 | REST API ([reference](docs/api/README.md)) |
+| http://127.0.0.1:16686 | Jaeger traces |
+| http://127.0.0.1:9090 | Prometheus (metrics, alerts) |
+| http://127.0.0.1:3000 | Grafana (`make up-obs`) |
+
+Internal gRPC services listen on `:9001`–`:9005` with reflection enabled (`grpcurl -plaintext 127.0.0.1:9001 list`).
+
+## Tests
+
+```bash
+make test   # unit + integration (real Postgres, one fresh database per test)
+make e2e    # black-box tests against docker compose, over gRPC, Kafka and REST
+make lint   # gofmt, go vet, buf lint
+```
+
+- **Domain**: pure Go, no I/O (ledger rules, limits and the night window, CPF, Pix keys, E2E IDs).
+- **Integration**: every repository and use case against PostgreSQL, including concurrency tests (N parallel debits, parallel limit consumption, concurrent saga runs) and a randomized invariant check.
+- **End to end**: transfers, two-phase Pix, refusals with compensation, events reaching Kafka with the right correlation ID, Kafka consumers removing keys of closed accounts, the statement converging, and the public API's authorization.
+
+CI runs lint, a check that generated code is up to date, all tests with Postgres, Docker builds of every service, and the e2e suite plus the demo against docker compose.
+
+## Repository
+
+```text
+contracts/      Protobuf (buf) + generated Go code
+packages/       go-common (money, document) · go-platform (postgres, outbox, inbox, kafka, grpcserver, telemetry…)
+services/       one Go module per service
+tests/e2e/      end-to-end tests
+infrastructure/ Postgres init, Prometheus, alerts, Grafana
+docs/           architecture, services, events, API, ADRs, roadmap
+```
+
+What is done and what comes next: [ROADMAP.md](docs/ROADMAP.md). Decisions: [ADRs](docs/decisions/README.md).
 
 ## License
 

@@ -13,6 +13,7 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/statement-service/internal/grpcapi"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/statement-service/internal/projection"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/statement-service/migrations"
@@ -22,6 +23,8 @@ func main() {
 	log := config.Logger("statement-service")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	defer telemetry.SetupTracing(ctx, "statement-service", log)()
+	go telemetry.ServeMetrics(ctx, config.String("METRICS_ADDR", ":9105"), log)
 
 	pool, err := postgres.Connect(ctx, config.String("DATABASE_URL",
 		"postgres://bank:bank@localhost:54329/statement?sslmode=disable"))

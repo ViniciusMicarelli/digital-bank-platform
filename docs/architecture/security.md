@@ -423,9 +423,9 @@ trivy config
 | File | Description |
 |------|-------------|
 | [security.md](security.md) | This security architecture document |
-| [authentication.md](./authentication.md) | Authentication implementation |
-| [authorization.md](./authorization.md) | Authorization implementation |
-| [encryption.md](./encryption.md) | Encryption at rest |
-| [tls.md](./tls.md) | TLS configuration |
-| [compliance.md](./compliance.md) | Compliance requirements |
-| [testing.md](./testing.md) | Security testing procedures |
+| authentication.md | Authentication implementation |
+| authorization.md | Authorization implementation |
+| encryption.md | Encryption at rest |
+| tls.md | TLS configuration |
+| compliance.md | Compliance requirements |
+| testing.md | Security testing procedures |

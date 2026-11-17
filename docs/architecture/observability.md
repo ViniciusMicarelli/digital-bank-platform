@@ -1,6 +1,32 @@
 # Observability Architecture
 
-This document describes the observability architecture of the Digital Bank Platform.
+This document describes the observability architecture of the Digital Bank Platform. The first section is what runs today in `docker compose`; the rest is the target design for production.
+
+## Implemented
+
+| Signal | How | Where |
+|---|---|---|
+| **Logs** | JSON (`log/slog`) on stdout. Every gRPC/HTTP request logs method/route, status, duration, `correlation_id` and `trace_id`. | `docker compose logs` |
+| **Traces** | OpenTelemetry on every gRPC server/client and on the gateway; exported over OTLP to Jaeger. One request shows up as one trace across gateway → pix → transaction → account → ledger. | Jaeger: http://127.0.0.1:16686 |
+| **Metrics** | Prometheus, scraped every 5 s from each service's `/metrics`. | Prometheus: http://127.0.0.1:9090 |
+| **Dashboards** | Grafana with provisioned datasources and an overview dashboard (`make up-obs`). | http://127.0.0.1:3000 |
+| **Alerts** | Prometheus rules in [`alerts.yml`](../../infrastructure/monitoring/prometheus/alerts.yml): gRPC error rate, ledger write p99 > 200 ms, outbox relay failing, dead-lettered events, spike of failed transactions. | Prometheus → Alerts |
+
+Metrics exported (labels kept low-cardinality, never IDs):
+
+| Metric | Labels |
+|---|---|
+| `grpc_server_handled_total`, `grpc_server_handling_seconds` | `method`, `code` |
+| `http_requests_total`, `http_request_duration_seconds` | `route` (pattern, e.g. `POST /v1/accounts/{id}/transfers`), `status` |
+| `outbox_published_total`, `outbox_publish_errors_total` | per instance |
+| `events_consumed_total` | `type`, `outcome` (`ok`, `retry`, `dead_letter`) |
+| `bank_business_events_total` | `event` (e.g. `transaction.completed`), `kind` (transaction type / Pix status) |
+
+Correlation: the gateway accepts or creates `X-Correlation-ID`; it travels in gRPC metadata (`x-correlation-id`), is written into every event envelope, and is restored by Kafka consumers. Traces use W3C `traceparent`.
+
+Code: `packages/go-platform/telemetry`, `packages/go-platform/grpcserver`, `services/api-gateway/internal/httpapi/middleware.go`.
+
+---
 
 ## Overview
 
@@ -479,9 +505,9 @@ Service A ──► Kafka (inject context) ──► Service B (extract context)
 | File | Description |
 |------|-------------|
 | [observability.md](observability.md) | This observability architecture document |
-| [metrics.md](./metrics.md) | Metrics definitions and collection |
-| [tracing.md](./tracing.md) | Distributed tracing configuration |
-| [logging.md](./logging.md) | Logging strategy and configuration |
-| [dashboards.md](./dashboards.md) | Dashboard definitions |
-| [alerts.md](./alerts.md) | Alert rules and thresholds |
-| [runbooks.md](./runbooks.md) | Operational runbooks |
+| metrics.md | Metrics definitions and collection |
+| tracing.md | Distributed tracing configuration |
+| logging.md | Logging strategy and configuration |
+| dashboards.md | Dashboard definitions |
+| alerts.md | Alert rules and thresholds |
+| runbooks.md | Operational runbooks |

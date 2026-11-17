@@ -1,6 +1,6 @@
 # Documentation
 
-Technical documentation for the Digital Bank Platform.
+Technical documentation for the Digital Bank Platform. What is built and what is next: [ROADMAP.md](ROADMAP.md).
 
 ## Architecture
 

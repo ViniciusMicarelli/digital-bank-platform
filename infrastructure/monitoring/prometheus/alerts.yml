@@ -1,0 +1,38 @@
+groups:
+  - name: digital-bank
+    rules:
+      - alert: HighGrpcErrorRate
+        expr: |
+          sum by (job, instance) (rate(grpc_server_handled_total{code=~"Internal|Unavailable|Unknown|DeadlineExceeded"}[5m]))
+            / sum by (job, instance) (rate(grpc_server_handled_total[5m])) > 0.05
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "More than 5% of gRPC calls on {{ $labels.instance }} fail with server errors"
+
+      - alert: SlowLedger
+        expr: |
+          histogram_quantile(0.99, sum by (le) (rate(grpc_server_handling_seconds_bucket{method=~"/bank.ledger.v1.LedgerService/(PostEntry|Hold|Capture)"}[5m]))) > 0.2
+        for: 10m
+        labels: { severity: ticket }
+        annotations:
+          summary: "Ledger write p99 above 200 ms"
+
+      - alert: OutboxRelayFailing
+        expr: increase(outbox_publish_errors_total[5m]) > 0
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $labels.instance }} cannot publish events to Kafka"
+
+      - alert: EventsDeadLettered
+        expr: increase(events_consumed_total{outcome="dead_letter"}[15m]) > 0
+        labels: { severity: ticket }
+        annotations:
+          summary: "Events sent to a dead-letter topic ({{ $labels.type }})"
+
+      - alert: TransfersFailingTechnically
+        expr: increase(bank_business_events_total{event="transaction.failed"}[10m]) > 20
+        labels: { severity: ticket }
+        annotations:
+          summary: "Many failed transactions in the last 10 minutes"

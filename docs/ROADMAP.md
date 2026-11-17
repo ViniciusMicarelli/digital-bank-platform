@@ -67,12 +67,19 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Consumes `ledger.entry.posted` and `pix.transfer.*`, builds a per-account feed projection.
 - Cursor-paginated `ListFeed`, rebuildable by replaying topics.
 
-## Phase 7 — Edge and observability
+## Phase 7 — Edge and observability ✅
 
 - `api-gateway`: public REST/JSON API over the internal gRPC services, JWT authentication, `Idempotency-Key` header, consistent error format.
 - Structured JSON logs (`log/slog`), Prometheus metrics and OpenTelemetry tracing on every gRPC call.
 - Full stack in Docker Compose plus an end-to-end smoke script (`make e2e`).
 
-## Later (not planned yet)
+## Next
 
-Cards and card authorization, credit and invoices, boleto payments, notifications, user onboarding/KYC, Kubernetes manifests, Terraform. Each will reuse the ledger holds, sagas and outbox built above.
+Ordered by value for the platform:
+
+1. **identity-service**: real login (password + MFA), refresh tokens, asymmetric JWT keys with rotation; the gateway's dev login goes away.
+2. **Security hardening**: mTLS between services ([ADR-0014](decisions/0014-zero-trust-security.md)), field-level encryption of documents ([ADR-0015](decisions/0015-encryption.md)), shared rate limiter.
+3. **Pix**: QR codes (EMV BR Code), refunds, scheduled Pix.
+4. **card-service**: debit card authorization using ledger holds (< 200 ms), clearing via capture.
+5. **Operations**: Kubernetes manifests / Helm, Terraform, idempotency-key retention jobs, ledger reconciliation job.
+6. **credit-service**, **payment-service** (boleto), **notification-service**, **user-service** (KYC). Each reuses the ledger holds, sagas and outbox built above.

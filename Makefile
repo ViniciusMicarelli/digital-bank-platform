@@ -7,7 +7,7 @@ BUF_VERSION          := v1.75.0
 PROTOC_GEN_GO        := v1.36.12
 PROTOC_GEN_GO_GRPC   := v1.6.2
 
-.PHONY: help up down test test-unit e2e cover lint fmt tidy generate tools run-%
+.PHONY: help up up-obs demo down test test-unit e2e cover lint fmt tidy generate tools run-%
 
 help: ## List available targets
 	@grep -E '^[a-z%-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -15,8 +15,14 @@ help: ## List available targets
 up: ## Build and start the local stack (docker compose)
 	docker compose up -d --build --wait
 
+up-obs: ## Start the stack plus Grafana (http://127.0.0.1:3000)
+	docker compose --profile observability up -d --build --wait
+
+demo: ## Walk through the public API with curl (needs `make up` and jq)
+	./scripts/demo.sh
+
 down: ## Stop the local stack
-	docker compose down
+	docker compose --profile observability down
 
 test: ## Run all tests, including integration tests (needs `make up`)
 	PGTEST_REQUIRED=1 go test -race -count=1 $(MODULES)

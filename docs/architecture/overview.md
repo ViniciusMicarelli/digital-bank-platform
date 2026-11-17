@@ -28,40 +28,31 @@ The platform is designed as a cloud-native, event-driven system optimized for fi
 | Infrastructure | Kubernetes, Terraform |
 | Observability | OpenTelemetry + Prometheus + Grafana + Loki + Jaeger + Pyroscope |
 
-See [docs/tech-stack.md](./tech-stack.md) for detailed technology choices.
-
 ## Repository Structure
 
 ```text
 .
-├── contracts/          # API/event schemas (source of truth)
-│   ├── proto/          # gRPC/Protobuf definitions
-│   ├── openapi/        # REST API specs
-│   └── events/         # Event schemas
-├── services/           # Go microservices
-│   ├── api-gateway/
-│   ├── identity-service/
-│   ├── user-service/
-│   ├── account-service/
-│   ├── ledger-service/
-│   ├── transaction-service/
-│   ├── pix-service/
-│   ├── payment-service/
-│   ├── card-service/
-│   ├── credit-service/
-│   ├── statement-service/
-│   └── notification-service/
-└── packages/           # Shared Go libraries
-    ├── go-common/
-    ├── go-errors/
-    ├── go-logger/
-    ├── go-messaging/
-    └── go-observability/
+├── contracts/             # Protobuf contracts (buf) + generated Go code, one module
+├── packages/
+│   ├── go-common/         # money (exact amounts), document (CPF)
+│   └── go-platform/       # postgres, pgtest, grpcserver, outbox, inbox, kafka, telemetry, correlation, config
+├── services/              # one Go module per service, hexagonal layout
+│   ├── api-gateway/       # ✅ public REST API
+│   ├── ledger-service/    # ✅ double-entry ledger
+│   ├── account-service/   # ✅ accounts and limits
+│   ├── transaction-service/ # ✅ saga orchestrator
+│   ├── pix-service/       # ✅ Pix (simulated DICT/SPI)
+│   ├── statement-service/ # ✅ CQRS feed
+│   └── …                  # identity, user, payment, card, credit, notification: planned
+├── tests/e2e/             # end-to-end tests against docker compose
+└── infrastructure/        # docker (Postgres init), monitoring (Prometheus, alerts, Grafana)
 ```
 
-See [docs/architecture/repository-structure.md](./repository-structure.md) for detailed layout conventions.
+Status of each service: [ROADMAP.md](../ROADMAP.md).
 
 ## Service Communication Diagram
+
+Target architecture. Solid boxes in the [README](../../README.md#architecture) diagram are the ones running today.
 
 ```mermaid
 flowchart LR
@@ -127,7 +118,7 @@ The **single source of truth** for all money movements. All balance changes are 
 - `debit_ledger`: Debits from an account (negative balance entry)
 - `account_ledger`: Net position of each account
 
-See [docs/services/ledger-service.md](./services/ledger-service.md) for implementation details.
+See [docs/services/ledger-service.md](../services/ledger-service.md) for implementation details.
 
 ### Transaction Service
 Orchestrates money-movement workflows using the Saga pattern:
@@ -164,7 +155,7 @@ Downstream services (statements, notifications, analytics) consume events asynch
 ### Transactional Outbox Pattern
 Each event is written to a database table in the same transaction as the event record. A separate process polls for committed outbox records and publishes them to Kafka.
 
-See [docs/architecture/consistency.md](./consistency.md) for detailed consistency guarantees.
+See docs/architecture/consistency.md for detailed consistency guarantees.
 
 ## Deployment
 
@@ -177,7 +168,7 @@ See [docs/architecture/consistency.md](./consistency.md) for detailed consistenc
 - Horizontal Pod Autoscaling (CPU and RPS metrics)
 - Cell-based sharding for horizontal scaling
 
-See [docs/architecture/deployment.md](./deployment.md) for deployment strategies.
+See docs/architecture/deployment.md for deployment strategies.
 
 ## Documentation Index
 
@@ -189,9 +180,6 @@ See [docs/architecture/deployment.md](./deployment.md) for deployment strategies
 | [patterns.md](./patterns.md) | Architectural patterns used |
 | [security.md](./security.md) | Security architecture and practices |
 | [observability.md](./observability.md) | Observability and monitoring |
-| [consistency.md](./consistency.md) | Data consistency model |
-| [deployment.md](./deployment.md) | Deployment and operations |
-| [repository-structure.md](./repository-structure.md) | Repository layout conventions |
 
 ## Contributing
 

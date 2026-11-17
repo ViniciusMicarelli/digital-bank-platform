@@ -16,6 +16,7 @@ import (
 
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/correlation"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/outbox"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 )
 
 // Brokers splits a comma-separated broker list.
@@ -129,8 +130,10 @@ func process(ctx context.Context, client *kgo.Client, cfg ConsumerConfig, log *s
 	var err error
 	for attempt := 1; attempt <= cfg.MaxAttempts; attempt++ {
 		if err = handle(evCtx, ev); err == nil {
+			telemetry.EventsConsumed.WithLabelValues(ev.Type, "ok").Inc()
 			return nil
 		}
+		telemetry.EventsConsumed.WithLabelValues(ev.Type, "retry").Inc()
 		log.WarnContext(evCtx, "event handler failed", "event_type", ev.Type, "event_id", ev.ID, "attempt", attempt, "error", err)
 		select {
 		case <-ctx.Done():
@@ -139,6 +142,7 @@ func process(ctx context.Context, client *kgo.Client, cfg ConsumerConfig, log *s
 		}
 	}
 	log.ErrorContext(evCtx, "event dead-lettered", "event_type", ev.Type, "event_id", ev.ID, "error", err)
+	telemetry.EventsConsumed.WithLabelValues(ev.Type, "dead_letter").Inc()
 	return deadLetter(ctx, client, rec, err)
 }
 

@@ -330,9 +330,9 @@ Quarterly failover drills:
 | File | Description |
 |------|-------------|
 | [README.md](README.md) | This database documentation |
-| [schema.md](./schema.md) | Database schema design patterns |
-| [migrations.md](./migrations.md) | Migration strategy and tools |
-| [backups.md](./backups.md) | Backup and recovery procedures |
-| [monitoring.md](./monitoring.md) | Database monitoring and alerting |
-| [security.md](./security.md) | Database security practices |
-| [ledger.md](./ledger.md) | Ledger database design |
+| schema.md | Database schema design patterns |
+| migrations.md | Migration strategy and tools |
+| backups.md | Backup and recovery procedures |
+| monitoring.md | Database monitoring and alerting |
+| security.md | Database security practices |
+| ledger.md | Ledger database design |

@@ -12,6 +12,7 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/ledger-service/internal/adapters/grpcapi"
 	pgstore "github.com/ViniciusMicarelli/digital-bank-platform/services/ledger-service/internal/adapters/postgres"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/ledger-service/internal/application"
@@ -22,6 +23,8 @@ func main() {
 	log := config.Logger("ledger-service")
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	defer telemetry.SetupTracing(ctx, "ledger-service", log)()
+	go telemetry.ServeMetrics(ctx, config.String("METRICS_ADDR", ":9101"), log)
 
 	pool, err := postgres.Connect(ctx, config.String("DATABASE_URL",
 		"postgres://bank:bank@localhost:54329/ledger?sslmode=disable"))

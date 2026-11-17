@@ -13,6 +13,7 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/document"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/outbox"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/domain"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/ports"
 )
@@ -318,7 +319,11 @@ func (s *Service) finish(ctx context.Context, t *domain.Transfer, st domain.Stat
 	if err != nil {
 		return err
 	}
-	return s.store.SaveTransfer(ctx, *t, ev)
+	if err := s.store.SaveTransfer(ctx, *t, ev); err != nil {
+		return err
+	}
+	telemetry.BusinessEvents.WithLabelValues(eventType, string(t.Status)).Inc()
+	return nil
 }
 
 // RecoverOnce resumes transfers left unfinished by crashes or outages.

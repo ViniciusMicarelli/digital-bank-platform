@@ -9,6 +9,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 )
 
 // Record is a message ready for the broker.
@@ -93,6 +95,7 @@ func (r *Relay) PublishBatch(ctx context.Context) (int, error) {
 			return err
 		}
 		n = len(ids)
+		telemetry.OutboxPublished.Add(float64(n))
 		return nil
 	})
 	return n, err
@@ -108,6 +111,7 @@ func (r *Relay) Run(ctx context.Context, interval time.Duration) {
 		switch {
 		case err != nil && ctx.Err() == nil:
 			r.log.WarnContext(ctx, "outbox relay", "error", err)
+			telemetry.OutboxErrors.Inc()
 			backoff = min(backoff*2, 30*time.Second)
 			wait = backoff
 		case n > 0:

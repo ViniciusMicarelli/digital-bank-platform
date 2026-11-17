@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: digital-bank
+    folder: Digital Bank
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

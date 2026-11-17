@@ -20,6 +20,7 @@ import (
 
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/outbox"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/transaction-service/internal/domain"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/transaction-service/internal/ports"
 )
@@ -291,7 +292,13 @@ func (s *Service) save(ctx context.Context, t domain.Transaction, step ports.Ste
 		}
 		events = append(events, outbox.Message{Topic: topic, Key: t.ID.String(), Event: ev})
 	}
-	return s.store.Save(ctx, t, step, events...)
+	if err := s.store.Save(ctx, t, step, events...); err != nil {
+		return err
+	}
+	if eventType != "" {
+		telemetry.BusinessEvents.WithLabelValues(eventType, string(t.Type)).Inc()
+	}
+	return nil
 }
 
 // RecoverOnce resumes stale sagas and compensates reservations that waited

@@ -38,6 +38,7 @@ jobs:
           go-version-file: go.work
       - run: docker compose up -d --build --wait
       - run: make e2e
+      - run: sudo apt-get install -y jq && make demo
       - if: failure()
         run: docker compose logs
 
@@ -45,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service: [ledger-service, account-service, transaction-service, pix-service, statement-service]
+        service: [ledger-service, account-service, transaction-service, pix-service, statement-service, api-gateway]
     steps:
       - uses: actions/checkout@v4
       - run: docker build --build-arg SERVICE=${{ matrix.service }} -t ${{ matrix.service }} .
