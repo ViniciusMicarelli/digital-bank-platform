@@ -51,7 +51,7 @@ make lint    # gofmt + go vet
 - [x] **account-service**: account lifecycle, CPF validation, per-transaction/daily/nightly limits
 - [x] Local stack with Docker Compose + migrations + integration tests
 - [x] **transaction-service**: orchestrated sagas (internal transfer, two-phase Pix out, Pix in) with recovery worker
-- [ ] Transactional outbox → Kafka
+- [x] Transactional outbox → Kafka relay, consumer groups with DLQ, inbox deduplication
 - [ ] **pix-service** with an orchestrated saga
 - [ ] API gateway, identity and observability (OpenTelemetry)
 

@@ -10,6 +10,7 @@ import (
 	ledgerv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/ledger/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/ledger-service/internal/adapters/grpcapi"
 	pgstore "github.com/ViniciusMicarelli/digital-bank-platform/services/ledger-service/internal/adapters/postgres"
@@ -35,6 +36,8 @@ func main() {
 	}
 
 	app := application.New(pgstore.NewStore(pool), log)
+	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
+
 	srv := grpcserver.New(log, grpcserver.Options{})
 	ledgerv1.RegisterLedgerServiceServer(srv, grpcapi.NewServer(app))
 

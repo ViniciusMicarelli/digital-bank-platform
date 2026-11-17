@@ -42,7 +42,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Recovery worker that resumes or compensates stuck sagas.
 - End-to-end test: open two accounts, fund one, transfer, check both balances.
 
-## Phase 4 — Events
+## Phase 4 — Events ✅
 
 [ADR-0004](decisions/0004-kafka-for-events.md), [ADR-0007](decisions/0007-transactional-outbox.md)
 

@@ -12,6 +12,7 @@ import (
 	ledgerv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/ledger/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/adapters/grpcapi"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/adapters/ledger"
@@ -45,6 +46,8 @@ func main() {
 	defer ledgerConn.Close()
 
 	app := application.New(pgstore.NewStore(pool), ledger.New(ledgerv1.NewLedgerServiceClient(ledgerConn)), nil)
+	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
+
 	srv := grpcserver.New(log, grpcserver.Options{})
 	accountv1.RegisterAccountServiceServer(srv, grpcapi.NewServer(app))
 

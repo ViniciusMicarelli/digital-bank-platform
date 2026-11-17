@@ -14,6 +14,7 @@ import (
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/transaction-service/internal/adapters/clients"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/transaction-service/internal/adapters/grpcapi"
@@ -61,6 +62,8 @@ func main() {
 		config.Duration("RECOVERY_INTERVAL", 5*time.Second),
 		config.Duration("RECOVERY_STALE_AFTER", 10*time.Second),
 		config.Duration("RESERVATION_TIMEOUT", 15*time.Minute))
+
+	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
 
 	srv := grpcserver.New(log, grpcserver.Options{})
 	txv1.RegisterTransactionServiceServer(srv, grpcapi.NewServer(app))
