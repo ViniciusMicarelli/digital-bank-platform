@@ -1,0 +1,152 @@
+{{- range $name, $svc := .Values.services }}
+{{- $ctx := dict "name" $name "root" $ }}
+{{- $replicas := default $.Values.defaults.replicas $svc.replicas }}
+{{- /* Not "merge": it treats enabled=false as unset and takes the default. */}}
+{{- $autoscaling := deepCopy $.Values.defaults.autoscaling }}
+{{- range $k, $v := (default dict $svc.autoscaling) }}{{ $_ := set $autoscaling $k $v }}{{ end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels: {{- include "db.labels" $ctx | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels: {{- include "db.labels" $ctx | nindent 4 }}
+spec:
+  {{- if not $autoscaling.enabled }}
+  replicas: {{ $replicas }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: {{- include "db.selector" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "db.labels" $ctx | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ default $svc.port $svc.metricsPort | quote }}
+    spec:
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {{- include "db.selector" $ctx | nindent 14 }}
+      containers:
+        - name: {{ $name }}
+          image: "{{ $.Values.image.registry }}/{{ $name }}:{{ $.Values.image.tag }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          ports:
+            - name: {{ if $svc.http }}http{{ else }}grpc{{ end }}
+              containerPort: {{ $svc.port }}
+            {{- if $svc.metricsPort }}
+            - name: metrics
+              containerPort: {{ $svc.metricsPort }}
+            {{- end }}
+          env:
+            {{- if $svc.http }}
+            - { name: HTTP_ADDR, value: ":{{ $svc.port }}" }
+            {{- else }}
+            - { name: GRPC_ADDR, value: ":{{ $svc.port }}" }
+            - { name: METRICS_ADDR, value: ":{{ $svc.metricsPort }}" }
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: {{ $.Values.databaseSecret }}, key: {{ $name }} }
+            - { name: KAFKA_BROKERS, value: {{ $.Values.kafka.brokers | quote }} }
+            - { name: ALLOWED_CALLERS, value: {{ join "," $svc.callers | quote }} }
+            {{- end }}
+            {{- if eq $name "kms-service" }}
+            - name: KMS_ROOT_KEY
+              valueFrom:
+                secretKeyRef: { name: {{ $.Values.kmsRootKeySecret }}, key: root-key }
+            {{- end }}
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: {{ $.Values.otel.endpoint | quote }} }
+            - { name: TLS_CA, value: /certs/ca.crt }
+            - { name: TLS_CERT, value: /certs/tls.crt }
+            - { name: TLS_KEY, value: /certs/tls.key }
+            {{- range $k, $v := $svc.env }}
+            - { name: {{ $k }}, value: {{ $v | quote }} }
+            {{- end }}
+          # The images are FROM scratch: the binary checks its own health.
+          startupProbe:
+            exec: { command: ["/server", "healthcheck"] }
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            exec: { command: ["/server", "healthcheck"] }
+            periodSeconds: 5
+          livenessProbe:
+            exec: { command: ["/server", "healthcheck"] }
+            periodSeconds: 10
+            failureThreshold: 3
+          resources: {{- toYaml (default $.Values.defaults.resources $svc.resources) | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tls, mountPath: /certs, readOnly: true }
+      volumes:
+        - name: tls
+          secret: { secretName: {{ $name }}-tls }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels: {{- include "db.labels" $ctx | nindent 4 }}
+spec:
+  selector: {{- include "db.selector" $ctx | nindent 4 }}
+  ports:
+    - name: {{ if $svc.http }}http{{ else }}grpc{{ end }}
+      port: {{ $svc.port }}
+      targetPort: {{ $svc.port }}
+    {{- if $svc.metricsPort }}
+    - name: metrics
+      port: {{ $svc.metricsPort }}
+      targetPort: {{ $svc.metricsPort }}
+    {{- end }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  labels: {{- include "db.labels" $ctx | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {{- include "db.selector" $ctx | nindent 6 }}
+{{- if $autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}
+  labels: {{- include "db.labels" $ctx | nindent 4 }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ $name }} }
+  minReplicas: {{ $autoscaling.minReplicas }}
+  maxReplicas: {{ $autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: {{ $autoscaling.targetCPU }} }
+{{- end }}
+{{- end }}

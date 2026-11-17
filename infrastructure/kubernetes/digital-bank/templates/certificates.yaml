@@ -1,0 +1,26 @@
+{{- if .Values.certManager.enabled }}
+{{- range $name, $svc := .Values.services }}
+---
+# Workload identity for mTLS. cert-manager renews it before expiry and the
+# service reloads the files without restarting.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $name }}
+spec:
+  secretName: {{ $name }}-tls
+  duration: {{ $.Values.certManager.duration }}
+  renewBefore: {{ $.Values.certManager.renewBefore }}
+  privateKey: { algorithm: ECDSA, size: 256, rotationPolicy: Always }
+  usages: [server auth, client auth, digital signature]
+  dnsNames:
+    - {{ $name }}
+    - {{ $name }}.{{ $.Release.Namespace }}.svc
+    - localhost
+  ipAddresses: ["127.0.0.1"]
+  uris: ["spiffe://digital-bank/{{ $name }}"]
+  issuerRef:
+    kind: {{ $.Values.certManager.issuer.kind }}
+    name: {{ $.Values.certManager.issuer.name }}
+{{- end }}
+{{- end }}

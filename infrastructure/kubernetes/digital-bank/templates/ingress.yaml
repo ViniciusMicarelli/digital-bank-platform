@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "64k"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [{{ .Values.gateway.host }}]
+      secretName: {{ .Values.gateway.tlsSecret }}
+  rules:
+    - host: {{ .Values.gateway.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port: { number: {{ (index .Values.services "api-gateway").port }} }

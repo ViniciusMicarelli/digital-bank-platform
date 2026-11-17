@@ -1,0 +1,40 @@
+# Default deny: no pod receives traffic unless a policy below allows it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+{{- range $name, $svc := .Values.services }}
+---
+# {{ $name }}: same callers as its mTLS ALLOWED_CALLERS, plus Prometheus.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  policyTypes: [Ingress]
+  ingress:
+    {{- if $svc.http }}
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $.Values.ingressController.namespace }} }
+      ports: [{ port: {{ $svc.port }} }]
+    {{- end }}
+    {{- if $svc.callers }}
+    - from:
+        {{- range $svc.callers }}
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: {{ . }} }
+        {{- end }}
+      ports: [{ port: {{ $svc.port }} }]
+    {{- end }}
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $.Values.monitoring.namespace }} }
+      ports: [{ port: {{ default $svc.port $svc.metricsPort }} }]
+{{- end }}

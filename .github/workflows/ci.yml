@@ -45,6 +45,21 @@ jobs:
       - if: failure()
         run: docker compose logs
 
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.22.1
+      - run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz | tar xz -C /usr/local/bin kubeconform
+      - run: make k8s-validate
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.0
+      - run: make tf-validate
+
   docker:
     runs-on: ubuntu-latest
     strategy:

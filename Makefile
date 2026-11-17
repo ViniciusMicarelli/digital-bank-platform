@@ -7,7 +7,7 @@ BUF_VERSION          := v1.75.0
 PROTOC_GEN_GO        := v1.36.12
 PROTOC_GEN_GO_GRPC   := v1.6.2
 
-.PHONY: help certs rotate-certs up up-obs demo down test test-unit e2e cover lint fmt tidy generate tools run-%
+.PHONY: help certs rotate-certs k8s-validate tf-validate infra-tools up up-obs demo down test test-unit e2e cover lint fmt tidy generate tools run-%
 
 help: ## List available targets
 	@grep -E '^[a-z%-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -61,10 +61,23 @@ fmt: ## Format all Go code
 tidy: ## Run go mod tidy in every module
 	@for d in $$(go list -m -f '{{.Dir}}'); do (cd $$d && GOWORK=off go mod tidy); done
 
+k8s-validate: ## Lint and render the Helm chart, validate it against Kubernetes schemas
+	helm lint infrastructure/kubernetes/digital-bank
+	helm template db infrastructure/kubernetes/digital-bank --namespace bank \
+		| kubeconform -strict -summary -kubernetes-version 1.33.0 -skip Certificate
+
+tf-validate: ## terraform fmt + validate (no backend, no AWS credentials needed)
+	cd infrastructure/terraform && terraform fmt -recursive -check && \
+		terraform init -backend=false -input=false >/dev/null && terraform validate
+
 tools: ## Install buf and the protoc plugins into ./bin
 	GOBIN=$(BIN) go install github.com/bufbuild/buf/cmd/buf@$(BUF_VERSION)
 	GOBIN=$(BIN) go install google.golang.org/protobuf/cmd/protoc-gen-go@$(PROTOC_GEN_GO)
 	GOBIN=$(BIN) go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@$(PROTOC_GEN_GO_GRPC)
+
+infra-tools: ## Install helm and kubeconform into ./bin
+	GOBIN=$(BIN) go install helm.sh/helm/v3/cmd/helm@v3.22.1
+	GOBIN=$(BIN) go install github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0
 
 generate: ## Regenerate Go code from contracts/proto
 	cd contracts && rm -rf gen && buf lint && buf generate

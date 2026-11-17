@@ -6,7 +6,7 @@ A digital bank built in **Go** as event-driven microservices: checking accounts,
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 ```bash
-make up     # dev certificates, Postgres, Kafka, Redis, 8 services, Jaeger, Prometheus
+make up     # dev certificates, Postgres, Kafka, Redis, 9 services, Jaeger, Prometheus
 make demo   # a customer journey through the REST API
 make e2e    # end-to-end tests against the running stack
 ```
@@ -70,6 +70,8 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 
 **Zero trust inside.** Services talk over mutual TLS 1.3 with SPIFFE identities, and each one authorizes its callers: the gateway's certificate gets `PERMISSION_DENIED` from the ledger. CPFs are encrypted at rest with a blind index (an expand/contract migration encrypted the existing rows), and rate limits are shared across gateway replicas through Redis. → [security](docs/architecture/security.md)
 
+**Operable.** A KMS keeps master keys out of the services (envelope encryption, rotation, imported legacy keys), certificates rotate without restarts, a reconciliation job re-proves the ledger every few minutes, retention jobs keep tables small, and restarts are invisible to callers. A Helm chart (with NetworkPolicies mirroring the mTLS matrix) and AWS Terraform are validated in CI. → [deployment](docs/deployment.md)
+
 **Observable.** One request is one trace across all services (OpenTelemetry → Jaeger). Correlation IDs travel through gRPC metadata and Kafka events. Prometheus metrics with low-cardinality labels, business counters, alert rules and a Grafana dashboard. → [observability](docs/architecture/observability.md)
 
 ## Getting Started
@@ -123,7 +125,7 @@ contracts/      Protobuf (buf) + generated Go code
 packages/       go-common (money, document) · go-platform (postgres, outbox, inbox, kafka, grpcserver, telemetry…)
 services/       one Go module per service
 tests/e2e/      end-to-end tests
-infrastructure/ Postgres init, Prometheus, alerts, Grafana
+infrastructure/ Helm chart, Terraform (AWS), Postgres init, Prometheus, alerts, Grafana
 docs/           architecture, services, events, API, ADRs, roadmap
 ```
 

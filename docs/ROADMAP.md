@@ -103,7 +103,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Same-bank Pix can be refunded (the receiver gets an incoming record).
 - Every service has a container healthcheck (`/server healthcheck`); dependencies start in order and `make up` waits until all are serving.
 
-## Phase 12 — Operations
+## Phase 12 — Operations ✅
 
 - **Ledger reconciliation job**: periodically re-checks every ledger invariant in production and exports `ledger_invariant_violations`, with an alert.
 - **Retention jobs**: published outbox rows, processed inbox rows and expired refresh tokens are deleted on a schedule.

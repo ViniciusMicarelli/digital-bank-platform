@@ -1,0 +1,114 @@
+# Images are built from the repository's Dockerfile:
+#   docker build --build-arg SERVICE=<name> -t <registry>/<name>:<tag> .
+image:
+  registry: ghcr.io/viniciusmicarelli/digital-bank
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+# Shared infrastructure, provisioned outside the chart (see infrastructure/terraform).
+kafka:
+  brokers: "kafka-bootstrap.kafka.svc:9092"
+otel:
+  endpoint: "otel-collector.observability.svc:4317"
+# Secret holding one DATABASE_URL per service, under the key "<service>".
+# Create it with External Secrets / your secret manager; never in values.
+databaseSecret: digital-bank-databases
+# Root key of kms-service, under key "root-key" (production: an HSM instead).
+kmsRootKeySecret: digital-bank-kms-root
+
+# mTLS: cert-manager issues every workload a certificate whose URI SAN is
+# spiffe://digital-bank/<service>; services reload renewed certificates.
+certManager:
+  enabled: true
+  issuer:
+    kind: ClusterIssuer
+    name: digital-bank-ca
+  duration: 720h   # 30 days
+  renewBefore: 240h
+
+# Namespace and pod labels of the ingress controller and of Prometheus,
+# allowed through the NetworkPolicies.
+ingressController:
+  namespace: ingress-nginx
+monitoring:
+  namespace: observability
+
+gateway:
+  host: api.digitalbank.example
+  tlsSecret: api-digitalbank-tls
+
+defaults:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits: { memory: 256Mi }
+  autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 10, targetCPU: 70 }
+
+# One entry per service. callers mirrors ALLOWED_CALLERS: it drives both
+# the mTLS authorization and the NetworkPolicy (defense in depth).
+services:
+  ledger-service:
+    port: 9001
+    metricsPort: 9101
+    callers: [account-service, transaction-service]
+    env: {}
+  account-service:
+    port: 9002
+    metricsPort: 9102
+    callers: [api-gateway, transaction-service, pix-service, card-service]
+    env:
+      LEDGER_ADDR: ledger-service:9001
+      KMS_ADDR: kms-service:9008
+  transaction-service:
+    port: 9003
+    metricsPort: 9103
+    callers: [api-gateway, pix-service, card-service]
+    env:
+      LEDGER_ADDR: ledger-service:9001
+      ACCOUNT_ADDR: account-service:9002
+  pix-service:
+    port: 9004
+    metricsPort: 9104
+    callers: [api-gateway]
+    env:
+      ACCOUNT_ADDR: account-service:9002
+      TRANSACTION_ADDR: transaction-service:9003
+  statement-service:
+    port: 9005
+    metricsPort: 9105
+    callers: [api-gateway]
+    env: {}
+  identity-service:
+    port: 9006
+    metricsPort: 9106
+    callers: [api-gateway]
+    env:
+      KMS_ADDR: kms-service:9008
+  card-service:
+    port: 9007
+    metricsPort: 9107
+    callers: [api-gateway]
+    # Authorizations have a p99 target of 200 ms: keep headroom.
+    replicas: 3
+    env:
+      ACCOUNT_ADDR: account-service:9002
+      TRANSACTION_ADDR: transaction-service:9003
+      KMS_ADDR: kms-service:9008
+  kms-service:
+    port: 9008
+    metricsPort: 9108
+    callers: [identity-service, account-service, card-service]
+    autoscaling: { enabled: false }
+    env: {}
+  api-gateway:
+    port: 8080
+    http: true
+    callers: []
+    env:
+      IDENTITY_ADDR: identity-service:9006
+      ACCOUNT_ADDR: account-service:9002
+      TRANSACTION_ADDR: transaction-service:9003
+      PIX_ADDR: pix-service:9004
+      STATEMENT_ADDR: statement-service:9005
+      CARD_ADDR: card-service:9007
+      REDIS_ADDR: redis-master.redis.svc:6379

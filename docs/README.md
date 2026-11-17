@@ -11,6 +11,10 @@ Technical documentation for the Digital Bank Platform. What is built and what is
 - [Security](architecture/security.md): authentication, authorization, encryption and card data
 - [Observability](architecture/observability.md): logs, metrics, traces and alerts
 
+## Operations
+
+- [Deployment and operations](deployment.md): Kubernetes chart, Terraform, KMS, certificates, background jobs, runbook
+
 ## Services
 
 | Service | Description |
@@ -27,6 +31,7 @@ Technical documentation for the Digital Bank Platform. What is built and what is
 | [credit-service](services/credit-service.md) | Credit limits and invoices |
 | [statement-service](services/statement-service.md) | Statements and history |
 | [notification-service](services/notification-service.md) | Push, email and SMS |
+| kms-service | Envelope encryption for the other services' keys (see [deployment](deployment.md#keys-kms-service)) |
 
 ## Contracts and Data
 
