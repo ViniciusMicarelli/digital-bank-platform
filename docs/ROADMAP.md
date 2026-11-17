@@ -103,11 +103,40 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Same-bank Pix can be refunded (the receiver gets an incoming record).
 - Every service has a container healthcheck (`/server healthcheck`); dependencies start in order and `make up` waits until all are serving.
 
-## Next
+## Phase 12 — Operations
 
-Ordered by value for the platform:
+- **Ledger reconciliation job**: periodically re-checks every ledger invariant in production and exports `ledger_invariant_violations`, with an alert.
+- **Retention jobs**: published outbox rows, processed inbox rows and expired refresh tokens are deleted on a schedule.
+- **Contract migration**: drop the plaintext `accounts.document` column, guarded so it refuses to run while unencrypted rows exist.
+- **kms-service**: envelope encryption. Services no longer receive key-encryption keys; they hold a data key wrapped by the KMS (per-service key rings, authorized by mTLS identity, versioned master keys with rotation).
+- **Certificate rotation**: services reload their certificate from disk on change; `make rotate-certs` reissues short-lived certificates without restarts.
+- **Kubernetes**: a Helm chart (Deployments with probes and resources, Services, HPA, PodDisruptionBudgets, default-deny NetworkPolicies that mirror the mTLS caller matrix), validated in CI.
+- **Terraform**: AWS reference infrastructure (VPC, EKS, RDS PostgreSQL, MSK, ElastiCache, KMS), validated in CI.
 
-1. **Operations**: Kubernetes manifests / Helm, Terraform, a KMS for key-encryption keys, certificate rotation, idempotency-key retention jobs, ledger reconciliation job, dropping the plaintext `accounts.document` column (contract step).
-2. **Pix**: dynamic QR codes served by URL, scheduled Pix, Pix Automático.
-3. **Cards**: credit function, step-up MFA to reveal card data, tokenization.
-4. **credit-service**, **payment-service** (boleto), **notification-service**, **user-service** (KYC). Each reuses the ledger holds, sagas and outbox built above.
+## Phase 13 — Pix: scheduling, recurring and dynamic QR codes
+
+- Scheduled Pix (a date in the future) and recurring Pix (weekly / monthly), executed by a worker, cancellable.
+- Pix Automático: a payer authorizes a receiver (mandate with a maximum amount and frequency); the receiver's charges are paid automatically within it.
+- Dynamic QR codes: the BR Code carries a URL; the payload is served as a JWS signed by the bank (Ed25519), verified before paying.
+
+## Phase 14 — Cards: step-up and tokenization
+
+- Step-up authentication: revealing card data requires a fresh password (+ TOTP when enabled) confirmation, proven by a short-lived step-up token.
+- Tokenization: device tokens (a different card number per wallet) mapped to the card in the vault, suspendable on their own; authorizations by token resolve to the card.
+
+## Phase 15 — Credit
+
+- credit-service: credit limits, credit-function authorizations against the limit, monthly invoices (closing and due dates), invoice payment from the checking account, late interest.
+- card-service: the card gains a credit function; the network chooses debit or credit.
+
+## Phase 16 — Bill payments (boleto)
+
+- payment-service: boleto parsing and validation (47-digit line, check digits, due date, amount), payment through a two-phase saga with a simulated settlement network, scheduled payments.
+
+## Phase 17 — Notifications
+
+- notification-service: consumes domain events and notifies customers (in-app inbox, simulated push/email), with per-customer preferences and a live stream (SSE) through the gateway.
+
+## Phase 18 — Onboarding and KYC
+
+- user-service: customer profile (CPF, birth date, address), KYC checks against a simulated bureau (approve, reject, manual review), and accounts can only be opened after KYC approval.
