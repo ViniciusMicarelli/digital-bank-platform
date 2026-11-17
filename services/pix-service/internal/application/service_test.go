@@ -1,16 +1,21 @@
 package application_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -18,6 +23,7 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/outbox"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/pgtest"
 	pgstore "github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/adapters/postgres"
+	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/adapters/qrfetch"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/adapters/simulator"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/application"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/domain"
@@ -118,13 +124,14 @@ func (f *fakeTxs) CreditIncoming(_ context.Context, key string, to uuid.UUID, am
 }
 
 type env struct {
-	svc   *application.Service
-	store *pgstore.Store
-	pool  *pgxpool.Pool
-	txs   *fakeTxs
-	ana   uuid.UUID
-	bruno uuid.UUID
-	ctx   context.Context
+	qrSigner application.QRSigner
+	svc      *application.Service
+	store    *pgstore.Store
+	pool     *pgxpool.Pool
+	txs      *fakeTxs
+	ana      uuid.UUID
+	bruno    uuid.UUID
+	ctx      context.Context
 }
 
 func setup(t *testing.T) env {
@@ -288,7 +295,7 @@ func TestQRCodeOneTimeCharge(t *testing.T) {
 	e := setup(t)
 	_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
 	amount := brl("42.50")
-	q, payload, err := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", &amount, "Pedido 7", true, time.Hour)
+	q, payload, err := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", &amount, "Pedido 7", true, false, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +330,7 @@ func TestQRCodeClaimReleasedWhenPaymentFails(t *testing.T) {
 	e := setup(t)
 	_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
 	amount := brl("500")
-	_, payload, _ := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", &amount, "", true, 0)
+	_, payload, _ := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", &amount, "", true, false, 0)
 
 	poor, err := e.svc.PayQRCode(e.ctx, "p1", e.ana, payload, nil, "") // Ana has R$ 100
 	if err != nil || poor.Status != domain.StatusRejected {
@@ -338,7 +345,7 @@ func TestQRCodeClaimReleasedWhenPaymentFails(t *testing.T) {
 func TestQRCodeOpenAmountAndExpiry(t *testing.T) {
 	e := setup(t)
 	_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
-	_, payload, err := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", nil, "Doações", false, 0)
+	_, payload, err := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", nil, "Doações", false, false, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,10 +359,10 @@ func TestQRCodeOpenAmountAndExpiry(t *testing.T) {
 		}
 	}
 
-	if _, _, err := e.svc.CreateQRCode(e.ctx, e.ana, "bruno@example.com", nil, "", false, 0); !errors.Is(err, domain.ErrInvalidArgument) {
+	if _, _, err := e.svc.CreateQRCode(e.ctx, e.ana, "bruno@example.com", nil, "", false, false, 0); !errors.Is(err, domain.ErrInvalidArgument) {
 		t.Fatalf("someone else's key err = %v", err)
 	}
-	_, expiring, _ := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", nil, "", false, time.Minute)
+	_, expiring, _ := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", nil, "", false, false, time.Minute)
 	e.svc.SetClock(func() time.Time { return time.Now().Add(2 * time.Minute) })
 	if _, err := e.svc.DecodeQRCode(e.ctx, expiring); !errors.Is(err, domain.ErrQRUnavailable) {
 		t.Fatalf("expired code err = %v", err)
@@ -469,5 +476,169 @@ func TestSameBankPixCanBeRefunded(t *testing.T) {
 	}
 	if _, err := e.svc.Refund(e.ctx, "r3", e.bruno, in.ID, brl("35.01"), ""); !errors.Is(err, domain.ErrRefundTooLarge) {
 		t.Fatalf("over-refund err = %v", err)
+	}
+}
+
+func day(s string) time.Time {
+	t, _ := time.ParseInLocation("2006-01-02 15:04", s+" 10:00", domain.Location)
+	return t
+}
+
+func TestScheduledAndRecurringPix(t *testing.T) {
+	e := setup(t)
+	e.svc.SetClock(func() time.Time { return day("2026-11-17") })
+	_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
+
+	if _, err := e.svc.Schedule(e.ctx, "s1", e.ana, "bruno@example.com", brl("10"), "presente", day("2026-11-20"), domain.Once, 0); err != nil {
+		t.Fatal(err)
+	}
+	rent, err := e.svc.Schedule(e.ctx, "s2", e.ana, "bruno@example.com", brl("30"), "aluguel", day("2026-11-30"), domain.Monthly, 3)
+	if err != nil || rent.NextDate.Format("2006-01-02") != "2026-11-30" {
+		t.Fatalf("recurring = %+v, %v", rent, err)
+	}
+	if again, _ := e.svc.Schedule(e.ctx, "s2", e.ana, "bruno@example.com", brl("30"), "aluguel", day("2026-11-30"), domain.Monthly, 3); again.ID != rent.ID {
+		t.Fatal("schedule creation must be idempotent")
+	}
+
+	run := func(date string) int {
+		n, err := e.svc.RunDueSchedules(e.ctx, day(date))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if run("2026-11-19") != 0 {
+		t.Fatal("nothing is due before the date")
+	}
+	if run("2026-11-20") != 1 || run("2026-11-20") != 0 || e.txs.balance[e.bruno] != 10_00 {
+		t.Fatalf("one-time Pix must run once (bruno %d)", e.txs.balance[e.bruno])
+	}
+	run("2026-11-30")
+	run("2026-12-30")
+	e.txs.balance[e.ana] = 0 // the third month has no funds
+	run("2027-01-30")
+	sc, runs, _ := e.svc.ScheduleRuns(e.ctx, e.ana, rent.ID)
+	if sc.Status != domain.ScheduleCompleted || len(runs) != 3 || runs[2].Status != "REJECTED" || e.txs.balance[e.bruno] != 70_00 {
+		t.Fatalf("recurring = %+v runs %+v (bruno %d)", sc, runs, e.txs.balance[e.bruno])
+	}
+
+	weekly, _ := e.svc.Schedule(e.ctx, "s3", e.ana, "bruno@example.com", brl("1"), "", day("2027-02-01"), domain.Weekly, 0)
+	if _, err := e.svc.CancelSchedule(e.ctx, e.bruno, weekly.ID); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatal("only the owner cancels")
+	}
+	if _, err := e.svc.CancelSchedule(e.ctx, e.ana, weekly.ID); err != nil {
+		t.Fatal(err)
+	}
+	if run("2027-02-01") != 0 {
+		t.Fatal("a cancelled schedule must not run")
+	}
+}
+
+func TestPixAutomatico(t *testing.T) {
+	e := setup(t)
+	e.svc.SetClock(func() time.Time { return day("2026-11-17") })
+	_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "academia@example.com") // Bruno is the receiver (a gym)
+	_, _ = e.svc.RegisterKey(e.ctx, e.ana, domain.KeyEmail, "ana@example.com")
+
+	m, err := e.svc.RequestMandate(e.ctx, e.bruno, "academia@example.com", "ana@example.com", brl("120"), domain.Monthly, "Mensalidade academia")
+	if err != nil || m.Status != domain.MandatePending || m.PayerAccount != e.ana {
+		t.Fatalf("request = %+v, %v", m, err)
+	}
+	if _, err := e.svc.ChargeMandate(e.ctx, "c1", e.bruno, m.ID, brl("99"), day("2026-11-25")); !errors.Is(err, domain.ErrMandateNotActive) {
+		t.Fatalf("charge before approval: %v", err)
+	}
+	if _, err := e.svc.DecideMandate(e.ctx, e.ana, m.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	c, err := e.svc.ChargeMandate(e.ctx, "c1", e.bruno, m.ID, brl("99"), day("2026-11-25"))
+	if err != nil || c.AccountID != e.ana || c.MandateID != m.ID {
+		t.Fatalf("charge = %+v, %v", c, err)
+	}
+	if again, err := e.svc.ChargeMandate(e.ctx, "c1", e.bruno, m.ID, brl("99"), day("2026-11-25")); err != nil || again.ID != c.ID {
+		t.Fatalf("retried charge = %v", err)
+	}
+	if _, err := e.svc.ChargeMandate(e.ctx, "c2", e.bruno, m.ID, brl("10"), day("2026-11-28")); !errors.Is(err, domain.ErrChargeNotAllowed) {
+		t.Fatalf("second charge in November: %v", err)
+	}
+	if _, _ = e.svc.RunDueSchedules(e.ctx, day("2026-11-25")); e.txs.balance[e.bruno] != 99_00 {
+		t.Fatalf("charge not paid: bruno %d", e.txs.balance[e.bruno])
+	}
+
+	// December's charge is scheduled, then Ana revokes: it must not be paid.
+	if _, err := e.svc.ChargeMandate(e.ctx, "c3", e.bruno, m.ID, brl("99"), day("2026-12-26")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.svc.RevokeMandate(e.ctx, e.ana, m.ID); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = e.svc.RunDueSchedules(e.ctx, day("2026-12-26"))
+	if e.txs.balance[e.bruno] != 99_00 {
+		t.Fatal("a revoked mandate was charged")
+	}
+}
+
+// serveQR plays the receiver bank's public endpoints for dynamic QR codes.
+func serveQR(t *testing.T, e env, forge bool) string {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /pix/qr/v2/{txid}", func(w http.ResponseWriter, r *http.Request) {
+		jws, err := e.svc.DynamicPayload(r.Context(), r.PathValue("txid"))
+		if err != nil {
+			http.Error(w, err.Error(), 404)
+			return
+		}
+		if forge { // same kid, different key, different receiver and amount
+			evil := application.NewQRSigner(bytes.Repeat([]byte{6}, 32), "")
+			tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.MapClaims{"txid": "x", "status": "ATIVA",
+				"chave": "maria@outrobanco.com.br", "valor": map[string]string{"original": "999.00"}})
+			tok.Header["kid"] = e.qrSigner.Kid
+			jws, _ = tok.SignedString(evil.Key)
+		}
+		_, _ = io.WriteString(w, jws)
+	})
+	mux.HandleFunc("GET /pix/qr/jwks.json", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"keys": e.svc.QRJWKS()})
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+	return strings.TrimPrefix(srv.URL, "http://")
+}
+
+func TestDynamicQRCode(t *testing.T) {
+	for _, forge := range []bool{false, true} {
+		e := setup(t)
+		e.qrSigner = application.NewQRSigner(bytes.Repeat([]byte{8}, 32), "")
+		host := serveQR(t, e, forge)
+		e.qrSigner.Location = host + "/pix/qr/v2"
+		e.svc.SetQRSigner(e.qrSigner)
+		e.svc.SetQRFetcher(qrfetch.New("http"))
+		_, _ = e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
+
+		amount := brl("33.30")
+		_, payload, err := e.svc.CreateQRCode(e.ctx, e.bruno, "bruno@example.com", &amount, "Pedido 9", true, true, time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(payload, "bruno@example.com") || strings.Contains(payload, "33.30") {
+			t.Fatal("a dynamic code must carry only the URL")
+		}
+		d, err := e.svc.DecodeQRCode(e.ctx, payload)
+		if forge {
+			if err == nil {
+				t.Fatalf("forged payload accepted: %+v", d)
+			}
+			continue
+		}
+		if err != nil || d.Code.Key != "bruno@example.com" || *d.Code.Amount != amount || d.Charge == nil {
+			t.Fatalf("decode = %+v, %v", d, err)
+		}
+		paid, err := e.svc.PayQRCode(e.ctx, "p1", e.ana, payload, nil, "")
+		if err != nil || paid.Status != domain.StatusCompleted || e.txs.balance[e.bruno] != 33_30 {
+			t.Fatalf("pay = %+v, %v", paid, err)
+		}
+		// Once paid, the bank serves the charge as CONCLUIDA: it cannot be paid again.
+		if _, err := e.svc.DecodeQRCode(e.ctx, payload); !errors.Is(err, domain.ErrQRUnavailable) {
+			t.Fatalf("decode after payment: %v", err)
+		}
 	}
 }

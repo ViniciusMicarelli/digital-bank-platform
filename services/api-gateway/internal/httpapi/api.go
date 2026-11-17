@@ -71,6 +71,9 @@ func New(c Clients, v *auth.Verifier, log *slog.Logger, opts Options) *API {
 func (a *API) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	// Public by design: other banks fetch dynamic QR payloads and our keys.
+	mux.HandleFunc("GET /pix/qr/v2/{txid}", a.qrPayload)
+	mux.HandleFunc("GET /pix/qr/jwks.json", a.qrJWKS)
 	mux.HandleFunc("POST /v1/auth/register", a.perIP(a.register))
 	mux.HandleFunc("POST /v1/auth/login", a.perIP(a.login))
 	mux.HandleFunc("POST /v1/auth/refresh", a.perIP(a.refresh))
@@ -79,6 +82,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/auth/mfa/totp/confirm", a.authenticated(a.confirmTOTP))
 	if a.opts.Sandbox {
 		mux.HandleFunc("POST /v1/sandbox/pix-in", a.authenticated(a.sandboxPixIn))
+		mux.HandleFunc("POST /v1/sandbox/pix/run-schedules", a.authenticated(a.sandboxRunSchedules))
 		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations", a.authenticated(a.networkAuthorize))
 		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations/{authID}/clear", a.authenticated(a.networkClear))
 		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations/{authID}/reverse", a.authenticated(a.networkReverse))
@@ -104,6 +108,15 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/accounts/{id}/pix/transfers", a.authenticated(a.owned(a.listPix)))
 	mux.HandleFunc("GET /v1/pix/keys/{key}", a.authenticated(a.lookupKey))
 	mux.HandleFunc("POST /v1/accounts/{id}/pix/qr-codes", a.authenticated(a.owned(a.createQRCode)))
+	mux.HandleFunc("POST /v1/accounts/{id}/pix/schedules", a.authenticated(a.owned(a.createSchedule)))
+	mux.HandleFunc("GET /v1/accounts/{id}/pix/schedules", a.authenticated(a.owned(a.listSchedules)))
+	mux.HandleFunc("DELETE /v1/accounts/{id}/pix/schedules/{scheduleID}", a.authenticated(a.owned(a.cancelSchedule)))
+	mux.HandleFunc("POST /v1/accounts/{id}/pix/mandates", a.authenticated(a.owned(a.requestMandate)))
+	mux.HandleFunc("GET /v1/accounts/{id}/pix/mandates", a.authenticated(a.owned(a.listMandates)))
+	mux.HandleFunc("POST /v1/accounts/{id}/pix/mandates/{mandateID}/approve", a.authenticated(a.owned(a.decideMandate(true))))
+	mux.HandleFunc("POST /v1/accounts/{id}/pix/mandates/{mandateID}/reject", a.authenticated(a.owned(a.decideMandate(false))))
+	mux.HandleFunc("POST /v1/accounts/{id}/pix/mandates/{mandateID}/revoke", a.authenticated(a.owned(a.revokeMandate)))
+	mux.HandleFunc("POST /v1/accounts/{id}/pix/mandates/{mandateID}/charges", a.authenticated(a.owned(a.chargeMandate)))
 	mux.HandleFunc("POST /v1/pix/qr-codes/decode", a.authenticated(a.decodeQRCode))
 	mux.HandleFunc("POST /v1/accounts/{id}/pix/qr-payments", a.authenticated(a.owned(a.payQRCode)))
 	mux.HandleFunc("POST /v1/accounts/{id}/pix/transfers/{transferID}/refunds", a.authenticated(a.owned(a.refundPix)))

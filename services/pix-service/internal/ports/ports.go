@@ -13,6 +13,8 @@ import (
 )
 
 type Store interface {
+	ScheduleStore
+
 	// InsertKey stores k if the value is free and the account has room.
 	InsertKey(ctx context.Context, k domain.Key, event outbox.Message) error
 	DeleteKey(ctx context.Context, account, keyID uuid.UUID, event func(domain.Key) (outbox.Message, error)) error
@@ -42,6 +44,40 @@ type Store interface {
 	// receiver's incoming record, in one transaction (idempotent).
 	CompleteInternal(ctx context.Context, t, incoming domain.Transfer, events ...outbox.Message) error
 	Unfinished(ctx context.Context, before time.Time, limit int) ([]uuid.UUID, error)
+}
+
+// ScheduleRun records one execution of a schedule.
+type ScheduleRun struct {
+	Occurrence int
+	Date       time.Time
+	TransferID uuid.UUID
+	Status     string // the transfer status, or FAILED / MANDATE_REVOKED
+	Reason     string
+}
+
+// Schedules and Pix Automático mandates.
+type ScheduleStore interface {
+	// InsertSchedule stores s unless its idempotency key exists; then it returns the stored one.
+	InsertSchedule(ctx context.Context, s domain.Schedule) (*domain.Schedule, error)
+	Schedule(ctx context.Context, id uuid.UUID) (domain.Schedule, error)
+	Schedules(ctx context.Context, account uuid.UUID) ([]domain.Schedule, error)
+	SaveScheduleStatus(ctx context.Context, s domain.Schedule) error
+	// ProcessDueSchedules locks each due schedule (FOR UPDATE SKIP LOCKED, so
+	// replicas never run the same one), calls run, then stores the run record
+	// and the schedule's new state in the same transaction.
+	ProcessDueSchedules(ctx context.Context, today time.Time, limit int, run func(*domain.Schedule) (ScheduleRun, error)) (int, error)
+	ScheduleRuns(ctx context.Context, id uuid.UUID) ([]ScheduleRun, error)
+
+	InsertMandate(ctx context.Context, m domain.Mandate) error
+	Mandate(ctx context.Context, id uuid.UUID) (domain.Mandate, error)
+	MandatesByAccount(ctx context.Context, account uuid.UUID) ([]domain.Mandate, error)
+	// UpdateMandate locks the mandate, applies change and saves it; when it
+	// ends REVOKED, the mandate's pending charges are cancelled too.
+	UpdateMandate(ctx context.Context, id uuid.UUID, change func(*domain.Mandate) error) (domain.Mandate, error)
+	// ChargeMandate locks the mandate, lets charge validate it and build the
+	// schedule, and stores both. A retried charge (same schedule key)
+	// returns the stored schedule without charging again.
+	ChargeMandate(ctx context.Context, id uuid.UUID, scheduleKey string, charge func(*domain.Mandate) (domain.Schedule, error)) (domain.Schedule, error)
 }
 
 // Holder is the owner of one of our accounts.
@@ -79,4 +115,14 @@ type Directory interface {
 // and returns *domain.RejectedError when the receiving bank refuses.
 type SPI interface {
 	Send(ctx context.Context, endToEndID string, receiver domain.Party, key string, amount money.Money) error
+}
+
+// JWK is a public key in RFC 7517 form.
+type JWK struct{ Kid, Kty, Crv, X, Alg string }
+
+// QRFetcher retrieves the signed payload of a dynamic QR code from the
+// receiver's bank (location is the URL without scheme), together with that
+// bank's public keys.
+type QRFetcher interface {
+	Fetch(ctx context.Context, location string) (jws string, keys []JWK, err error)
 }

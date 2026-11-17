@@ -19,18 +19,29 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	PixService_RegisterKey_FullMethodName      = "/bank.pix.v1.PixService/RegisterKey"
-	PixService_DeleteKey_FullMethodName        = "/bank.pix.v1.PixService/DeleteKey"
-	PixService_ListKeys_FullMethodName         = "/bank.pix.v1.PixService/ListKeys"
-	PixService_LookupKey_FullMethodName        = "/bank.pix.v1.PixService/LookupKey"
-	PixService_CreateTransfer_FullMethodName   = "/bank.pix.v1.PixService/CreateTransfer"
-	PixService_GetTransfer_FullMethodName      = "/bank.pix.v1.PixService/GetTransfer"
-	PixService_ListTransfers_FullMethodName    = "/bank.pix.v1.PixService/ListTransfers"
-	PixService_SimulateIncoming_FullMethodName = "/bank.pix.v1.PixService/SimulateIncoming"
-	PixService_CreateQrCode_FullMethodName     = "/bank.pix.v1.PixService/CreateQrCode"
-	PixService_DecodeQrCode_FullMethodName     = "/bank.pix.v1.PixService/DecodeQrCode"
-	PixService_PayQrCode_FullMethodName        = "/bank.pix.v1.PixService/PayQrCode"
-	PixService_RefundTransfer_FullMethodName   = "/bank.pix.v1.PixService/RefundTransfer"
+	PixService_RegisterKey_FullMethodName         = "/bank.pix.v1.PixService/RegisterKey"
+	PixService_DeleteKey_FullMethodName           = "/bank.pix.v1.PixService/DeleteKey"
+	PixService_ListKeys_FullMethodName            = "/bank.pix.v1.PixService/ListKeys"
+	PixService_LookupKey_FullMethodName           = "/bank.pix.v1.PixService/LookupKey"
+	PixService_CreateTransfer_FullMethodName      = "/bank.pix.v1.PixService/CreateTransfer"
+	PixService_GetTransfer_FullMethodName         = "/bank.pix.v1.PixService/GetTransfer"
+	PixService_ListTransfers_FullMethodName       = "/bank.pix.v1.PixService/ListTransfers"
+	PixService_SimulateIncoming_FullMethodName    = "/bank.pix.v1.PixService/SimulateIncoming"
+	PixService_CreateQrCode_FullMethodName        = "/bank.pix.v1.PixService/CreateQrCode"
+	PixService_DecodeQrCode_FullMethodName        = "/bank.pix.v1.PixService/DecodeQrCode"
+	PixService_PayQrCode_FullMethodName           = "/bank.pix.v1.PixService/PayQrCode"
+	PixService_RefundTransfer_FullMethodName      = "/bank.pix.v1.PixService/RefundTransfer"
+	PixService_GetDynamicQrPayload_FullMethodName = "/bank.pix.v1.PixService/GetDynamicQrPayload"
+	PixService_GetQrJwks_FullMethodName           = "/bank.pix.v1.PixService/GetQrJwks"
+	PixService_CreateSchedule_FullMethodName      = "/bank.pix.v1.PixService/CreateSchedule"
+	PixService_ListSchedules_FullMethodName       = "/bank.pix.v1.PixService/ListSchedules"
+	PixService_CancelSchedule_FullMethodName      = "/bank.pix.v1.PixService/CancelSchedule"
+	PixService_RunDueSchedules_FullMethodName     = "/bank.pix.v1.PixService/RunDueSchedules"
+	PixService_RequestMandate_FullMethodName      = "/bank.pix.v1.PixService/RequestMandate"
+	PixService_DecideMandate_FullMethodName       = "/bank.pix.v1.PixService/DecideMandate"
+	PixService_RevokeMandate_FullMethodName       = "/bank.pix.v1.PixService/RevokeMandate"
+	PixService_ListMandates_FullMethodName        = "/bank.pix.v1.PixService/ListMandates"
+	PixService_ChargeMandate_FullMethodName       = "/bank.pix.v1.PixService/ChargeMandate"
 )
 
 // PixServiceClient is the client API for PixService service.
@@ -60,6 +71,21 @@ type PixServiceClient interface {
 	PayQrCode(ctx context.Context, in *PayQrCodeRequest, opts ...grpc.CallOption) (*PayQrCodeResponse, error)
 	// Returns (part of) a received Pix to the payer, within 90 days.
 	RefundTransfer(ctx context.Context, in *RefundTransferRequest, opts ...grpc.CallOption) (*RefundTransferResponse, error)
+	// The signed payload of a dynamic QR code (served publicly at its URL).
+	GetDynamicQrPayload(ctx context.Context, in *GetDynamicQrPayloadRequest, opts ...grpc.CallOption) (*GetDynamicQrPayloadResponse, error)
+	// Public keys that verify dynamic QR payloads.
+	GetQrJwks(ctx context.Context, in *GetQrJwksRequest, opts ...grpc.CallOption) (*GetQrJwksResponse, error)
+	CreateSchedule(ctx context.Context, in *CreateScheduleRequest, opts ...grpc.CallOption) (*CreateScheduleResponse, error)
+	ListSchedules(ctx context.Context, in *ListSchedulesRequest, opts ...grpc.CallOption) (*ListSchedulesResponse, error)
+	CancelSchedule(ctx context.Context, in *CancelScheduleRequest, opts ...grpc.CallOption) (*CancelScheduleResponse, error)
+	// Runs schedules due on a date (sandbox/operations; a worker does it every 30 s).
+	RunDueSchedules(ctx context.Context, in *RunDueSchedulesRequest, opts ...grpc.CallOption) (*RunDueSchedulesResponse, error)
+	// Pix Automático: the receiver requests, the payer approves, the receiver charges.
+	RequestMandate(ctx context.Context, in *RequestMandateRequest, opts ...grpc.CallOption) (*RequestMandateResponse, error)
+	DecideMandate(ctx context.Context, in *DecideMandateRequest, opts ...grpc.CallOption) (*DecideMandateResponse, error)
+	RevokeMandate(ctx context.Context, in *RevokeMandateRequest, opts ...grpc.CallOption) (*RevokeMandateResponse, error)
+	ListMandates(ctx context.Context, in *ListMandatesRequest, opts ...grpc.CallOption) (*ListMandatesResponse, error)
+	ChargeMandate(ctx context.Context, in *ChargeMandateRequest, opts ...grpc.CallOption) (*ChargeMandateResponse, error)
 }
 
 type pixServiceClient struct {
@@ -190,6 +216,116 @@ func (c *pixServiceClient) RefundTransfer(ctx context.Context, in *RefundTransfe
 	return out, nil
 }
 
+func (c *pixServiceClient) GetDynamicQrPayload(ctx context.Context, in *GetDynamicQrPayloadRequest, opts ...grpc.CallOption) (*GetDynamicQrPayloadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDynamicQrPayloadResponse)
+	err := c.cc.Invoke(ctx, PixService_GetDynamicQrPayload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) GetQrJwks(ctx context.Context, in *GetQrJwksRequest, opts ...grpc.CallOption) (*GetQrJwksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetQrJwksResponse)
+	err := c.cc.Invoke(ctx, PixService_GetQrJwks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) CreateSchedule(ctx context.Context, in *CreateScheduleRequest, opts ...grpc.CallOption) (*CreateScheduleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateScheduleResponse)
+	err := c.cc.Invoke(ctx, PixService_CreateSchedule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) ListSchedules(ctx context.Context, in *ListSchedulesRequest, opts ...grpc.CallOption) (*ListSchedulesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSchedulesResponse)
+	err := c.cc.Invoke(ctx, PixService_ListSchedules_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) CancelSchedule(ctx context.Context, in *CancelScheduleRequest, opts ...grpc.CallOption) (*CancelScheduleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelScheduleResponse)
+	err := c.cc.Invoke(ctx, PixService_CancelSchedule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) RunDueSchedules(ctx context.Context, in *RunDueSchedulesRequest, opts ...grpc.CallOption) (*RunDueSchedulesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RunDueSchedulesResponse)
+	err := c.cc.Invoke(ctx, PixService_RunDueSchedules_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) RequestMandate(ctx context.Context, in *RequestMandateRequest, opts ...grpc.CallOption) (*RequestMandateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestMandateResponse)
+	err := c.cc.Invoke(ctx, PixService_RequestMandate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) DecideMandate(ctx context.Context, in *DecideMandateRequest, opts ...grpc.CallOption) (*DecideMandateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DecideMandateResponse)
+	err := c.cc.Invoke(ctx, PixService_DecideMandate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) RevokeMandate(ctx context.Context, in *RevokeMandateRequest, opts ...grpc.CallOption) (*RevokeMandateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeMandateResponse)
+	err := c.cc.Invoke(ctx, PixService_RevokeMandate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) ListMandates(ctx context.Context, in *ListMandatesRequest, opts ...grpc.CallOption) (*ListMandatesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMandatesResponse)
+	err := c.cc.Invoke(ctx, PixService_ListMandates_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) ChargeMandate(ctx context.Context, in *ChargeMandateRequest, opts ...grpc.CallOption) (*ChargeMandateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChargeMandateResponse)
+	err := c.cc.Invoke(ctx, PixService_ChargeMandate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PixServiceServer is the server API for PixService service.
 // All implementations must embed UnimplementedPixServiceServer
 // for forward compatibility.
@@ -217,6 +353,21 @@ type PixServiceServer interface {
 	PayQrCode(context.Context, *PayQrCodeRequest) (*PayQrCodeResponse, error)
 	// Returns (part of) a received Pix to the payer, within 90 days.
 	RefundTransfer(context.Context, *RefundTransferRequest) (*RefundTransferResponse, error)
+	// The signed payload of a dynamic QR code (served publicly at its URL).
+	GetDynamicQrPayload(context.Context, *GetDynamicQrPayloadRequest) (*GetDynamicQrPayloadResponse, error)
+	// Public keys that verify dynamic QR payloads.
+	GetQrJwks(context.Context, *GetQrJwksRequest) (*GetQrJwksResponse, error)
+	CreateSchedule(context.Context, *CreateScheduleRequest) (*CreateScheduleResponse, error)
+	ListSchedules(context.Context, *ListSchedulesRequest) (*ListSchedulesResponse, error)
+	CancelSchedule(context.Context, *CancelScheduleRequest) (*CancelScheduleResponse, error)
+	// Runs schedules due on a date (sandbox/operations; a worker does it every 30 s).
+	RunDueSchedules(context.Context, *RunDueSchedulesRequest) (*RunDueSchedulesResponse, error)
+	// Pix Automático: the receiver requests, the payer approves, the receiver charges.
+	RequestMandate(context.Context, *RequestMandateRequest) (*RequestMandateResponse, error)
+	DecideMandate(context.Context, *DecideMandateRequest) (*DecideMandateResponse, error)
+	RevokeMandate(context.Context, *RevokeMandateRequest) (*RevokeMandateResponse, error)
+	ListMandates(context.Context, *ListMandatesRequest) (*ListMandatesResponse, error)
+	ChargeMandate(context.Context, *ChargeMandateRequest) (*ChargeMandateResponse, error)
 	mustEmbedUnimplementedPixServiceServer()
 }
 
@@ -262,6 +413,39 @@ func (UnimplementedPixServiceServer) PayQrCode(context.Context, *PayQrCodeReques
 }
 func (UnimplementedPixServiceServer) RefundTransfer(context.Context, *RefundTransferRequest) (*RefundTransferResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RefundTransfer not implemented")
+}
+func (UnimplementedPixServiceServer) GetDynamicQrPayload(context.Context, *GetDynamicQrPayloadRequest) (*GetDynamicQrPayloadResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDynamicQrPayload not implemented")
+}
+func (UnimplementedPixServiceServer) GetQrJwks(context.Context, *GetQrJwksRequest) (*GetQrJwksResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetQrJwks not implemented")
+}
+func (UnimplementedPixServiceServer) CreateSchedule(context.Context, *CreateScheduleRequest) (*CreateScheduleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateSchedule not implemented")
+}
+func (UnimplementedPixServiceServer) ListSchedules(context.Context, *ListSchedulesRequest) (*ListSchedulesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSchedules not implemented")
+}
+func (UnimplementedPixServiceServer) CancelSchedule(context.Context, *CancelScheduleRequest) (*CancelScheduleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CancelSchedule not implemented")
+}
+func (UnimplementedPixServiceServer) RunDueSchedules(context.Context, *RunDueSchedulesRequest) (*RunDueSchedulesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RunDueSchedules not implemented")
+}
+func (UnimplementedPixServiceServer) RequestMandate(context.Context, *RequestMandateRequest) (*RequestMandateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestMandate not implemented")
+}
+func (UnimplementedPixServiceServer) DecideMandate(context.Context, *DecideMandateRequest) (*DecideMandateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DecideMandate not implemented")
+}
+func (UnimplementedPixServiceServer) RevokeMandate(context.Context, *RevokeMandateRequest) (*RevokeMandateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeMandate not implemented")
+}
+func (UnimplementedPixServiceServer) ListMandates(context.Context, *ListMandatesRequest) (*ListMandatesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMandates not implemented")
+}
+func (UnimplementedPixServiceServer) ChargeMandate(context.Context, *ChargeMandateRequest) (*ChargeMandateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ChargeMandate not implemented")
 }
 func (UnimplementedPixServiceServer) mustEmbedUnimplementedPixServiceServer() {}
 func (UnimplementedPixServiceServer) testEmbeddedByValue()                    {}
@@ -500,6 +684,204 @@ func _PixService_RefundTransfer_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _PixService_GetDynamicQrPayload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDynamicQrPayloadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).GetDynamicQrPayload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_GetDynamicQrPayload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).GetDynamicQrPayload(ctx, req.(*GetDynamicQrPayloadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_GetQrJwks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetQrJwksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).GetQrJwks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_GetQrJwks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).GetQrJwks(ctx, req.(*GetQrJwksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_CreateSchedule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateScheduleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).CreateSchedule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_CreateSchedule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).CreateSchedule(ctx, req.(*CreateScheduleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_ListSchedules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSchedulesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).ListSchedules(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_ListSchedules_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).ListSchedules(ctx, req.(*ListSchedulesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_CancelSchedule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelScheduleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).CancelSchedule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_CancelSchedule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).CancelSchedule(ctx, req.(*CancelScheduleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_RunDueSchedules_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RunDueSchedulesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).RunDueSchedules(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_RunDueSchedules_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).RunDueSchedules(ctx, req.(*RunDueSchedulesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_RequestMandate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestMandateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).RequestMandate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_RequestMandate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).RequestMandate(ctx, req.(*RequestMandateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_DecideMandate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DecideMandateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).DecideMandate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_DecideMandate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).DecideMandate(ctx, req.(*DecideMandateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_RevokeMandate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeMandateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).RevokeMandate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_RevokeMandate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).RevokeMandate(ctx, req.(*RevokeMandateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_ListMandates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMandatesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).ListMandates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_ListMandates_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).ListMandates(ctx, req.(*ListMandatesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_ChargeMandate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChargeMandateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).ChargeMandate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_ChargeMandate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).ChargeMandate(ctx, req.(*ChargeMandateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // PixService_ServiceDesc is the grpc.ServiceDesc for PixService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -554,6 +936,50 @@ var PixService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RefundTransfer",
 			Handler:    _PixService_RefundTransfer_Handler,
+		},
+		{
+			MethodName: "GetDynamicQrPayload",
+			Handler:    _PixService_GetDynamicQrPayload_Handler,
+		},
+		{
+			MethodName: "GetQrJwks",
+			Handler:    _PixService_GetQrJwks_Handler,
+		},
+		{
+			MethodName: "CreateSchedule",
+			Handler:    _PixService_CreateSchedule_Handler,
+		},
+		{
+			MethodName: "ListSchedules",
+			Handler:    _PixService_ListSchedules_Handler,
+		},
+		{
+			MethodName: "CancelSchedule",
+			Handler:    _PixService_CancelSchedule_Handler,
+		},
+		{
+			MethodName: "RunDueSchedules",
+			Handler:    _PixService_RunDueSchedules_Handler,
+		},
+		{
+			MethodName: "RequestMandate",
+			Handler:    _PixService_RequestMandate_Handler,
+		},
+		{
+			MethodName: "DecideMandate",
+			Handler:    _PixService_DecideMandate_Handler,
+		},
+		{
+			MethodName: "RevokeMandate",
+			Handler:    _PixService_RevokeMandate_Handler,
+		},
+		{
+			MethodName: "ListMandates",
+			Handler:    _PixService_ListMandates_Handler,
+		},
+		{
+			MethodName: "ChargeMandate",
+			Handler:    _PixService_ChargeMandate_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

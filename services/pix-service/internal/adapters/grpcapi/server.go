@@ -203,7 +203,7 @@ func (s *Server) CreateQrCode(ctx context.Context, req *pixv1.CreateQrCodeReques
 		return nil, err
 	}
 	q, payload, err := s.app.CreateQRCode(ctx, account, req.GetKey(), amount, req.GetDescription(), req.GetOneTime(),
-		time.Duration(req.GetExpiresInSeconds())*time.Second)
+		req.GetDynamic(), time.Duration(req.GetExpiresInSeconds())*time.Second)
 	if err != nil {
 		return nil, toStatus(err)
 	}
@@ -343,6 +343,12 @@ func toStatus(err error) error {
 		return grpcserver.Error(codes.FailedPrecondition, "NOT_REFUNDABLE", err.Error())
 	case errors.Is(err, domain.ErrRefundTooLarge):
 		return grpcserver.Error(codes.FailedPrecondition, "REFUND_TOO_LARGE", err.Error())
+	case errors.Is(err, domain.ErrMandateNotActive):
+		return grpcserver.Error(codes.FailedPrecondition, "MANDATE_NOT_ACTIVE", err.Error())
+	case errors.Is(err, domain.ErrChargeNotAllowed):
+		return grpcserver.Error(codes.FailedPrecondition, "CHARGE_NOT_ALLOWED", err.Error())
+	case errors.Is(err, application.ErrDynamicQRDisabled):
+		return grpcserver.Error(codes.FailedPrecondition, "DYNAMIC_QR_DISABLED", err.Error())
 	case errors.Is(err, domain.ErrBusy):
 		return grpcserver.Error(codes.Aborted, "IN_PROGRESS", err.Error())
 	}

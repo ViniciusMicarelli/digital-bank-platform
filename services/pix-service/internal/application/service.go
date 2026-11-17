@@ -35,6 +35,8 @@ type Service struct {
 	spi      ports.SPI
 	log      *slog.Logger
 	now      func() time.Time
+	qr       *QRSigner
+	fetcher  ports.QRFetcher
 }
 
 // SetClock replaces the clock (tests).
@@ -158,7 +160,10 @@ const QRCity = "SAO PAULO"
 
 // CreateQRCode issues a charge for one of the account's keys. With oneTime it
 // can be paid once; ttl (0 = no expiry) bounds how long it is valid.
-func (s *Service) CreateQRCode(ctx context.Context, account uuid.UUID, key string, amount *money.Money, description string, oneTime bool, ttl time.Duration) (domain.QRCode, string, error) {
+func (s *Service) CreateQRCode(ctx context.Context, account uuid.UUID, key string, amount *money.Money, description string, oneTime, dynamic bool, ttl time.Duration) (domain.QRCode, string, error) {
+	if dynamic && s.qr == nil {
+		return domain.QRCode{}, "", ErrDynamicQRDisabled
+	}
 	holder, err := s.accounts.Holder(ctx, account)
 	if err != nil {
 		return domain.QRCode{}, "", err
@@ -185,10 +190,16 @@ func (s *Service) CreateQRCode(ctx context.Context, account uuid.UUID, key strin
 		exp := s.now().Add(ttl)
 		q.ExpiresAt = &exp
 	}
-	payload, err := domain.BRCode{
+	code := domain.BRCode{
 		Key: value, Amount: amount, MerchantName: holder.Name, MerchantCity: QRCity,
 		TxID: q.TxID, Description: description, OneTime: oneTime,
-	}.Encode()
+	}
+	if dynamic {
+		// The code only points at the signed payload: key and amount travel
+		// in the JWS, so they can be changed or revoked after printing.
+		code = domain.BRCode{URL: s.qr.Location + "/" + q.TxID, MerchantName: holder.Name, MerchantCity: QRCity, OneTime: oneTime}
+	}
+	payload, err := code.Encode()
 	if err != nil {
 		return domain.QRCode{}, "", err
 	}
@@ -211,6 +222,11 @@ func (s *Service) DecodeQRCode(ctx context.Context, payload string) (DecodedQR, 
 	code, err := domain.DecodeBRCode(payload)
 	if err != nil {
 		return DecodedQR{}, err
+	}
+	if code.URL != "" {
+		if err := s.resolveDynamic(ctx, &code); err != nil {
+			return DecodedQR{}, err
+		}
 	}
 	_, value, receiver, _, err := s.Lookup(ctx, code.Key)
 	if err != nil {

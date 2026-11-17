@@ -21,7 +21,7 @@
 | 401 | Missing or invalid token / credentials | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `MFA_REQUIRED`, `ACCOUNT_LOCKED`, `REFRESH_TOKEN_REUSED` |
 | 404 | Not found, or not yours | `NOT_FOUND` |
 | 409 | Same key, different request; or still processing | `IDEMPOTENCY_CONFLICT`, `IN_PROGRESS` |
-| 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS`, `QR_CODE_UNAVAILABLE`, `REFUND_TOO_LARGE`, `NOT_REFUNDABLE` |
+| 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS`, `QR_CODE_UNAVAILABLE`, `REFUND_TOO_LARGE`, `NOT_REFUNDABLE`, `CHARGE_NOT_ALLOWED`, `MANDATE_NOT_ACTIVE` |
 | 429 | Rate limited | `RATE_LIMITED` |
 | 503 | A dependency is down; retry with the same key | `RETRY_LATER` |
 
@@ -50,7 +50,14 @@
 | `GET` | `/v1/pix/keys/{key}` | Look up a key before paying |
 | `GET` | `/v1/accounts/{id}/pix/transfers?direction=incoming\|outgoing` | Pix sent / received (use a received one's `id` to refund it) |
 | `POST` | `/v1/accounts/{id}/pix/transfers` | `{key, amount, description}` · Idempotency-Key |
-| `POST` | `/v1/accounts/{id}/pix/qr-codes` | Issue a BR Code `{key, amount?, description, one_time, expires_in_seconds}` → `{txid, payload}` |
+| `POST` | `/v1/accounts/{id}/pix/qr-codes` | Issue a BR Code `{key, amount?, description, one_time, dynamic, expires_in_seconds}` → `{txid, payload}` |
+| `POST` / `GET` | `/v1/accounts/{id}/pix/schedules` | Schedule `{key, amount, start_date, frequency: ONCE\|WEEKLY\|MONTHLY, occurrences}` (Idempotency-Key) / list |
+| `DELETE` | `/v1/accounts/{id}/pix/schedules/{scheduleID}` | Cancel a schedule |
+| `POST` / `GET` | `/v1/accounts/{id}/pix/mandates` | Pix Automático: request `{receiver_key, payer_key, max_amount, frequency, description}` / list |
+| `POST` | `/v1/accounts/{id}/pix/mandates/{mandateID}/approve` · `/reject` · `/revoke` | Payer decides; either side revokes |
+| `POST` | `/v1/accounts/{id}/pix/mandates/{mandateID}/charges` | Receiver charges `{amount, due_date}` (Idempotency-Key) |
+| `GET` | `/pix/qr/v2/{txid}` · `/pix/qr/jwks.json` | *(public)* Signed payload of a dynamic QR code, verification keys |
+| `POST` | `/v1/sandbox/pix/run-schedules` | *(sandbox)* Run schedules due on `{as_of}` |
 | `POST` | `/v1/pix/qr-codes/decode` | `{payload}` → receiver, amount, txid |
 | `POST` | `/v1/accounts/{id}/pix/qr-payments` | Pay a BR Code `{payload, amount?}` · Idempotency-Key |
 | `POST` | `/v1/accounts/{id}/pix/transfers/{transferID}/refunds` | Refund a received Pix `{amount, reason}` · Idempotency-Key |

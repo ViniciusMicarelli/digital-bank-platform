@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // schedules use America/Sao_Paulo; the scratch image has no zoneinfo
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
@@ -15,11 +16,13 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kms"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/adapters/clients"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/adapters/grpcapi"
 	pgstore "github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/adapters/postgres"
+	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/adapters/qrfetch"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/adapters/simulator"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/internal/application"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/pix-service/migrations"
@@ -63,6 +66,18 @@ func main() {
 		clients.NewAccounts(accountv1.NewAccountServiceClient(accountConn)),
 		clients.NewTransactions(txv1.NewTransactionServiceClient(txConn)),
 		simulator.NewDirectory(), simulator.NewSPI(), log)
+
+	// Dynamic QR codes: the signing key derives from a KMS data key.
+	if os.Getenv("KMS_ADDR") != "" || os.Getenv("PIX_QR_SEED") != "" {
+		seed, err := kms.MasterKey(ctx, log, pool, "pix-service/qr-signing", "PIX_QR_SEED")
+		if err != nil {
+			log.Error("QR signing key", "error", err)
+			os.Exit(1)
+		}
+		app.SetQRSigner(application.NewQRSigner(seed, config.String("PIX_QR_LOCATION", "pix.digitalbank.example/pix/qr/v2")))
+	}
+	app.SetQRFetcher(qrfetch.New(config.String("PIX_QR_SCHEME", "https")))
+	go app.RunSchedules(ctx, config.Duration("SCHEDULE_INTERVAL", 30*time.Second))
 
 	brokers := kafka.Brokers(config.String("KAFKA_BROKERS", ""))
 	go kafka.RunOutboxRelay(ctx, pool, log, brokers)

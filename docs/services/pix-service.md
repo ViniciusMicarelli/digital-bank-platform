@@ -17,7 +17,9 @@ Pix, the Brazilian instant payment system. Integrations with the Central Bank (*
 | QR codes: BR Code (EMV QRCPS-MPM + CRC16-CCITT) static or one-time, with amount or open amount, expiry and `txid` | ✅ |
 | Paying QR codes, with one-time charges reserved before money moves | ✅ |
 | Refunds ("devolução") of received Pix, partial or full, within 90 days | ✅ |
-| Dynamic QR codes served by URL (JWS payload), scheduled Pix, Pix Automático | planned |
+| Dynamic QR codes: the BR Code carries a URL; the charge is served as a JWS signed by the bank and verified by the payer | ✅ |
+| Scheduled Pix (a future date) and recurring Pix (weekly / monthly), cancellable | ✅ |
+| Pix Automático: receiver-requested, payer-approved mandates with a maximum and a frequency; charges paid on their due dates | ✅ |
 
 ## Outgoing Transfer Flow
 
@@ -45,6 +47,22 @@ Paying a code:
 1. `DecodeQrCode` checks the checksum and structure, resolves the receiver, and for charges issued here checks the code still matches what was issued (key, amount), is not expired, and is not paid.
 2. `PayQrCode` creates the transfer, then **claims** the charge (`UPDATE … WHERE paid_transfer_id IS NULL`) before any money moves. A second payer of a one-time code is refused with `QR_CODE_UNAVAILABLE`.
 3. If the payment fails (no funds, refused), the claim is released in the same transaction that marks the transfer failed, so the charge can be paid again.
+
+## Dynamic QR Codes
+
+A dynamic code does not contain the key or the amount, only a URL (`26.25`), e.g. `pix.digitalbank.example/pix/qr/v2/<txid>`. The payer's bank:
+
+1. fetches the URL and gets a compact **JWS** (EdDSA) whose claims follow the Central Bank's Pix API (`txid`, `chave`, `valor.original`, `status`, `calendario`, `solicitacaoPagador`);
+2. fetches the receiver bank's JWKS (`/pix/qr/jwks.json`) and verifies the signature;
+3. pays only if the status is `ATIVA`; once paid, the endpoint serves the charge as `CONCLUIDA`.
+
+A forged payload (another key, even with the right `kid`) is rejected. The signing key is an Ed25519 key derived from a kms-service data key (`pix-service/qr-signing`). Both endpoints are public, as other banks must reach them.
+
+## Scheduled, Recurring and Automatic Pix
+
+- **Schedules** run on São Paulo dates. Monthly dates are computed from the first date and clamped to the month's end (the 31st runs on Feb 28 and on Mar 31 again).
+- A worker (every 30 s) locks each due schedule with `FOR UPDATE SKIP LOCKED`, sends the Pix with the key `sched:<id>:<n>` and records the run, in one transaction: replicas never run an occurrence twice, and a crash mid-run is retried with the same key. A refused occurrence (no funds) is recorded and the schedule moves on.
+- **Pix Automático**: the receiver requests a mandate for a payer's key (max amount, weekly or monthly); the payer approves or rejects; the receiver then charges at most once per period and never above the maximum. Each charge is a schedule on its due date. Revoking cancels pending charges, and a charge whose mandate is no longer active is skipped at execution.
 
 ## Refunds
 
@@ -81,6 +99,9 @@ Defined in [`contracts/proto/bank/pix/v1/pix.proto`](../../contracts/proto/bank/
 | `SimulateIncoming` | Simulated SPI delivery |
 | `CreateQrCode` / `DecodeQrCode` / `PayQrCode` | BR Code charges |
 | `RefundTransfer` | Refund a received Pix |
+| `GetDynamicQrPayload` / `GetQrJwks` | Signed payload and verification keys of dynamic codes |
+| `CreateSchedule` / `ListSchedules` / `CancelSchedule` / `RunDueSchedules` | Scheduled and recurring Pix |
+| `RequestMandate` / `DecideMandate` / `RevokeMandate` / `ListMandates` / `ChargeMandate` | Pix Automático |
 
 ## Events
 
@@ -96,4 +117,4 @@ Defined in [`contracts/proto/bank/pix/v1/pix.proto`](../../contracts/proto/bank/
 
 ## Data
 
-`pix_keys`, `pix_transfers` (with `qr_txid`, `refund_of`, `refunded_amount`), `qr_codes`, `outbox`, `inbox`. Every transfer stores its `end_to_end_id` (E2E ID), the unique identifier of a Pix payment.
+`pix_keys`, `pix_transfers` (with `qr_txid`, `refund_of`, `refunded_amount`), `qr_codes`, `pix_schedules`, `pix_schedule_runs`, `pix_mandates`, `data_keys`, `outbox`, `inbox`. Every transfer stores its `end_to_end_id` (E2E ID), the unique identifier of a Pix payment.

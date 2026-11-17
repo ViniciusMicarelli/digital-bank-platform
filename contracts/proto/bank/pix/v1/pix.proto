@@ -31,6 +31,23 @@ service PixService {
   rpc PayQrCode(PayQrCodeRequest) returns (PayQrCodeResponse);
   // Returns (part of) a received Pix to the payer, within 90 days.
   rpc RefundTransfer(RefundTransferRequest) returns (RefundTransferResponse);
+  // The signed payload of a dynamic QR code (served publicly at its URL).
+  rpc GetDynamicQrPayload(GetDynamicQrPayloadRequest) returns (GetDynamicQrPayloadResponse);
+  // Public keys that verify dynamic QR payloads.
+  rpc GetQrJwks(GetQrJwksRequest) returns (GetQrJwksResponse);
+
+  rpc CreateSchedule(CreateScheduleRequest) returns (CreateScheduleResponse);
+  rpc ListSchedules(ListSchedulesRequest) returns (ListSchedulesResponse);
+  rpc CancelSchedule(CancelScheduleRequest) returns (CancelScheduleResponse);
+  // Runs schedules due on a date (sandbox/operations; a worker does it every 30 s).
+  rpc RunDueSchedules(RunDueSchedulesRequest) returns (RunDueSchedulesResponse);
+
+  // Pix Automático: the receiver requests, the payer approves, the receiver charges.
+  rpc RequestMandate(RequestMandateRequest) returns (RequestMandateResponse);
+  rpc DecideMandate(DecideMandateRequest) returns (DecideMandateResponse);
+  rpc RevokeMandate(RevokeMandateRequest) returns (RevokeMandateResponse);
+  rpc ListMandates(ListMandatesRequest) returns (ListMandatesResponse);
+  rpc ChargeMandate(ChargeMandateRequest) returns (ChargeMandateResponse);
 }
 
 enum KeyType {
@@ -179,6 +196,8 @@ message CreateQrCodeRequest {
   bool one_time = 5;
   // 0 = no expiry.
   int64 expires_in_seconds = 6;
+  // Dynamic code: the BR Code carries a URL to a signed (JWS) payload.
+  bool dynamic = 7;
 }
 
 message CreateQrCodeResponse {
@@ -242,4 +261,158 @@ message ListTransfersRequest {
 message ListTransfersResponse {
   repeated Transfer transfers = 1;
   string next_page_token = 2;
+}
+
+message GetDynamicQrPayloadRequest {
+  string txid = 1;
+}
+
+message GetDynamicQrPayloadResponse {
+  // Compact JWS (EdDSA) of the charge.
+  string jws = 1;
+}
+
+message GetQrJwksRequest {}
+
+message Jwk {
+  string kid = 1;
+  string kty = 2;
+  string crv = 3;
+  string x = 4;
+  string alg = 5;
+}
+
+message GetQrJwksResponse {
+  repeated Jwk keys = 1;
+}
+
+enum Frequency {
+  FREQUENCY_UNSPECIFIED = 0;
+  FREQUENCY_ONCE = 1;
+  FREQUENCY_WEEKLY = 2;
+  FREQUENCY_MONTHLY = 3;
+}
+
+message Schedule {
+  string id = 1;
+  string account_id = 2;
+  string key = 3;
+  bank.common.v1.Money amount = 4;
+  string description = 5;
+  // YYYY-MM-DD (São Paulo calendar).
+  string start_date = 6;
+  Frequency frequency = 7;
+  // 0 = until cancelled.
+  int32 occurrences = 8;
+  int32 executed = 9;
+  string next_date = 10;
+  // ACTIVE, CANCELLED, COMPLETED.
+  string status = 11;
+  string mandate_id = 12;
+}
+
+message CreateScheduleRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string key = 3;
+  bank.common.v1.Money amount = 4;
+  string description = 5;
+  string start_date = 6;
+  Frequency frequency = 7;
+  int32 occurrences = 8;
+}
+
+message CreateScheduleResponse {
+  Schedule schedule = 1;
+}
+
+message ListSchedulesRequest {
+  string account_id = 1;
+}
+
+message ListSchedulesResponse {
+  repeated Schedule schedules = 1;
+}
+
+message CancelScheduleRequest {
+  string account_id = 1;
+  string schedule_id = 2;
+}
+
+message CancelScheduleResponse {
+  Schedule schedule = 1;
+}
+
+message RunDueSchedulesRequest {
+  // YYYY-MM-DD; empty = today.
+  string as_of = 1;
+}
+
+message RunDueSchedulesResponse {
+  int32 executed = 1;
+}
+
+message Mandate {
+  string id = 1;
+  string receiver_account_id = 2;
+  string receiver_key = 3;
+  string receiver_name = 4;
+  string payer_account_id = 5;
+  bank.common.v1.Money max_amount = 6;
+  Frequency frequency = 7;
+  string description = 8;
+  // PENDING, ACTIVE, REJECTED, REVOKED.
+  string status = 9;
+}
+
+message RequestMandateRequest {
+  string receiver_account_id = 1;
+  string receiver_key = 2;
+  string payer_key = 3;
+  bank.common.v1.Money max_amount = 4;
+  Frequency frequency = 5;
+  string description = 6;
+}
+
+message RequestMandateResponse {
+  Mandate mandate = 1;
+}
+
+message DecideMandateRequest {
+  string payer_account_id = 1;
+  string mandate_id = 2;
+  bool approve = 3;
+}
+
+message DecideMandateResponse {
+  Mandate mandate = 1;
+}
+
+message RevokeMandateRequest {
+  string account_id = 1;
+  string mandate_id = 2;
+}
+
+message RevokeMandateResponse {
+  Mandate mandate = 1;
+}
+
+message ListMandatesRequest {
+  string account_id = 1;
+}
+
+message ListMandatesResponse {
+  repeated Mandate mandates = 1;
+}
+
+message ChargeMandateRequest {
+  string idempotency_key = 1;
+  string receiver_account_id = 2;
+  string mandate_id = 3;
+  bank.common.v1.Money amount = 4;
+  string due_date = 5;
+}
+
+message ChargeMandateResponse {
+  Schedule schedule = 1;
 }

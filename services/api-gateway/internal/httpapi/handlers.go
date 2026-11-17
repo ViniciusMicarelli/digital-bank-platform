@@ -448,6 +448,7 @@ func (a *API) createQRCode(w http.ResponseWriter, r *http.Request, acc *accountv
 		Description      string `json:"description"`
 		OneTime          bool   `json:"one_time"`
 		ExpiresInSeconds int64  `json:"expires_in_seconds"`
+		Dynamic          bool   `json:"dynamic"`
 	}
 	if !decode(w, r, &req) {
 		return
@@ -458,7 +459,7 @@ func (a *API) createQRCode(w http.ResponseWriter, r *http.Request, acc *accountv
 	}
 	resp, err := a.c.Pix.CreateQrCode(r.Context(), &pixv1.CreateQrCodeRequest{
 		AccountId: acc.GetId(), Key: req.Key, Amount: amount, Description: req.Description,
-		OneTime: req.OneTime, ExpiresInSeconds: req.ExpiresInSeconds,
+		OneTime: req.OneTime, ExpiresInSeconds: req.ExpiresInSeconds, Dynamic: req.Dynamic,
 	})
 	if err != nil {
 		writeGRPCError(w, r.Context(), err)

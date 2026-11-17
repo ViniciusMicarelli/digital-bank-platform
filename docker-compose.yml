@@ -61,7 +61,7 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/kms-service.pem
       TLS_KEY: /certs/kms-service-key.pem
-      ALLOWED_CALLERS: identity-service,account-service,card-service,dev-client
+      ALLOWED_CALLERS: identity-service,account-service,card-service,pix-service,dev-client
       KMS_OPERATORS: dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/kms?sslmode=disable
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -159,6 +159,9 @@ services:
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
+      KMS_ADDR: kms-service:9008
+      PIX_QR_LOCATION: api-gateway:8080/pix/qr/v2
+      PIX_QR_SCHEME: http
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/pix-service.pem
       TLS_KEY: /certs/pix-service-key.pem
@@ -171,6 +174,7 @@ services:
       TRANSACTION_ADDR: transaction-service:9003
     ports: ["9004:9004"]
     depends_on:
+      kms-service: { condition: service_healthy }
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
       account-service: { condition: service_healthy }

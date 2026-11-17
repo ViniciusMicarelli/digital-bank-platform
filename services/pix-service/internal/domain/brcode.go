@@ -16,7 +16,10 @@ import (
 // profile of EMV QRCPS-MPM: TLV fields (2-digit id, 2-digit length, value)
 // ending with a CRC16-CCITT checksum.
 type BRCode struct {
-	Key          string
+	Key string
+	// URL (without scheme) of a dynamic code's signed payload; dynamic codes
+	// carry it instead of the key.
+	URL          string
 	Amount       *money.Money // nil: the payer chooses the amount
 	MerchantName string
 	MerchantCity string
@@ -40,6 +43,7 @@ const (
 	fieldCRC           = "63"
 	pixGUI             = "br.gov.bcb.pix"
 	subGUI, subKey     = "00", "01"
+	subURL             = "25"
 	subDescription     = "02"
 	subTxID            = "05"
 	maxMerchantName    = 25
@@ -74,8 +78,8 @@ func asciiUpper(s string, max int) string {
 
 // Encode renders the payload, including the CRC.
 func (c BRCode) Encode() (string, error) {
-	if c.Key == "" {
-		return "", fmt.Errorf("%w: QR code needs a Pix key", ErrInvalidArgument)
+	if (c.Key == "") == (c.URL == "") {
+		return "", fmt.Errorf("%w: a QR code needs a Pix key or (dynamic) a URL", ErrInvalidArgument)
 	}
 	txid := c.TxID
 	if txid == "" {
@@ -84,7 +88,12 @@ func (c BRCode) Encode() (string, error) {
 	if txid != noTxID && !txidRE.MatchString(txid) {
 		return "", fmt.Errorf("%w: txid must be 1-25 letters or digits", ErrInvalidArgument)
 	}
-	account := tlv(subGUI, pixGUI) + tlv(subKey, c.Key)
+	account := tlv(subGUI, pixGUI)
+	if c.URL != "" {
+		account += tlv(subURL, c.URL)
+	} else {
+		account += tlv(subKey, c.Key)
+	}
 	if d := asciiUpper(c.Description, maxQRDescription); d != "" {
 		account += tlv(subDescription, d)
 	}
@@ -174,11 +183,12 @@ func DecodeBRCode(payload string) (BRCode, error) {
 		return BRCode{}, invalid("only BRL Pix QR codes are supported")
 	}
 	acc, _, err := parseTLV(f[fieldMerchantInfo])
-	if err != nil || !strings.EqualFold(acc[subGUI], pixGUI) || acc[subKey] == "" {
+	if err != nil || !strings.EqualFold(acc[subGUI], pixGUI) || (acc[subKey] == "" && acc[subURL] == "") {
 		return BRCode{}, invalid("QR code has no Pix key")
 	}
 	c := BRCode{
 		Key:          acc[subKey],
+		URL:          acc[subURL],
 		Description:  acc[subDescription],
 		MerchantName: f[fieldMerchantName],
 		MerchantCity: f[fieldMerchantCity],

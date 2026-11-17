@@ -113,7 +113,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - **Kubernetes**: a Helm chart (Deployments with probes and resources, Services, HPA, PodDisruptionBudgets, default-deny NetworkPolicies that mirror the mTLS caller matrix), validated in CI.
 - **Terraform**: AWS reference infrastructure (VPC, EKS, RDS PostgreSQL, MSK, ElastiCache, KMS), validated in CI.
 
-## Phase 13 — Pix: scheduling, recurring and dynamic QR codes
+## Phase 13 — Pix: scheduling, recurring and dynamic QR codes ✅
 
 - Scheduled Pix (a date in the future) and recurring Pix (weekly / monthly), executed by a worker, cancellable.
 - Pix Automático: a payer authorizes a receiver (mandate with a maximum amount and frequency); the receiver's charges are paid automatically within it.

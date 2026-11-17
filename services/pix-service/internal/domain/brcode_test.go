@@ -74,3 +74,17 @@ func TestDecodeRejects(t *testing.T) {
 		t.Error("invalid txid accepted")
 	}
 }
+
+func TestDynamicBRCode(t *testing.T) {
+	payload, err := BRCode{URL: "pix.digitalbank.example/qr/v2/abc123", MerchantName: "Loja", MerchantCity: "SP", OneTime: true}.Encode()
+	if err != nil || !strings.Contains(payload, "2536pix.digitalbank.example/qr/v2/abc123") {
+		t.Fatalf("dynamic payload = %s, %v", payload, err)
+	}
+	c, err := DecodeBRCode(payload)
+	if err != nil || c.URL != "pix.digitalbank.example/qr/v2/abc123" || c.Key != "" {
+		t.Fatalf("decoded = %+v, %v", c, err)
+	}
+	if _, err := (BRCode{Key: "k", URL: "u"}).Encode(); err == nil {
+		t.Fatal("key and URL together must fail")
+	}
+}
