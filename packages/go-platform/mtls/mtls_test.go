@@ -2,6 +2,7 @@ package mtls_test
 
 import (
 	"context"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -68,7 +69,9 @@ func stream(t *testing.T, addr string, creds credentials.TransportCredentials) e
 	if err != nil {
 		return err
 	}
-	if err := s.Send(&reflectionpb.ServerReflectionRequest{MessageRequest: &reflectionpb.ServerReflectionRequest_ListServices{}}); err != nil {
+	// If the server already refused the stream, Send returns io.EOF and the
+	// real status comes from Recv (documented gRPC behavior).
+	if err := s.Send(&reflectionpb.ServerReflectionRequest{MessageRequest: &reflectionpb.ServerReflectionRequest_ListServices{}}); err != nil && err != io.EOF {
 		return err
 	}
 	_, err = s.Recv()
