@@ -74,6 +74,28 @@ func (s *Service) Register(ctx context.Context, email, password, fullName string
 	return c.CustomerID, nil
 }
 
+// EnsureAnalyst creates a back-office analyst (or promotes an existing
+// user). Used to bootstrap development and demo environments; production
+// staff would come from the bank's identity provider.
+func (s *Service) EnsureAnalyst(ctx context.Context, email, password, name string) (uuid.UUID, error) {
+	norm, err := domain.NormalizeEmail(email)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	c, err := s.store.CredentialsByEmail(ctx, norm)
+	if errors.Is(err, domain.ErrNotFound) {
+		id, err := s.Register(ctx, norm, password, name)
+		if err != nil {
+			return uuid.Nil, err
+		}
+		return id, s.store.SetRole(ctx, id, domain.RoleAnalyst)
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return c.CustomerID, s.store.SetRole(ctx, c.CustomerID, domain.RoleAnalyst)
+}
+
 // Login checks the password (and the TOTP code when enabled) and starts a
 // new session. Failures are counted even though an error is returned, so the
 // transaction commits and the authentication error is reported afterwards.
@@ -124,7 +146,7 @@ func (s *Service) Login(ctx context.Context, email, password, code string) (uuid
 			return err
 		}
 		customer = c.CustomerID
-		pair, _, err = s.issue(ctx, tx, c.CustomerID, uuid.Must(uuid.NewV7()), now)
+		pair, _, err = s.issue(ctx, tx, c.CustomerID, uuid.Must(uuid.NewV7()), c.Role, now)
 		return err
 	})
 	if err != nil {
@@ -218,8 +240,12 @@ func (s *Service) Refresh(ctx context.Context, token string) (TokenPair, error) 
 			refreshErr = domain.ErrInvalidRefresh
 			return nil
 		}
+		c, err := tx.CredentialsForUpdate(ctx, rt.CustomerID)
+		if err != nil {
+			return err
+		}
 		var nextID uuid.UUID
-		if pair, nextID, err = s.issue(ctx, tx, rt.CustomerID, rt.FamilyID, now); err != nil {
+		if pair, nextID, err = s.issue(ctx, tx, rt.CustomerID, rt.FamilyID, c.Role, now); err != nil {
 			return err
 		}
 		return tx.RevokeRefreshToken(ctx, rt.ID, &nextID)
@@ -245,12 +271,12 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 }
 
 // issue signs an access token and stores a new refresh token in family.
-func (s *Service) issue(ctx context.Context, tx ports.Tx, customer, family uuid.UUID, now time.Time) (TokenPair, uuid.UUID, error) {
+func (s *Service) issue(ctx context.Context, tx ports.Tx, customer, family uuid.UUID, role domain.Role, now time.Time) (TokenPair, uuid.UUID, error) {
 	key, err := s.signingKey(ctx)
 	if err != nil {
 		return TokenPair{}, uuid.Nil, err
 	}
-	access, accessExp, err := domain.SignAccessToken(key, customer, now)
+	access, accessExp, err := domain.SignAccessToken(key, customer, role, now)
 	if err != nil {
 		return TokenPair{}, uuid.Nil, err
 	}

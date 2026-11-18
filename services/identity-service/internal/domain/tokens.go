@@ -46,9 +46,12 @@ func (k SigningKey) JWK() JWK {
 }
 
 // SignAccessToken issues a short-lived token whose subject is the customer.
-func SignAccessToken(k SigningKey, customerID uuid.UUID, now time.Time) (string, time.Time, error) {
+func SignAccessToken(k SigningKey, customerID uuid.UUID, role Role, now time.Time) (string, time.Time, error) {
 	exp := now.Add(AccessTokenTTL)
-	tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.RegisteredClaims{
+	if role == "" {
+		role = RoleCustomer
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, AccessClaims{RegisteredClaims: jwt.RegisteredClaims{
 		Issuer:    Issuer,
 		Subject:   customerID.String(),
 		Audience:  jwt.ClaimStrings{Audience},
@@ -56,7 +59,7 @@ func SignAccessToken(k SigningKey, customerID uuid.UUID, now time.Time) (string,
 		NotBefore: jwt.NewNumericDate(now),
 		ExpiresAt: jwt.NewNumericDate(exp),
 		ID:        uuid.NewString(),
-	})
+	}, Role: role})
 	tok.Header["kid"] = k.Kid
 	s, err := tok.SignedString(k.Private)
 	return s, exp, err
@@ -123,6 +126,22 @@ type Credentials struct {
 	TOTPLastStep   int64
 	FailedAttempts int
 	LockedUntil    *time.Time
+	Role           Role
+}
+
+// Role separates customers from bank staff.
+type Role string
+
+const (
+	RoleCustomer Role = "CUSTOMER"
+	// RoleAnalyst works in the back office (KYC reviews, account blocks).
+	RoleAnalyst Role = "ANALYST"
+)
+
+// AccessClaims are the access token's claims: who, and with which role.
+type AccessClaims struct {
+	jwt.RegisteredClaims
+	Role Role `json:"role,omitempty"`
 }
 
 // Locked reports whether logins are refused at now.

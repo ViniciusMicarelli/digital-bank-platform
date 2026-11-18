@@ -34,6 +34,8 @@ type Store interface {
 	// InsertCredentials fails with domain.ErrEmailTaken if the email exists.
 	InsertCredentials(ctx context.Context, c domain.Credentials, ev outbox.Message) error
 	Credentials(ctx context.Context, customerID uuid.UUID) (domain.Credentials, error)
+	CredentialsByEmail(ctx context.Context, email string) (domain.Credentials, error)
+	SetRole(ctx context.Context, customerID uuid.UUID, role domain.Role) error
 
 	ActiveKey(ctx context.Context) (StoredKey, error)
 	// PublishedKeys are the keys whose tokens may still be valid.

@@ -242,6 +242,9 @@ services:
     volumes:
       - ./infrastructure/certs:/certs:ro
     environment:
+      # Development / demo back-office analyst (production staff come from SSO).
+      BOOTSTRAP_ANALYST_EMAIL: analista@digitalbank.dev
+      BOOTSTRAP_ANALYST_PASSWORD: correct horse battery staple
       KMS_ADDR: kms-service:9008
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/identity-service.pem

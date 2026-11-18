@@ -54,6 +54,14 @@ func main() {
 		os.Exit(1)
 	}
 	app := application.New(pgstore.NewStore(pool), box, log)
+	// Development / demo: a back-office analyst from the environment.
+	if email := config.String("BOOTSTRAP_ANALYST_EMAIL", ""); email != "" {
+		if _, err := app.EnsureAnalyst(ctx, email, config.String("BOOTSTRAP_ANALYST_PASSWORD", ""), "Analista Digital Bank"); err != nil {
+			log.Error("bootstrap analyst", "error", err)
+			os.Exit(1)
+		}
+		log.Info("back-office analyst ready", "email", email)
+	}
 	if err := app.EnsureSigningKey(ctx); err != nil {
 		log.Error("signing key", "error", err)
 		os.Exit(1)

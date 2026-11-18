@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router'
 import { LiveNotifications } from './app/live'
-import { useAccounts, useProfile } from './app/queries'
+import { useAccounts, useMe, useProfile } from './app/queries'
 import { useSignedIn } from './app/contexts'
 import { Layout, MorePage } from './components/Layout'
 import { Loading } from './components/ui'
@@ -18,6 +18,7 @@ const CreditPage = page(() => import('./pages/Credit'), 'CreditPage')
 const BoletosPage = page(() => import('./pages/Boletos'), 'BoletosPage')
 const NotificationsPage = page(() => import('./pages/Notifications'), 'NotificationsPage')
 const SettingsPage = page(() => import('./pages/Settings'), 'SettingsPage')
+const BackofficePage = page(() => import('./pages/Backoffice'), 'BackofficePage')
 
 function SignedOut() {
   return useSignedIn() ? <Navigate to="/" replace /> : <Outlet />
@@ -30,21 +31,32 @@ function SignedIn() {
 
 /** The app needs a verified identity and an account; otherwise onboarding. */
 function useReady() {
+  const me = useMe()
   const profile = useProfile()
   const accounts = useAccounts()
-  if (profile.isLoading || accounts.isLoading) return undefined
+  if (me.isLoading || profile.isLoading || accounts.isLoading) return undefined
+  if (me.data?.role === 'ANALYST') return 'staff' as const
   return profile.data?.kyc_status === 'APPROVED' && (accounts.data?.length ?? 0) > 0
 }
 
 function Ready() {
   const ready = useReady()
   if (ready === undefined) return <Loading />
+  if (ready === 'staff') return <Navigate to="/backoffice" replace />
   return ready ? <Outlet /> : <Navigate to="/cadastro" replace />
+}
+
+/** Bank staff only; customers go back to their app. */
+function Staff() {
+  const me = useMe()
+  if (me.isLoading) return <Loading />
+  return me.data?.role === 'ANALYST' ? <Suspense fallback={<Loading />}><BackofficePage /></Suspense> : <Navigate to="/" replace />
 }
 
 function Onboarding() {
   const ready = useReady()
   if (ready === undefined) return <Loading />
+  if (ready === 'staff') return <Navigate to="/backoffice" replace />
   return ready ? <Navigate to="/" replace /> : <OnboardingPage />
 }
 
@@ -58,6 +70,7 @@ export default function App() {
         </Route>
         <Route element={<SignedIn />}>
           <Route path="/cadastro" element={<Onboarding />} />
+          <Route path="/backoffice" element={<Staff />} />
           <Route element={<Ready />}>
             <Route element={<Suspense fallback={<Loading />}><Layout /></Suspense>}>
               <Route index element={<HomePage />} />

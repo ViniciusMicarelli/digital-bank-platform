@@ -9,6 +9,7 @@ package userv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -125,8 +126,11 @@ type Profile struct {
 	Phone     string   `protobuf:"bytes,5,opt,name=phone,proto3" json:"phone,omitempty"`
 	Address   *Address `protobuf:"bytes,6,opt,name=address,proto3" json:"address,omitempty"`
 	// NOT_STARTED, PENDING, APPROVED, REJECTED, MANUAL_REVIEW.
-	KycStatus     string `protobuf:"bytes,7,opt,name=kyc_status,json=kycStatus,proto3" json:"kyc_status,omitempty"`
-	KycReason     string `protobuf:"bytes,8,opt,name=kyc_reason,json=kycReason,proto3" json:"kyc_reason,omitempty"`
+	KycStatus string `protobuf:"bytes,7,opt,name=kyc_status,json=kycStatus,proto3" json:"kyc_status,omitempty"`
+	KycReason string `protobuf:"bytes,8,opt,name=kyc_reason,json=kycReason,proto3" json:"kyc_reason,omitempty"`
+	// The analyst who decided a manual review.
+	ReviewedBy    string                 `protobuf:"bytes,9,opt,name=reviewed_by,json=reviewedBy,proto3" json:"reviewed_by,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -215,6 +219,20 @@ func (x *Profile) GetKycReason() string {
 		return x.KycReason
 	}
 	return ""
+}
+
+func (x *Profile) GetReviewedBy() string {
+	if x != nil {
+		return x.ReviewedBy
+	}
+	return ""
+}
+
+func (x *Profile) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
 }
 
 type GetProfileRequest struct {
@@ -522,10 +540,12 @@ func (x *SubmitKycResponse) GetProfile() *Profile {
 }
 
 type ReviewKycRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CustomerId    string                 `protobuf:"bytes,1,opt,name=customer_id,json=customerId,proto3" json:"customer_id,omitempty"`
-	Approve       bool                   `protobuf:"varint,2,opt,name=approve,proto3" json:"approve,omitempty"`
-	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	CustomerId string                 `protobuf:"bytes,1,opt,name=customer_id,json=customerId,proto3" json:"customer_id,omitempty"`
+	Approve    bool                   `protobuf:"varint,2,opt,name=approve,proto3" json:"approve,omitempty"`
+	Reason     string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	// The analyst deciding (empty in the sandbox, where the customer plays it).
+	ReviewerId    string `protobuf:"bytes,4,opt,name=reviewer_id,json=reviewerId,proto3" json:"reviewer_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -581,6 +601,101 @@ func (x *ReviewKycRequest) GetReason() string {
 	return ""
 }
 
+func (x *ReviewKycRequest) GetReviewerId() string {
+	if x != nil {
+		return x.ReviewerId
+	}
+	return ""
+}
+
+type ListKycReviewsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Limit         int32                  `protobuf:"varint,1,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListKycReviewsRequest) Reset() {
+	*x = ListKycReviewsRequest{}
+	mi := &file_bank_user_v1_user_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListKycReviewsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListKycReviewsRequest) ProtoMessage() {}
+
+func (x *ListKycReviewsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_user_v1_user_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListKycReviewsRequest.ProtoReflect.Descriptor instead.
+func (*ListKycReviewsRequest) Descriptor() ([]byte, []int) {
+	return file_bank_user_v1_user_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListKycReviewsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type ListKycReviewsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Profiles      []*Profile             `protobuf:"bytes,1,rep,name=profiles,proto3" json:"profiles,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListKycReviewsResponse) Reset() {
+	*x = ListKycReviewsResponse{}
+	mi := &file_bank_user_v1_user_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListKycReviewsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListKycReviewsResponse) ProtoMessage() {}
+
+func (x *ListKycReviewsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_user_v1_user_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListKycReviewsResponse.ProtoReflect.Descriptor instead.
+func (*ListKycReviewsResponse) Descriptor() ([]byte, []int) {
+	return file_bank_user_v1_user_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListKycReviewsResponse) GetProfiles() []*Profile {
+	if x != nil {
+		return x.Profiles
+	}
+	return nil
+}
+
 type ReviewKycResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Profile       *Profile               `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
@@ -590,7 +705,7 @@ type ReviewKycResponse struct {
 
 func (x *ReviewKycResponse) Reset() {
 	*x = ReviewKycResponse{}
-	mi := &file_bank_user_v1_user_proto_msgTypes[9]
+	mi := &file_bank_user_v1_user_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -602,7 +717,7 @@ func (x *ReviewKycResponse) String() string {
 func (*ReviewKycResponse) ProtoMessage() {}
 
 func (x *ReviewKycResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_user_v1_user_proto_msgTypes[9]
+	mi := &file_bank_user_v1_user_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -615,7 +730,7 @@ func (x *ReviewKycResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReviewKycResponse.ProtoReflect.Descriptor instead.
 func (*ReviewKycResponse) Descriptor() ([]byte, []int) {
-	return file_bank_user_v1_user_proto_rawDescGZIP(), []int{9}
+	return file_bank_user_v1_user_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ReviewKycResponse) GetProfile() *Profile {
@@ -634,7 +749,7 @@ type GetIdentityRequest struct {
 
 func (x *GetIdentityRequest) Reset() {
 	*x = GetIdentityRequest{}
-	mi := &file_bank_user_v1_user_proto_msgTypes[10]
+	mi := &file_bank_user_v1_user_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -646,7 +761,7 @@ func (x *GetIdentityRequest) String() string {
 func (*GetIdentityRequest) ProtoMessage() {}
 
 func (x *GetIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_user_v1_user_proto_msgTypes[10]
+	mi := &file_bank_user_v1_user_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -659,7 +774,7 @@ func (x *GetIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIdentityRequest.ProtoReflect.Descriptor instead.
 func (*GetIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_bank_user_v1_user_proto_rawDescGZIP(), []int{10}
+	return file_bank_user_v1_user_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetIdentityRequest) GetCustomerId() string {
@@ -680,7 +795,7 @@ type GetIdentityResponse struct {
 
 func (x *GetIdentityResponse) Reset() {
 	*x = GetIdentityResponse{}
-	mi := &file_bank_user_v1_user_proto_msgTypes[11]
+	mi := &file_bank_user_v1_user_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -692,7 +807,7 @@ func (x *GetIdentityResponse) String() string {
 func (*GetIdentityResponse) ProtoMessage() {}
 
 func (x *GetIdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_user_v1_user_proto_msgTypes[11]
+	mi := &file_bank_user_v1_user_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -705,7 +820,7 @@ func (x *GetIdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetIdentityResponse.ProtoReflect.Descriptor instead.
 func (*GetIdentityResponse) Descriptor() ([]byte, []int) {
-	return file_bank_user_v1_user_proto_rawDescGZIP(), []int{11}
+	return file_bank_user_v1_user_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetIdentityResponse) GetKycStatus() string {
@@ -733,7 +848,7 @@ var File_bank_user_v1_user_proto protoreflect.FileDescriptor
 
 const file_bank_user_v1_user_proto_rawDesc = "" +
 	"\n" +
-	"\x17bank/user/v1/user.proto\x12\fbank.user.v1\"\xc0\x01\n" +
+	"\x17bank/user/v1/user.proto\x12\fbank.user.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xc0\x01\n" +
 	"\aAddress\x12\x1f\n" +
 	"\vpostal_code\x18\x01 \x01(\tR\n" +
 	"postalCode\x12\x16\n" +
@@ -744,7 +859,7 @@ const file_bank_user_v1_user_proto_rawDesc = "" +
 	"complement\x12\x1a\n" +
 	"\bdistrict\x18\x05 \x01(\tR\bdistrict\x12\x12\n" +
 	"\x04city\x18\x06 \x01(\tR\x04city\x12\x14\n" +
-	"\x05state\x18\a \x01(\tR\x05state\"\x8a\x02\n" +
+	"\x05state\x18\a \x01(\tR\x05state\"\xe6\x02\n" +
 	"\aProfile\x12\x1f\n" +
 	"\vcustomer_id\x18\x01 \x01(\tR\n" +
 	"customerId\x12\x1b\n" +
@@ -758,7 +873,12 @@ const file_bank_user_v1_user_proto_rawDesc = "" +
 	"\n" +
 	"kyc_status\x18\a \x01(\tR\tkycStatus\x12\x1d\n" +
 	"\n" +
-	"kyc_reason\x18\b \x01(\tR\tkycReason\"4\n" +
+	"kyc_reason\x18\b \x01(\tR\tkycReason\x12\x1f\n" +
+	"\vreviewed_by\x18\t \x01(\tR\n" +
+	"reviewedBy\x129\n" +
+	"\n" +
+	"updated_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"4\n" +
 	"\x11GetProfileRequest\x12\x1f\n" +
 	"\vcustomer_id\x18\x01 \x01(\tR\n" +
 	"customerId\"E\n" +
@@ -779,12 +899,18 @@ const file_bank_user_v1_user_proto_rawDesc = "" +
 	"\vcustomer_id\x18\x01 \x01(\tR\n" +
 	"customerId\"D\n" +
 	"\x11SubmitKycResponse\x12/\n" +
-	"\aprofile\x18\x01 \x01(\v2\x15.bank.user.v1.ProfileR\aprofile\"e\n" +
+	"\aprofile\x18\x01 \x01(\v2\x15.bank.user.v1.ProfileR\aprofile\"\x86\x01\n" +
 	"\x10ReviewKycRequest\x12\x1f\n" +
 	"\vcustomer_id\x18\x01 \x01(\tR\n" +
 	"customerId\x12\x18\n" +
 	"\aapprove\x18\x02 \x01(\bR\aapprove\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"D\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\x12\x1f\n" +
+	"\vreviewer_id\x18\x04 \x01(\tR\n" +
+	"reviewerId\"-\n" +
+	"\x15ListKycReviewsRequest\x12\x14\n" +
+	"\x05limit\x18\x01 \x01(\x05R\x05limit\"K\n" +
+	"\x16ListKycReviewsResponse\x121\n" +
+	"\bprofiles\x18\x01 \x03(\v2\x15.bank.user.v1.ProfileR\bprofiles\"D\n" +
 	"\x11ReviewKycResponse\x12/\n" +
 	"\aprofile\x18\x01 \x01(\v2\x15.bank.user.v1.ProfileR\aprofile\"5\n" +
 	"\x12GetIdentityRequest\x12\x1f\n" +
@@ -794,13 +920,14 @@ const file_bank_user_v1_user_proto_rawDesc = "" +
 	"\n" +
 	"kyc_status\x18\x01 \x01(\tR\tkycStatus\x12\x1b\n" +
 	"\tfull_name\x18\x02 \x01(\tR\bfullName\x12\x10\n" +
-	"\x03cpf\x18\x03 \x01(\tR\x03cpf2\xa8\x03\n" +
+	"\x03cpf\x18\x03 \x01(\tR\x03cpf2\x85\x04\n" +
 	"\vUserService\x12O\n" +
 	"\n" +
 	"GetProfile\x12\x1f.bank.user.v1.GetProfileRequest\x1a .bank.user.v1.GetProfileResponse\x12X\n" +
 	"\rUpsertProfile\x12\".bank.user.v1.UpsertProfileRequest\x1a#.bank.user.v1.UpsertProfileResponse\x12L\n" +
 	"\tSubmitKyc\x12\x1e.bank.user.v1.SubmitKycRequest\x1a\x1f.bank.user.v1.SubmitKycResponse\x12L\n" +
-	"\tReviewKyc\x12\x1e.bank.user.v1.ReviewKycRequest\x1a\x1f.bank.user.v1.ReviewKycResponse\x12R\n" +
+	"\tReviewKyc\x12\x1e.bank.user.v1.ReviewKycRequest\x1a\x1f.bank.user.v1.ReviewKycResponse\x12[\n" +
+	"\x0eListKycReviews\x12#.bank.user.v1.ListKycReviewsRequest\x1a$.bank.user.v1.ListKycReviewsResponse\x12R\n" +
 	"\vGetIdentity\x12 .bank.user.v1.GetIdentityRequest\x1a!.bank.user.v1.GetIdentityResponseB\xc8\x01\n" +
 	"\x10com.bank.user.v1B\tUserProtoP\x01ZWgithub.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/user/v1;userv1\xa2\x02\x03BUX\xaa\x02\fBank.User.V1\xca\x02\fBank\\User\\V1\xe2\x02\x18Bank\\User\\V1\\GPBMetadata\xea\x02\x0eBank::User::V1b\x06proto3"
 
@@ -816,43 +943,50 @@ func file_bank_user_v1_user_proto_rawDescGZIP() []byte {
 	return file_bank_user_v1_user_proto_rawDescData
 }
 
-var file_bank_user_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_bank_user_v1_user_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_bank_user_v1_user_proto_goTypes = []any{
-	(*Address)(nil),               // 0: bank.user.v1.Address
-	(*Profile)(nil),               // 1: bank.user.v1.Profile
-	(*GetProfileRequest)(nil),     // 2: bank.user.v1.GetProfileRequest
-	(*GetProfileResponse)(nil),    // 3: bank.user.v1.GetProfileResponse
-	(*UpsertProfileRequest)(nil),  // 4: bank.user.v1.UpsertProfileRequest
-	(*UpsertProfileResponse)(nil), // 5: bank.user.v1.UpsertProfileResponse
-	(*SubmitKycRequest)(nil),      // 6: bank.user.v1.SubmitKycRequest
-	(*SubmitKycResponse)(nil),     // 7: bank.user.v1.SubmitKycResponse
-	(*ReviewKycRequest)(nil),      // 8: bank.user.v1.ReviewKycRequest
-	(*ReviewKycResponse)(nil),     // 9: bank.user.v1.ReviewKycResponse
-	(*GetIdentityRequest)(nil),    // 10: bank.user.v1.GetIdentityRequest
-	(*GetIdentityResponse)(nil),   // 11: bank.user.v1.GetIdentityResponse
+	(*Address)(nil),                // 0: bank.user.v1.Address
+	(*Profile)(nil),                // 1: bank.user.v1.Profile
+	(*GetProfileRequest)(nil),      // 2: bank.user.v1.GetProfileRequest
+	(*GetProfileResponse)(nil),     // 3: bank.user.v1.GetProfileResponse
+	(*UpsertProfileRequest)(nil),   // 4: bank.user.v1.UpsertProfileRequest
+	(*UpsertProfileResponse)(nil),  // 5: bank.user.v1.UpsertProfileResponse
+	(*SubmitKycRequest)(nil),       // 6: bank.user.v1.SubmitKycRequest
+	(*SubmitKycResponse)(nil),      // 7: bank.user.v1.SubmitKycResponse
+	(*ReviewKycRequest)(nil),       // 8: bank.user.v1.ReviewKycRequest
+	(*ListKycReviewsRequest)(nil),  // 9: bank.user.v1.ListKycReviewsRequest
+	(*ListKycReviewsResponse)(nil), // 10: bank.user.v1.ListKycReviewsResponse
+	(*ReviewKycResponse)(nil),      // 11: bank.user.v1.ReviewKycResponse
+	(*GetIdentityRequest)(nil),     // 12: bank.user.v1.GetIdentityRequest
+	(*GetIdentityResponse)(nil),    // 13: bank.user.v1.GetIdentityResponse
+	(*timestamppb.Timestamp)(nil),  // 14: google.protobuf.Timestamp
 }
 var file_bank_user_v1_user_proto_depIdxs = []int32{
 	0,  // 0: bank.user.v1.Profile.address:type_name -> bank.user.v1.Address
-	1,  // 1: bank.user.v1.GetProfileResponse.profile:type_name -> bank.user.v1.Profile
-	0,  // 2: bank.user.v1.UpsertProfileRequest.address:type_name -> bank.user.v1.Address
-	1,  // 3: bank.user.v1.UpsertProfileResponse.profile:type_name -> bank.user.v1.Profile
-	1,  // 4: bank.user.v1.SubmitKycResponse.profile:type_name -> bank.user.v1.Profile
-	1,  // 5: bank.user.v1.ReviewKycResponse.profile:type_name -> bank.user.v1.Profile
-	2,  // 6: bank.user.v1.UserService.GetProfile:input_type -> bank.user.v1.GetProfileRequest
-	4,  // 7: bank.user.v1.UserService.UpsertProfile:input_type -> bank.user.v1.UpsertProfileRequest
-	6,  // 8: bank.user.v1.UserService.SubmitKyc:input_type -> bank.user.v1.SubmitKycRequest
-	8,  // 9: bank.user.v1.UserService.ReviewKyc:input_type -> bank.user.v1.ReviewKycRequest
-	10, // 10: bank.user.v1.UserService.GetIdentity:input_type -> bank.user.v1.GetIdentityRequest
-	3,  // 11: bank.user.v1.UserService.GetProfile:output_type -> bank.user.v1.GetProfileResponse
-	5,  // 12: bank.user.v1.UserService.UpsertProfile:output_type -> bank.user.v1.UpsertProfileResponse
-	7,  // 13: bank.user.v1.UserService.SubmitKyc:output_type -> bank.user.v1.SubmitKycResponse
-	9,  // 14: bank.user.v1.UserService.ReviewKyc:output_type -> bank.user.v1.ReviewKycResponse
-	11, // 15: bank.user.v1.UserService.GetIdentity:output_type -> bank.user.v1.GetIdentityResponse
-	11, // [11:16] is the sub-list for method output_type
-	6,  // [6:11] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	14, // 1: bank.user.v1.Profile.updated_at:type_name -> google.protobuf.Timestamp
+	1,  // 2: bank.user.v1.GetProfileResponse.profile:type_name -> bank.user.v1.Profile
+	0,  // 3: bank.user.v1.UpsertProfileRequest.address:type_name -> bank.user.v1.Address
+	1,  // 4: bank.user.v1.UpsertProfileResponse.profile:type_name -> bank.user.v1.Profile
+	1,  // 5: bank.user.v1.SubmitKycResponse.profile:type_name -> bank.user.v1.Profile
+	1,  // 6: bank.user.v1.ListKycReviewsResponse.profiles:type_name -> bank.user.v1.Profile
+	1,  // 7: bank.user.v1.ReviewKycResponse.profile:type_name -> bank.user.v1.Profile
+	2,  // 8: bank.user.v1.UserService.GetProfile:input_type -> bank.user.v1.GetProfileRequest
+	4,  // 9: bank.user.v1.UserService.UpsertProfile:input_type -> bank.user.v1.UpsertProfileRequest
+	6,  // 10: bank.user.v1.UserService.SubmitKyc:input_type -> bank.user.v1.SubmitKycRequest
+	8,  // 11: bank.user.v1.UserService.ReviewKyc:input_type -> bank.user.v1.ReviewKycRequest
+	9,  // 12: bank.user.v1.UserService.ListKycReviews:input_type -> bank.user.v1.ListKycReviewsRequest
+	12, // 13: bank.user.v1.UserService.GetIdentity:input_type -> bank.user.v1.GetIdentityRequest
+	3,  // 14: bank.user.v1.UserService.GetProfile:output_type -> bank.user.v1.GetProfileResponse
+	5,  // 15: bank.user.v1.UserService.UpsertProfile:output_type -> bank.user.v1.UpsertProfileResponse
+	7,  // 16: bank.user.v1.UserService.SubmitKyc:output_type -> bank.user.v1.SubmitKycResponse
+	11, // 17: bank.user.v1.UserService.ReviewKyc:output_type -> bank.user.v1.ReviewKycResponse
+	10, // 18: bank.user.v1.UserService.ListKycReviews:output_type -> bank.user.v1.ListKycReviewsResponse
+	13, // 19: bank.user.v1.UserService.GetIdentity:output_type -> bank.user.v1.GetIdentityResponse
+	14, // [14:20] is the sub-list for method output_type
+	8,  // [8:14] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_bank_user_v1_user_proto_init() }
@@ -866,7 +1000,7 @@ func file_bank_user_v1_user_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_user_v1_user_proto_rawDesc), len(file_bank_user_v1_user_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

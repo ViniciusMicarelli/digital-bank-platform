@@ -41,6 +41,7 @@
 | `POST` | `/v1/auth/step-up` | `{password, totp_code?}` → `step_up_token` (5 min), sent as `X-Step-Up-Token` on sensitive actions (🔐) |
 | `POST` | `/v1/auth/mfa/totp` | Start TOTP enrollment → `{secret, otpauth_uri}` |
 | `POST` | `/v1/auth/mfa/totp/confirm` | `{code}` → enables TOTP |
+| `GET` | `/v1/me` | Who is signed in: `{customer_id, role}` (`CUSTOMER` or `ANALYST`) |
 | `GET` · `PUT` | `/v1/me/profile` | Profile `{full_name, cpf, birth_date, phone, address{postal_code, street, number, complement, district, city, state}}` (CPF masked in answers) |
 | `POST` | `/v1/me/kyc` | Start identity verification → `kyc_status` (`APPROVED`, `REJECTED`, `MANUAL_REVIEW`, `PENDING`) |
 | `POST` | `/v1/sandbox/kyc/review` | *(sandbox)* `{approve, reason?}` decide a manual review |
@@ -94,7 +95,13 @@
 | `POST` | `/v1/accounts/{id}/credit/invoices/{invoiceID}/payments` | Pay `{amount}` from the account (Idempotency-Key) |
 | `POST` | `/v1/sandbox/accounts/{id}/credit/cycle` | *(sandbox)* `{action: CLOSE \| EXPIRE}` close the invoice now / make it overdue |
 | `POST` | `/v1/sandbox/pix-in` | *(sandbox only)* Simulate an incoming Pix `{key, amount, payer_name}` |
+| `GET` | `/v1/backoffice/kyc/reviews` | 👤 Verifications in manual review, oldest first |
+| `POST` | `/v1/backoffice/kyc/reviews/{customerID}` | 👤 Decide `{approve, reason}` (reason required to reject); the analyst is recorded |
+| `GET` | `/v1/backoffice/customers/{customerID}` | 👤 Profile, verification and accounts with balances |
+| `POST` | `/v1/backoffice/accounts/{id}/block` · `/unblock` | 👤 Block `{reason}` / unblock an account |
 | `GET` | `/healthz`, `/metrics` | Health and Prometheus metrics |
+
+👤 Back office: the access token's `role` must be `ANALYST` (403 `STAFF_ONLY` otherwise); every request is logged with the analyst id.
 
 `scripts/demo.sh` (`make demo`) walks through all of them.
 

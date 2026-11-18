@@ -4,7 +4,7 @@
 FROM node:24-alpine AS build
 WORKDIR /repo/apps/web
 COPY apps/web/package.json apps/web/package-lock.json ./
-RUN npm ci --ignore-scripts
+RUN npm config set fetch-retries 5 && npm config set fetch-retry-maxtimeout 120000 && npm ci --ignore-scripts
 COPY packages/ts-core /repo/packages/ts-core
 COPY apps/web ./
 RUN npm run build

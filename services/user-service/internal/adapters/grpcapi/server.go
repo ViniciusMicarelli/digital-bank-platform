@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	userv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/user/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/document"
@@ -26,6 +27,7 @@ func pb(p domain.Profile) *userv1.Profile {
 	a := p.Address
 	return &userv1.Profile{CustomerId: p.CustomerID, FullName: p.FullName, CpfMasked: document.MaskCPF(p.CPF),
 		BirthDate: p.BirthDate.Format(time.DateOnly), Phone: p.Phone, KycStatus: string(p.KYCStatus), KycReason: p.KYCReason,
+		ReviewedBy: p.ReviewedBy, UpdatedAt: timestamppb.New(p.UpdatedAt),
 		Address: &userv1.Address{PostalCode: a.PostalCode, Street: a.Street, Number: a.Number, Complement: a.Complement,
 			District: a.District, City: a.City, State: a.State}}
 }
@@ -81,11 +83,23 @@ func (s *Server) ReviewKyc(ctx context.Context, req *userv1.ReviewKycRequest) (*
 	if err := need(req.GetCustomerId()); err != nil {
 		return nil, err
 	}
-	p, err := s.app.Review(ctx, req.GetCustomerId(), req.GetApprove(), req.GetReason())
+	p, err := s.app.Review(ctx, req.GetCustomerId(), req.GetApprove(), req.GetReason(), req.GetReviewerId())
 	if err != nil {
 		return nil, toStatus(err)
 	}
 	return &userv1.ReviewKycResponse{Profile: pb(p)}, nil
+}
+
+func (s *Server) ListKycReviews(ctx context.Context, req *userv1.ListKycReviewsRequest) (*userv1.ListKycReviewsResponse, error) {
+	list, err := s.app.Reviews(ctx, int(req.GetLimit()))
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	resp := &userv1.ListKycReviewsResponse{}
+	for _, p := range list {
+		resp.Profiles = append(resp.Profiles, pb(p))
+	}
+	return resp, nil
 }
 
 func (s *Server) GetIdentity(ctx context.Context, req *userv1.GetIdentityRequest) (*userv1.GetIdentityResponse, error) {

@@ -79,8 +79,14 @@ func TestOnboarding(t *testing.T) {
 	if p, _ := svc.SubmitKYC(ctx, "pep"); p.KYCStatus != domain.KYCManualReview || p.KYCReason != "PEP" {
 		t.Fatalf("pep = %+v", p)
 	}
-	if p, err := svc.Review(ctx, "pep", true, ""); err != nil || p.KYCStatus != domain.KYCApproved {
+	if q, _ := svc.Reviews(ctx, 10); len(q) != 1 || q[0].CustomerID != "pep" {
+		t.Fatalf("review queue = %+v", q)
+	}
+	if p, err := svc.Review(ctx, "pep", true, "", "analyst-1"); err != nil || p.KYCStatus != domain.KYCApproved || p.ReviewedBy != "analyst-1" {
 		t.Fatalf("review = %+v %v", p, err)
+	}
+	if q, _ := svc.Reviews(ctx, 10); len(q) != 0 {
+		t.Fatalf("decided reviews leave the queue: %+v", q)
 	}
 
 	// Irregular CPF: rejected; correcting the data allows a new attempt.

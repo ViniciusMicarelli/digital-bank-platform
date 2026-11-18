@@ -16,7 +16,8 @@ Who the customer is. It owns credentials and sessions, issues access tokens, and
 | JWKS (`GetJwks`) and key rotation (`RotateSigningKey`, automatic after 30 days); retired keys stay published for 20 min | ✅ |
 | Signing keys and TOTP seeds encrypted at rest (AES-256-GCM under `IDENTITY_KEK`, bound to their row) | ✅ |
 | Step-up tokens (`StepUp`): password (+ TOTP when enabled) re-checked with lockout; 5-minute token, audience `digital-bank-step-up`, `amr` claim, required by the gateway for sensitive actions | ✅ |
-| Password reset, device binding, session listing | planned |
+| Roles: `CUSTOMER` and `ANALYST` (back office) in the access token's `role` claim, kept across refreshes; a development analyst is bootstrapped from `BOOTSTRAP_ANALYST_EMAIL` / `BOOTSTRAP_ANALYST_PASSWORD` | ✅ |
+| Password reset, device binding, session listing, staff from the bank's SSO with mandatory MFA | planned |
 
 ## Token Flow
 

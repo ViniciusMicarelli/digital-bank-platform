@@ -23,6 +23,10 @@ This document describes the security architecture of the Digital Bank Platform. 
 
 Not yet: a KMS for the key-encryption keys, TLS for Postgres and Kafka, certificate rotation (dev certificates last 90 days), audit log shipping. See the [roadmap](../ROADMAP.md).
 
+### Staff (back office)
+
+Bank staff sign in through the same identity-service with role `ANALYST`, carried in the access token. The gateway's `/v1/backoffice/*` routes refuse any other role (403 `STAFF_ONLY`) and log every request with the analyst id; KYC decisions store the analyst (`reviewed_by`) and account blocks carry the analyst in their reason. Planned: staff from the bank's SSO with mandatory MFA and four-eyes approval for sensitive actions.
+
 ### Who may call whom (mTLS)
 
 | Service | Allowed callers |

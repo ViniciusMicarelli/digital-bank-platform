@@ -16,6 +16,8 @@ type Store interface {
 	Save(ctx context.Context, p domain.Profile, events ...outbox.Message) error
 	// Pending lists customers whose verification waits for the bureau.
 	Pending(ctx context.Context, before time.Time, limit int) ([]string, error)
+	// InReview lists the customers waiting for an analyst, oldest first.
+	InReview(ctx context.Context, limit int) ([]string, error)
 }
 
 // Bureau checks a person against credit bureaus / government records.

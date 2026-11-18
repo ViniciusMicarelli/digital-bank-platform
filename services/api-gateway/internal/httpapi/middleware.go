@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"github.com/ViniciusMicarelli/digital-bank-platform/services/api-gateway/internal/auth"
 	"log/slog"
 	"net"
 	"net/http"
@@ -96,6 +97,26 @@ func observe(log *slog.Logger, next http.Handler) http.Handler {
 
 type customerKey struct{}
 
+type roleKey struct{}
+
+func role(ctx context.Context) string {
+	r, _ := ctx.Value(roleKey{}).(string)
+	return r
+}
+
+// staff lets only back-office analysts through (403 for customers). Every
+// back-office request is logged with the analyst and the route (audit).
+func (a *API) staff(next http.HandlerFunc) http.HandlerFunc {
+	return a.authenticated(func(w http.ResponseWriter, r *http.Request) {
+		if role(r.Context()) != auth.RoleAnalyst {
+			writeError(w, r.Context(), http.StatusForbidden, "STAFF_ONLY", "this area is for bank staff")
+			return
+		}
+		a.log.InfoContext(r.Context(), "back-office request", "analyst_id", customerID(r.Context()), "method", r.Method, "path", r.URL.Path)
+		next(w, r)
+	})
+}
+
 func customerID(ctx context.Context) string {
 	id, _ := ctx.Value(customerKey{}).(string)
 	return id
@@ -109,7 +130,7 @@ func (a *API) authenticated(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, r.Context(), http.StatusUnauthorized, "UNAUTHENTICATED", "missing bearer token")
 			return
 		}
-		customer, err := a.auth.Verify(r.Context(), token)
+		customer, role, err := a.auth.VerifyAccess(r.Context(), token)
 		if err != nil {
 			writeError(w, r.Context(), http.StatusUnauthorized, "UNAUTHENTICATED", err.Error())
 			return
@@ -119,7 +140,8 @@ func (a *API) authenticated(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, r.Context(), http.StatusTooManyRequests, "RATE_LIMITED", "too many requests")
 			return
 		}
-		next(w, r.WithContext(context.WithValue(r.Context(), customerKey{}, customer)))
+		ctx := context.WithValue(context.WithValue(r.Context(), customerKey{}, customer), roleKey{}, role)
+		next(w, r.WithContext(ctx))
 	}
 }
 

@@ -56,6 +56,7 @@ type Profile struct {
 	KYCReason  string
 	UpdatedAt  time.Time
 	DecidedAt  *time.Time
+	ReviewedBy string
 }
 
 const MinAge = 18

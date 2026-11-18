@@ -33,7 +33,7 @@ Or the production image, served by nginx with the API behind it: `make up` also 
 | Money | Decimal strings end to end ([`money.ts`](../../packages/ts-core/src/money.ts)): parsed from what people type (`1.234,56`), formatted `R$ 1.234,56`, added with `BigInt`. No floats. |
 | Live notifications | `EventSource` cannot send an `Authorization` header, so [`sse.ts`](../../packages/ts-core/src/sse.ts) reads Server-Sent Events over `fetch`, reconnecting with `Last-Event-ID`. Each notification shows a toast and refreshes balances and lists; the statement (a projection built by another service) is read again a moment later. |
 | Sensitive actions | Revealing card data, adding or resuming a wallet token ask for the password in a modal ([`StepUp.tsx`](src/components/StepUp.tsx)); the 5-minute step-up token is reused for 4. |
-| Routing | Signed out → login; signed in without a verified identity or an account → onboarding; then the app. |
+| Routing | Signed out → login; analysts → the back office (`/backoffice`: KYC review queue, customer file, account block / unblock); customers without a verified identity or an account → onboarding; then the app. |
 | Errors | API codes become Portuguese messages ([`errors.ts`](../../packages/ts-core/src/errors.ts)). |
 | Sandbox | Helpers that only exist in the test environment (receive a Pix from another bank, pass the card, close an invoice, issue a boleto, play the KYC analyst) sit in dashed "Ambiente de testes" boxes. |
 | Hosting | nginx: SPA fallback, hashed assets cached for a year, CSP and other security headers, unbuffered proxy for the SSE stream. |

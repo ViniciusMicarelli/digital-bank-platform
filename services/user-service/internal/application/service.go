@@ -109,7 +109,7 @@ func (s *Service) verify(ctx context.Context, p *domain.Profile) error {
 
 // Review records an analyst's decision on a verification in manual review
 // (the sandbox exposes it to the customer).
-func (s *Service) Review(ctx context.Context, customer string, approve bool, reason string) (domain.Profile, error) {
+func (s *Service) Review(ctx context.Context, customer string, approve bool, reason, reviewer string) (domain.Profile, error) {
 	p, err := s.store.Profile(ctx, customer)
 	if err != nil {
 		return domain.Profile{}, err
@@ -124,13 +124,34 @@ func (s *Service) Review(ctx context.Context, customer string, approve bool, rea
 	if err := p.Decide(d, reason, s.now()); err != nil {
 		return domain.Profile{}, err
 	}
+	p.ReviewedBy = reviewer
 	return p, s.save(ctx, p)
+}
+
+// Reviews lists the verifications waiting for an analyst, oldest first.
+func (s *Service) Reviews(ctx context.Context, limit int) ([]domain.Profile, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	ids, err := s.store.InReview(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.Profile, 0, len(ids))
+	for _, id := range ids {
+		p, err := s.store.Profile(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, nil
 }
 
 func (s *Service) save(ctx context.Context, p domain.Profile) error {
 	ev, err := outbox.NewEvent(ctx, source, "user.kyc."+map[domain.KYCStatus]string{
 		domain.KYCApproved: "approved", domain.KYCRejected: "rejected", domain.KYCManualReview: "review",
-	}[p.KYCStatus], map[string]any{"customer_id": p.CustomerID, "status": p.KYCStatus, "reason": p.KYCReason})
+	}[p.KYCStatus], map[string]any{"customer_id": p.CustomerID, "status": p.KYCStatus, "reason": p.KYCReason, "reviewed_by": p.ReviewedBy})
 	if err != nil {
 		return err
 	}

@@ -3,8 +3,9 @@ import { ArrowLeftRight, CreditCard, House, Menu, type LucideIcon } from 'lucide
 import { StyleSheet, type ColorValue } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Glass } from '../../components/Glass'
-import { Loading, Screen } from '../../components/ui'
-import { useAccounts, useProfile } from '../../lib/queries'
+import { Button, Card, Loading, Muted, Screen } from '../../components/ui'
+import { client } from '../../lib/client'
+import { useAccounts, useMe, useProfile } from '../../lib/queries'
 import { font, useTheme } from '../../lib/theme'
 
 function icon(Icon: LucideIcon) {
@@ -15,9 +16,18 @@ function icon(Icon: LucideIcon) {
 export default function TabsLayout() {
   const { c } = useTheme()
   const insets = useSafeAreaInsets()
+  const me = useMe()
   const profile = useProfile()
   const accounts = useAccounts()
-  if (profile.isLoading || accounts.isLoading) return <Screen><Loading rows={5} /></Screen>
+  if (me.isLoading || profile.isLoading || accounts.isLoading) return <Screen><Loading rows={5} /></Screen>
+  if (me.data?.role === 'ANALYST') {
+    return (
+      <Screen title="Back office">
+        <Card><Muted>Você entrou como analista. O back office (fila de análises, contas) fica no app web, em /backoffice.</Muted>
+          <Button title="Sair" variant="secondary" onPress={() => client.logout()} /></Card>
+      </Screen>
+    )
+  }
   // No verified identity or no account yet: onboarding first.
   if (profile.data?.kyc_status !== 'APPROVED' || !accounts.data?.length) return <Redirect href="/cadastro" />
   return (

@@ -27,6 +27,7 @@ import (
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
+	userv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/user/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/api-gateway/internal/auth"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/api-gateway/internal/ratelimit"
@@ -91,6 +92,7 @@ type harness struct {
 	srv     *httptest.Server
 	sign    func(sub string) string
 	stepUp  func(sub string) string
+	analyst func(sub string) string
 	txs     *fakeTxs
 	account string
 }
@@ -100,17 +102,21 @@ func newHarness(t *testing.T, opts Options) harness {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	jwk := auth.JWK{Kid: "test", Kty: "OKP", Crv: "Ed25519", X: base64.RawURLEncoding.EncodeToString(pub)}
 	verifier := auth.NewVerifier(func(context.Context) ([]auth.JWK, error) { return []auth.JWK{jwk}, nil })
-	signFor := func(aud string) func(string) string {
+	signAs := func(aud, role string) func(string) string {
 		return func(sub string) string {
-			tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, jwt.RegisteredClaims{
+			tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, struct {
+				jwt.RegisteredClaims
+				Role string `json:"role,omitempty"`
+			}{jwt.RegisteredClaims{
 				Subject: sub, Issuer: auth.Issuer, Audience: jwt.ClaimStrings{aud},
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
-			})
+			}, role})
 			tok.Header["kid"] = "test"
 			s, _ := tok.SignedString(priv)
 			return s
 		}
 	}
+	signFor := func(aud string) func(string) string { return signAs(aud, "") }
 	sign := signFor(auth.Audience)
 	account := uuid.NewString()
 	txs := &fakeTxs{}
@@ -120,11 +126,11 @@ func newHarness(t *testing.T, opts Options) harness {
 	api := New(Clients{
 		Identity: &fakeIdentity{sign: sign},
 		Accounts: &fakeAccounts{owners: map[string]string{account: "ana"}}, Txs: txs,
-		Cards: &fakeCards{account: account},
+		Cards: &fakeCards{account: account}, Users: &fakeUsers{},
 	}, verifier, slog.New(slog.NewTextHandler(io.Discard, nil)), opts)
 	srv := httptest.NewServer(api.Handler())
 	t.Cleanup(srv.Close)
-	return harness{srv: srv, sign: sign, stepUp: signFor(auth.StepUpAudience), txs: txs, account: account}
+	return harness{srv: srv, sign: sign, stepUp: signFor(auth.StepUpAudience), analyst: signAs(auth.Audience, auth.RoleAnalyst), txs: txs, account: account}
 }
 
 func (h harness) do(t *testing.T, method, path, customer, body string, headers map[string]string) (*http.Response, map[string]any) {
@@ -319,5 +325,27 @@ func TestCORS(t *testing.T) {
 	h.ServeHTTP(rec, other)
 	if rec.Header().Get("Access-Control-Allow-Origin") != "" || rec.Code != http.StatusTeapot {
 		t.Fatalf("unlisted origin got %v", rec.Header())
+	}
+}
+
+type fakeUsers struct{ userv1.UserServiceClient }
+
+func (fakeUsers) ListKycReviews(context.Context, *userv1.ListKycReviewsRequest, ...grpc.CallOption) (*userv1.ListKycReviewsResponse, error) {
+	return &userv1.ListKycReviewsResponse{}, nil
+}
+
+func TestBackOfficeIsStaffOnly(t *testing.T) {
+	h := newHarness(t, Options{})
+	resp, body := h.do(t, "GET", "/v1/backoffice/kyc/reviews", "ana", "", nil)
+	if resp.StatusCode != http.StatusForbidden || errCode(body) != "STAFF_ONLY" {
+		t.Fatalf("customer in the back office: %d %v", resp.StatusCode, body)
+	}
+	resp, _ = h.do(t, "GET", "/v1/backoffice/kyc/reviews", "", "", map[string]string{"Authorization": "Bearer " + h.analyst("staff-1")})
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("analyst: %d", resp.StatusCode)
+	}
+	resp, body = h.do(t, "GET", "/v1/me", "", "", map[string]string{"Authorization": "Bearer " + h.analyst("staff-1")})
+	if resp.StatusCode != http.StatusOK || body["role"] != auth.RoleAnalyst {
+		t.Fatalf("me = %d %v", resp.StatusCode, body)
 	}
 }

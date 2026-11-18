@@ -19,11 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UserService_GetProfile_FullMethodName    = "/bank.user.v1.UserService/GetProfile"
-	UserService_UpsertProfile_FullMethodName = "/bank.user.v1.UserService/UpsertProfile"
-	UserService_SubmitKyc_FullMethodName     = "/bank.user.v1.UserService/SubmitKyc"
-	UserService_ReviewKyc_FullMethodName     = "/bank.user.v1.UserService/ReviewKyc"
-	UserService_GetIdentity_FullMethodName   = "/bank.user.v1.UserService/GetIdentity"
+	UserService_GetProfile_FullMethodName     = "/bank.user.v1.UserService/GetProfile"
+	UserService_UpsertProfile_FullMethodName  = "/bank.user.v1.UserService/UpsertProfile"
+	UserService_SubmitKyc_FullMethodName      = "/bank.user.v1.UserService/SubmitKyc"
+	UserService_ReviewKyc_FullMethodName      = "/bank.user.v1.UserService/ReviewKyc"
+	UserService_ListKycReviews_FullMethodName = "/bank.user.v1.UserService/ListKycReviews"
+	UserService_GetIdentity_FullMethodName    = "/bank.user.v1.UserService/GetIdentity"
 )
 
 // UserServiceClient is the client API for UserService service.
@@ -42,6 +43,8 @@ type UserServiceClient interface {
 	SubmitKyc(ctx context.Context, in *SubmitKycRequest, opts ...grpc.CallOption) (*SubmitKycResponse, error)
 	// An analyst's decision on a verification in MANUAL_REVIEW.
 	ReviewKyc(ctx context.Context, in *ReviewKycRequest, opts ...grpc.CallOption) (*ReviewKycResponse, error)
+	// Back office: verifications waiting for an analyst, oldest first.
+	ListKycReviews(ctx context.Context, in *ListKycReviewsRequest, opts ...grpc.CallOption) (*ListKycReviewsResponse, error)
 	// The verified identity, for account-service (includes the full CPF).
 	GetIdentity(ctx context.Context, in *GetIdentityRequest, opts ...grpc.CallOption) (*GetIdentityResponse, error)
 }
@@ -94,6 +97,16 @@ func (c *userServiceClient) ReviewKyc(ctx context.Context, in *ReviewKycRequest,
 	return out, nil
 }
 
+func (c *userServiceClient) ListKycReviews(ctx context.Context, in *ListKycReviewsRequest, opts ...grpc.CallOption) (*ListKycReviewsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListKycReviewsResponse)
+	err := c.cc.Invoke(ctx, UserService_ListKycReviews_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userServiceClient) GetIdentity(ctx context.Context, in *GetIdentityRequest, opts ...grpc.CallOption) (*GetIdentityResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetIdentityResponse)
@@ -120,6 +133,8 @@ type UserServiceServer interface {
 	SubmitKyc(context.Context, *SubmitKycRequest) (*SubmitKycResponse, error)
 	// An analyst's decision on a verification in MANUAL_REVIEW.
 	ReviewKyc(context.Context, *ReviewKycRequest) (*ReviewKycResponse, error)
+	// Back office: verifications waiting for an analyst, oldest first.
+	ListKycReviews(context.Context, *ListKycReviewsRequest) (*ListKycReviewsResponse, error)
 	// The verified identity, for account-service (includes the full CPF).
 	GetIdentity(context.Context, *GetIdentityRequest) (*GetIdentityResponse, error)
 	mustEmbedUnimplementedUserServiceServer()
@@ -143,6 +158,9 @@ func (UnimplementedUserServiceServer) SubmitKyc(context.Context, *SubmitKycReque
 }
 func (UnimplementedUserServiceServer) ReviewKyc(context.Context, *ReviewKycRequest) (*ReviewKycResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReviewKyc not implemented")
+}
+func (UnimplementedUserServiceServer) ListKycReviews(context.Context, *ListKycReviewsRequest) (*ListKycReviewsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListKycReviews not implemented")
 }
 func (UnimplementedUserServiceServer) GetIdentity(context.Context, *GetIdentityRequest) (*GetIdentityResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetIdentity not implemented")
@@ -240,6 +258,24 @@ func _UserService_ReviewKyc_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UserService_ListKycReviews_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListKycReviewsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServiceServer).ListKycReviews(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UserService_ListKycReviews_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServiceServer).ListKycReviews(ctx, req.(*ListKycReviewsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UserService_GetIdentity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetIdentityRequest)
 	if err := dec(in); err != nil {
@@ -280,6 +316,10 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReviewKyc",
 			Handler:    _UserService_ReviewKyc_Handler,
+		},
+		{
+			MethodName: "ListKycReviews",
+			Handler:    _UserService_ListKycReviews_Handler,
 		},
 		{
 			MethodName: "GetIdentity",

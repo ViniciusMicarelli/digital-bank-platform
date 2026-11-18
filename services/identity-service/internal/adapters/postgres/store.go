@@ -28,12 +28,12 @@ func (s *Store) InTx(ctx context.Context, fn func(ports.Tx) error) error {
 }
 
 const credCols = `customer_id, email, full_name, password_hash, totp_secret_enc, totp_enabled,
-	totp_last_step, failed_attempts, locked_until`
+	totp_last_step, failed_attempts, locked_until, role`
 
 func scanCreds(row pgx.Row) (domain.Credentials, error) {
 	var c domain.Credentials
 	err := row.Scan(&c.CustomerID, &c.Email, &c.FullName, &c.PasswordHash, &c.TOTPSecretEnc, &c.TOTPEnabled,
-		&c.TOTPLastStep, &c.FailedAttempts, &c.LockedUntil)
+		&c.TOTPLastStep, &c.FailedAttempts, &c.LockedUntil, &c.Role)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return c, fmt.Errorf("%w: customer", domain.ErrNotFound)
 	}
@@ -42,8 +42,12 @@ func scanCreds(row pgx.Row) (domain.Credentials, error) {
 
 func (s *Store) InsertCredentials(ctx context.Context, c domain.Credentials, ev outbox.Message) error {
 	return pg.InTx(ctx, s.pool, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO credentials (customer_id, email, full_name, password_hash) VALUES ($1, $2, $3, $4)`,
-			c.CustomerID, c.Email, c.FullName, c.PasswordHash)
+		role := c.Role
+		if role == "" {
+			role = domain.RoleCustomer
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO credentials (customer_id, email, full_name, password_hash, role) VALUES ($1, $2, $3, $4, $5)`,
+			c.CustomerID, c.Email, c.FullName, c.PasswordHash, role)
 		if pg.IsUniqueViolation(err, "credentials_email_key") {
 			return domain.ErrEmailTaken
 		}
@@ -144,4 +148,15 @@ func (t *txStore) RevokeRefreshToken(ctx context.Context, id uuid.UUID, replaced
 func (t *txStore) RevokeFamily(ctx context.Context, family uuid.UUID) error {
 	_, err := t.tx.Exec(ctx, `UPDATE refresh_tokens SET revoked_at = COALESCE(revoked_at, now()) WHERE family_id = $1`, family)
 	return err
+}
+
+// SetRole changes the role of a user (back-office bootstrap).
+func (s *Store) SetRole(ctx context.Context, id uuid.UUID, role domain.Role) error {
+	_, err := s.pool.Exec(ctx, `UPDATE credentials SET role = $2, updated_at = now() WHERE customer_id = $1`, id, role)
+	return err
+}
+
+// CredentialsByEmail reads a user by e-mail without locking.
+func (s *Store) CredentialsByEmail(ctx context.Context, email string) (domain.Credentials, error) {
+	return scanCreds(s.pool.QueryRow(ctx, `SELECT `+credCols+` FROM credentials WHERE email = $1`, email))
 }

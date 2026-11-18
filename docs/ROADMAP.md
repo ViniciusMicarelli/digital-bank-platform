@@ -162,7 +162,13 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Realistic cards (chip, contactless, sheen, 3D flip to the back after step-up), balance and limit count-ups, staggered entrances, skeletons; GSAP on the web, Reanimated on mobile, both respecting reduced motion.
 - Browser tests run in both themes.
 
+## Phase 22 — Back office ✅
+
+- Staff role (`ANALYST`) in identity-service, carried in the access token; the gateway's back-office routes require it and log every request with the analyst.
+- KYC manual review queue and decisions with the analyst recorded; customer file (profile, verification, accounts with balances); account block (with a reason) and unblock.
+- Back-office area in the web app (`/backoffice`): queue, customer file, decision, account actions; analysts land there after signing in, customers cannot open it.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.
-- Back office for analysts (KYC reviews, disputes) and the planned items listed in each service doc.
+- Back office: disputes and chargebacks, staff SSO with mandatory MFA, four-eyes approval for sensitive actions.

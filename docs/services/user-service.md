@@ -14,7 +14,7 @@ Onboarding: the customer's profile and **KYC** (know your customer). An account 
 | KYC: under 18 rejected locally; then the identity bureau answers approve, reject (with a reason) or manual review | ✅ |
 | Name, CPF and birth date lock once verification starts; contact data stays editable; a rejected profile can be corrected and submitted again | ✅ |
 | Bureau down: the verification stays `PENDING` and a worker asks again | ✅ |
-| Manual review decided by an analyst (`ReviewKyc`; the sandbox lets the customer play the analyst) | ✅ |
+| Manual review queue (`ListKycReviews`, oldest first) decided by an analyst in the back office (`ReviewKyc` records `reviewed_by`); the sandbox still lets the customer play the analyst | ✅ |
 | account-service asks `GetIdentity` before opening an account (`KYC_REQUIRED`, `DOCUMENT_MISMATCH`) | ✅ |
 | Document photos and liveness (selfie), address proof, back-office for analysts, periodic re-verification | planned |
 

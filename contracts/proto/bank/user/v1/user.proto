@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package bank.user.v1;
 
+import "google/protobuf/timestamp.proto";
+
 // UserService runs onboarding: the customer profile and KYC verification.
 // Accounts can only be opened for customers it has verified.
 service UserService {
@@ -14,6 +16,8 @@ service UserService {
   rpc SubmitKyc(SubmitKycRequest) returns (SubmitKycResponse);
   // An analyst's decision on a verification in MANUAL_REVIEW.
   rpc ReviewKyc(ReviewKycRequest) returns (ReviewKycResponse);
+  // Back office: verifications waiting for an analyst, oldest first.
+  rpc ListKycReviews(ListKycReviewsRequest) returns (ListKycReviewsResponse);
   // The verified identity, for account-service (includes the full CPF).
   rpc GetIdentity(GetIdentityRequest) returns (GetIdentityResponse);
 }
@@ -41,6 +45,9 @@ message Profile {
   // NOT_STARTED, PENDING, APPROVED, REJECTED, MANUAL_REVIEW.
   string kyc_status = 7;
   string kyc_reason = 8;
+  // The analyst who decided a manual review.
+  string reviewed_by = 9;
+  google.protobuf.Timestamp updated_at = 10;
 }
 
 message GetProfileRequest {
@@ -76,6 +83,16 @@ message ReviewKycRequest {
   string customer_id = 1;
   bool approve = 2;
   string reason = 3;
+  // The analyst deciding (empty in the sandbox, where the customer plays it).
+  string reviewer_id = 4;
+}
+
+message ListKycReviewsRequest {
+  int32 limit = 1;
+}
+
+message ListKycReviewsResponse {
+  repeated Profile profiles = 1;
 }
 
 message ReviewKycResponse {

@@ -252,3 +252,34 @@ func TestStepUp(t *testing.T) {
 		t.Fatalf("step-up with TOTP: %+v %v", claims, err)
 	}
 }
+
+func TestAnalystRole(t *testing.T) {
+	svc, _, _ := setup(t)
+	ctx := context.Background()
+	role := func(token string) domain.Role {
+		claims := &domain.AccessClaims{}
+		_, _, _ = jwt.NewParser().ParseUnverified(token, claims)
+		return claims.Role
+	}
+	_, _ = svc.Register(ctx, "cliente@example.com", "correct horse battery staple", "Cliente Um")
+	_, pair, err := svc.Login(ctx, "cliente@example.com", "correct horse battery staple", "")
+	if err != nil || role(pair.AccessToken) != domain.RoleCustomer {
+		t.Fatalf("customer token role = %q %v", role(pair.AccessToken), err)
+	}
+	id, err := svc.EnsureAnalyst(ctx, "Analista@Bank.dev", "correct horse battery staple", "Analista")
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := svc.EnsureAnalyst(ctx, "analista@bank.dev", "correct horse battery staple", "Analista")
+	if err != nil || again != id {
+		t.Fatalf("bootstrap is idempotent: %v %v", again, err)
+	}
+	_, pair, err = svc.Login(ctx, "analista@bank.dev", "correct horse battery staple", "")
+	if err != nil || role(pair.AccessToken) != domain.RoleAnalyst {
+		t.Fatalf("analyst token role = %q %v", role(pair.AccessToken), err)
+	}
+	refreshed, err := svc.Refresh(ctx, pair.RefreshToken)
+	if err != nil || role(refreshed.AccessToken) != domain.RoleAnalyst {
+		t.Fatalf("the role survives a refresh: %q %v", role(refreshed.AccessToken), err)
+	}
+}

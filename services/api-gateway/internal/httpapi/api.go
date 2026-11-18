@@ -103,6 +103,12 @@ func (a *API) Handler() http.Handler {
 		mux.HandleFunc("POST /v1/sandbox/boletos", a.authenticated(a.issueSandboxBoleto))
 		mux.HandleFunc("POST /v1/sandbox/kyc/review", a.authenticated(a.reviewKYC))
 	}
+	mux.HandleFunc("GET /v1/me", a.authenticated(a.me))
+	mux.HandleFunc("GET /v1/backoffice/kyc/reviews", a.staff(a.kycQueue))
+	mux.HandleFunc("POST /v1/backoffice/kyc/reviews/{customerID}", a.staff(a.decideKYC))
+	mux.HandleFunc("GET /v1/backoffice/customers/{customerID}", a.staff(a.customerFile))
+	mux.HandleFunc("POST /v1/backoffice/accounts/{id}/block", a.staff(a.blockAccount))
+	mux.HandleFunc("POST /v1/backoffice/accounts/{id}/unblock", a.staff(a.unblockAccount))
 	mux.HandleFunc("GET /v1/me/profile", a.authenticated(a.getProfile))
 	mux.HandleFunc("PUT /v1/me/profile", a.authenticated(a.putProfile))
 	mux.HandleFunc("POST /v1/me/kyc", a.authenticated(a.submitKYC))

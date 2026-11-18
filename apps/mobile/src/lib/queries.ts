@@ -51,3 +51,7 @@ export const typeLabels: Record<string, string> = {
 export const dateTime = (iso: string) =>
   new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 export const date = (iso: string) => (iso ? new Date(iso.length === 10 ? `${iso}T12:00:00` : iso).toLocaleDateString('pt-BR') : '—')
+
+export function useMe() {
+  return useQuery({ queryKey: ['me'], queryFn: () => api<{ customer_id: string; role: 'CUSTOMER' | 'ANALYST' }>('GET', '/v1/me'), staleTime: Infinity })
+}

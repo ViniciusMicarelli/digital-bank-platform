@@ -58,3 +58,8 @@ export function useStatement(accountId?: string, pageSize = 20) {
     refetchInterval: 10_000,
   })
 }
+
+/** Who is signed in, and with which role (CUSTOMER or ANALYST). */
+export function useMe() {
+  return useQuery({ queryKey: ['me'], queryFn: () => api<{ customer_id: string; role: 'CUSTOMER' | 'ANALYST' }>('GET', '/v1/me'), staleTime: Infinity })
+}

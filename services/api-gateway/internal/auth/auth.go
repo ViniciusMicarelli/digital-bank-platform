@@ -85,7 +85,29 @@ func (v *Verifier) key(ctx context.Context, kid string) (ed25519.PublicKey, erro
 
 // Verify returns the customer id (subject) of a valid access token.
 func (v *Verifier) Verify(ctx context.Context, token string) (string, error) {
-	return v.verify(ctx, token, Audience)
+	sub, _, err := v.VerifyAccess(ctx, token)
+	return sub, err
+}
+
+// RoleAnalyst marks back-office staff in the access token's role claim.
+const RoleAnalyst = "ANALYST"
+
+// VerifyAccess returns the subject and the role ("CUSTOMER" or "ANALYST")
+// of a valid access token.
+func (v *Verifier) VerifyAccess(ctx context.Context, token string) (string, string, error) {
+	claims := &accessClaims{}
+	if err := v.parse(ctx, token, Audience, claims); err != nil || claims.Subject == "" {
+		return "", "", ErrInvalidToken
+	}
+	if claims.Role == "" {
+		claims.Role = "CUSTOMER"
+	}
+	return claims.Subject, claims.Role, nil
+}
+
+type accessClaims struct {
+	jwt.RegisteredClaims
+	Role string `json:"role"`
 }
 
 // VerifyStepUp returns the customer id of a valid step-up token (a fresh
@@ -96,6 +118,13 @@ func (v *Verifier) VerifyStepUp(ctx context.Context, token string) (string, erro
 
 func (v *Verifier) verify(ctx context.Context, token, audience string) (string, error) {
 	claims := &jwt.RegisteredClaims{}
+	if err := v.parse(ctx, token, audience, claims); err != nil || claims.Subject == "" {
+		return "", ErrInvalidToken
+	}
+	return claims.Subject, nil
+}
+
+func (v *Verifier) parse(ctx context.Context, token, audience string, claims jwt.Claims) error {
 	_, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
 		kid, _ := t.Header["kid"].(string)
 		return v.key(ctx, kid)
@@ -106,8 +135,5 @@ func (v *Verifier) verify(ctx context.Context, token, audience string) (string, 
 		jwt.WithExpirationRequired(),
 		jwt.WithTimeFunc(v.now),
 	)
-	if err != nil || claims.Subject == "" {
-		return "", ErrInvalidToken
-	}
-	return claims.Subject, nil
+	return err
 }

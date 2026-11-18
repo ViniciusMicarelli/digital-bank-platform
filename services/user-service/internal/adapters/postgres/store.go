@@ -44,9 +44,9 @@ func (s *Store) Profile(ctx context.Context, customer string) (domain.Profile, e
 	)
 	a := &p.Address
 	err := s.pool.QueryRow(ctx, `SELECT customer_id, full_name, cpf_enc, birth_date, phone, postal_code, street, number, complement,
-		district, city, state, kyc_status, kyc_reason, decided_at, updated_at FROM profiles WHERE customer_id = $1`, customer).
+		district, city, state, kyc_status, kyc_reason, decided_at, updated_at, reviewed_by FROM profiles WHERE customer_id = $1`, customer).
 		Scan(&p.CustomerID, &p.FullName, &enc, &p.BirthDate, &p.Phone, &a.PostalCode, &a.Street, &a.Number, &a.Complement,
-			&a.District, &a.City, &a.State, &status, &p.KYCReason, &p.DecidedAt, &p.UpdatedAt)
+			&a.District, &a.City, &a.State, &status, &p.KYCReason, &p.DecidedAt, &p.UpdatedAt, &p.ReviewedBy)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return p, fmt.Errorf("%w: profile", domain.ErrNotFound)
 	}
@@ -63,14 +63,14 @@ func (s *Store) Save(ctx context.Context, p domain.Profile, events ...outbox.Mes
 	a := p.Address
 	err := pg.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `INSERT INTO profiles (customer_id, full_name, cpf_enc, cpf_index, birth_date, phone, postal_code,
-			street, number, complement, district, city, state, kyc_status, kyc_reason, decided_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+			street, number, complement, district, city, state, kyc_status, kyc_reason, decided_at, reviewed_by)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 			ON CONFLICT (customer_id) DO UPDATE SET full_name = $2, cpf_enc = $3, cpf_index = $4, birth_date = $5, phone = $6,
 			postal_code = $7, street = $8, number = $9, complement = $10, district = $11, city = $12, state = $13,
-			kyc_status = $14, kyc_reason = $15, decided_at = $16, updated_at = now()`,
+			kyc_status = $14, kyc_reason = $15, decided_at = $16, reviewed_by = $17, updated_at = now()`,
 			p.CustomerID, p.FullName, s.box.Seal([]byte(p.CPF), aad(p.CustomerID)), secretbox.BlindIndex(s.indexKey, p.CPF),
 			p.BirthDate, p.Phone, a.PostalCode, a.Street, a.Number, a.Complement, a.District, a.City, a.State,
-			p.KYCStatus, p.KYCReason, p.DecidedAt)
+			p.KYCStatus, p.KYCReason, p.DecidedAt, p.ReviewedBy)
 		if err != nil {
 			return err
 		}
@@ -91,6 +91,14 @@ func (s *Store) Save(ctx context.Context, p domain.Profile, events ...outbox.Mes
 func (s *Store) Pending(ctx context.Context, before time.Time, limit int) ([]string, error) {
 	rows, err := s.pool.Query(ctx, `SELECT customer_id FROM profiles WHERE kyc_status = 'PENDING' AND updated_at < $1
 		ORDER BY updated_at LIMIT $2`, before, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
+func (s *Store) InReview(ctx context.Context, limit int) ([]string, error) {
+	rows, err := s.pool.Query(ctx, `SELECT customer_id FROM profiles WHERE kyc_status = 'MANUAL_REVIEW' ORDER BY updated_at LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
 	}

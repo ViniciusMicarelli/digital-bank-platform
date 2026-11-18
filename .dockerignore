@@ -2,8 +2,8 @@ bin/
 .git/
 **/*_test.go
 docs/
-**/node_modules/
-**/dist/
-**/test-results/
-**/playwright-report/
-apps/mobile/
+**/node_modules
+**/dist
+**/test-results
+**/playwright-report
+apps/mobile
