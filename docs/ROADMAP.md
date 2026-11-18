@@ -147,7 +147,14 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Served by nginx with the API behind it (one origin, CSP); Playwright browser tests on desktop and mobile run in CI against that image.
 - Found on the way: a client that disconnects mid-request no longer cancels the write it started (the gateway detaches non-GET requests from the client, with a 30 s bound).
 
+## Phase 20 — Mobile app ✅
+
+- iOS and Android app (`apps/mobile`, Expo SDK 58, React Native, Expo Router): onboarding with KYC, home with pull to refresh, Pix (send, keys, QR Code request and share, copia e cola), cards (step-up sheet, controls, simulated purchases), boletos, credit, notifications and preferences.
+- `packages/ts-core`: the API client, money, SSE parser, errors and types shared with the web app; the SSE transport is fetch streaming on the web and incremental XMLHttpRequest on React Native (its fetch does not stream).
+- Refresh token in the Keychain / Keystore (`expo-secure-store`, this device only); the phone finds the gateway at the Expo dev server's address.
+- The gateway allows listed browser origins (`CORS_ALLOWED_ORIGINS`) so the app's web build can call it; CI lints, typechecks and runs Playwright on that build at a phone viewport.
+
 ## Next
 
-- Mobile app (`apps/mobile`) on the same API.
+- Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.
 - Back office for analysts (KYC reviews, disputes) and the planned items listed in each service doc.

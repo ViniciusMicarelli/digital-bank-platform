@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { parseBRL } from '../lib/money'
+import { parseBRL } from '@bank/core'
 import { Field } from './ui'
 
 /** An amount input in Brazilian format; onValue gets "10.50" or null. */

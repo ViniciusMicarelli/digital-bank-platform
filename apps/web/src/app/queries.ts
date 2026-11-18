@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { api, ApiError } from '../lib/api'
-import type { Account, Balance, FeedItem, Profile } from '../lib/types'
+import type { Account, Balance, FeedItem, Profile } from '@bank/core'
 
 export const keys = {
   profile: ['profile'] as const,

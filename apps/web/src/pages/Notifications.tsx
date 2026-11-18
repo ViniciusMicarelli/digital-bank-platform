@@ -3,7 +3,7 @@ import { useLiveConnected } from '../app/contexts'
 import {Badge, Button, Empty, Loading, PageTitle, Panel, Toggle } from '../components/ui'
 import { cx, dateTimeBR } from '../lib/format'
 import { api } from '../lib/api'
-import type { Notification } from '../lib/types'
+import type { Notification } from '@bank/core'
 
 const categories: Record<string, string> = {
   PIX: 'Pix', TRANSFER: 'Transferência', CARD: 'Cartão', CREDIT: 'Crédito', BOLETO: 'Boleto', ACCOUNT: 'Conta', PROFILE: 'Cadastro',

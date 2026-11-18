@@ -152,3 +152,34 @@ func (a *API) steppedUp(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+
+// cors lets the listed browser origins call the API. Credentials are bearer
+// tokens in headers (no cookies), so Allow-Credentials is never sent.
+func cors(allowed []string, next http.Handler) http.Handler {
+	if len(allowed) == 0 {
+		return next
+	}
+	ok := map[string]bool{}
+	for _, o := range allowed {
+		ok[o] = true
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin == "" || !ok[origin] {
+			next.ServeHTTP(w, r)
+			return
+		}
+		h := w.Header()
+		h.Set("Access-Control-Allow-Origin", origin)
+		h.Add("Vary", "Origin")
+		h.Set("Access-Control-Expose-Headers", "X-Correlation-ID, Retry-After")
+		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+			h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
+			h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key, X-Step-Up-Token, Last-Event-ID, X-Correlation-ID")
+			h.Set("Access-Control-Max-Age", "600")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}

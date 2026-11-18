@@ -72,6 +72,14 @@ A customer app in [`apps/web`](apps/web) (React, TypeScript, Tailwind): onboardi
 | ![Home](docs/images/web-home.png) | ![Cards](docs/images/web-cards.png) |
 | ![Boleto](docs/images/web-boleto.png) | <img src="docs/images/web-mobile.png" alt="Mobile" width="260"> |
 
+## Mobile App
+
+The same bank on iOS and Android in [`apps/mobile`](apps/mobile) (Expo, React Native): onboarding, Pix with QR codes, cards with step-up, boletos, credit and live notifications, sharing the API client with the web app ([`packages/ts-core`](packages/ts-core)). `make mobile`, then scan the QR code with Expo Go.
+
+| | | |
+|---|---|---|
+| <img src="docs/images/mobile-home.png" alt="Home" width="240"> | <img src="docs/images/mobile-pix.png" alt="Pix" width="240"> | <img src="docs/images/mobile-cards.png" alt="Cards" width="240"> |
+
 ## What Is Interesting Here
 
 **Money is exact.** Amounts are `int64` minor units with overflow and currency checks; floats never appear, not even in JSON (`"amount": "10.50"`). → [`packages/go-common/money`](packages/go-common/money/money.go)

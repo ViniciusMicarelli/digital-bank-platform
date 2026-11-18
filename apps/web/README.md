@@ -17,12 +17,12 @@ Or the production image, served by nginx with the API behind it: `make up` also 
 
 | Concern | Choice |
 |---|---|
-| API calls | [`src/lib/api.ts`](src/lib/api.ts): one origin (dev proxy / nginx), no CORS. Access token in memory, refresh token in `sessionStorage`; a 401 refreshes once and retries (single flight). Every money-moving request carries an `Idempotency-Key`, kept across retries of the same form. |
-| Money | Decimal strings end to end ([`src/lib/money.ts`](src/lib/money.ts)): parsed from what people type (`1.234,56`), formatted `R$ 1.234,56`, added with `BigInt`. No floats. |
-| Live notifications | `EventSource` cannot send an `Authorization` header, so [`src/lib/sse.ts`](src/lib/sse.ts) reads Server-Sent Events over `fetch`, reconnecting with `Last-Event-ID`. Each notification shows a toast and refreshes balances and lists; the statement (a projection built by another service) is read again a moment later. |
+| API calls | [`src/lib/api.ts`](src/lib/api.ts) on top of [`@bank/core`](../../packages/ts-core): one origin (dev proxy / nginx), no CORS. Access token in memory, refresh token in `sessionStorage`; a 401 refreshes once and retries (single flight). Every money-moving request carries an `Idempotency-Key`, kept across retries of the same form. |
+| Money | Decimal strings end to end ([`money.ts`](../../packages/ts-core/src/money.ts)): parsed from what people type (`1.234,56`), formatted `R$ 1.234,56`, added with `BigInt`. No floats. |
+| Live notifications | `EventSource` cannot send an `Authorization` header, so [`sse.ts`](../../packages/ts-core/src/sse.ts) reads Server-Sent Events over `fetch`, reconnecting with `Last-Event-ID`. Each notification shows a toast and refreshes balances and lists; the statement (a projection built by another service) is read again a moment later. |
 | Sensitive actions | Revealing card data, adding or resuming a wallet token ask for the password in a modal ([`StepUp.tsx`](src/components/StepUp.tsx)); the 5-minute step-up token is reused for 4. |
 | Routing | Signed out → login; signed in without a verified identity or an account → onboarding; then the app. |
-| Errors | API codes become Portuguese messages ([`src/lib/errors.ts`](src/lib/errors.ts)). |
+| Errors | API codes become Portuguese messages ([`errors.ts`](../../packages/ts-core/src/errors.ts)). |
 | Sandbox | Helpers that only exist in the test environment (receive a Pix from another bank, pass the card, close an invoice, issue a boleto, play the KYC analyst) sit in dashed "Ambiente de testes" boxes. |
 | Hosting | nginx: SPA fallback, hashed assets cached for a year, CSP and other security headers, unbuffered proxy for the SSE stream. |
 

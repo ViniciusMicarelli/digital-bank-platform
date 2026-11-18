@@ -5,8 +5,8 @@ import { useAccount, useProfile } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
 import { Alert, Badge, Button, Field, PageTitle, Panel } from '../components/ui'
 import { api, logout } from '../lib/api'
-import { errorMessage } from '../lib/errors'
-import { formatBRL } from '../lib/money'
+import { errorMessage } from '@bank/core'
+import { formatBRL } from '@bank/core'
 
 function TOTP() {
   const [enroll, setEnroll] = useState<{ secret: string; image: string } | null>(null)

@@ -3,8 +3,8 @@ import { Link } from 'react-router'
 import { useAccount, useBalance, useStatement } from '../app/queries'
 import { Amount, Button, Empty, Loading, Panel } from '../components/ui'
 import { dateTimeBR, typeLabels } from '../lib/format'
-import { formatBRL } from '../lib/money'
-import type { FeedItem } from '../lib/types'
+import { formatBRL } from '@bank/core'
+import type { FeedItem } from '@bank/core'
 
 
 export function FeedRow({ item }: { item: FeedItem }) {

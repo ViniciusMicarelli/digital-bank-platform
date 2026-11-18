@@ -381,6 +381,8 @@ services:
       TLS_KEY: /certs/api-gateway-key.pem
       HTTP_ADDR: ":8080"
       SANDBOX: "true"
+      # The mobile app on the web (expo start --web / the e2e build).
+      CORS_ALLOWED_ORIGINS: http://localhost:8082
       # Tests and the demo log in many times from one IP; the default is 2/s.
       AUTH_RATE_LIMIT_RPS: "50"
       REDIS_ADDR: redis:6379
@@ -409,7 +411,7 @@ services:
       notification-service: { condition: service_healthy }
 
   web:
-    build: { context: ./apps/web }
+    build: { context: ., dockerfile: apps/web/Dockerfile }
     ports: ["8081:8080"]
     depends_on:
       api-gateway: { condition: service_healthy }

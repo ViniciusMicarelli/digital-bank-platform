@@ -5,9 +5,9 @@ import { MoneyField } from '../components/MoneyField'
 import {Alert, Amount, Badge, Button, Empty, Loading, Modal, PageTitle, Panel, Sandbox, Select } from '../components/ui'
 import { dateBR, dateTimeBR } from '../lib/format'
 import { api, ApiError } from '../lib/api'
-import { errorMessage } from '../lib/errors'
-import { compareBRL, formatBRL } from '../lib/money'
-import type { CreditLine, Invoice } from '../lib/types'
+import { errorMessage } from '@bank/core'
+import { compareBRL, formatBRL } from '@bank/core'
+import type { CreditLine, Invoice } from '@bank/core'
 
 const invoiceStatus: Record<Invoice['status'], [string, 'brand' | 'amber' | 'green' | 'red']> = {
   OPEN: ['Aberta', 'brand'], CLOSED: ['Fechada', 'amber'], PAID: ['Paga', 'green'], OVERDUE: ['Vencida', 'red'],

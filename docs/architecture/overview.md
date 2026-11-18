@@ -33,6 +33,7 @@ The platform is designed as a cloud-native, event-driven system optimized for fi
 ```text
 .
 ├── apps/web/              # ✅ customer web app (React, TypeScript, Tailwind)
+├── apps/mobile/           # ✅ iOS / Android app (Expo, React Native)
 ├── contracts/             # Protobuf contracts (buf) + generated Go code, one module
 ├── packages/
 │   ├── go-common/         # money (exact amounts), document (CPF)

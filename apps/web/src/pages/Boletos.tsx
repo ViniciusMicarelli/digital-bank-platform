@@ -5,9 +5,9 @@ import { MoneyField } from '../components/MoneyField'
 import {Alert, Amount, Badge, Button, Empty, Field, Loading, PageTitle, Panel, Sandbox, Select } from '../components/ui'
 import { dateBR } from '../lib/format'
 import { api, newIdempotencyKey } from '../lib/api'
-import { errorMessage } from '../lib/errors'
-import { addBRL, formatBRL } from '../lib/money'
-import type { BoletoPayment, BoletoQuote } from '../lib/types'
+import { errorMessage } from '@bank/core'
+import { addBRL, formatBRL } from '@bank/core'
+import type { BoletoPayment, BoletoQuote } from '@bank/core'
 
 const statusLabel: Record<string, [string, 'green' | 'amber' | 'red' | 'slate' | 'brand']> = {
   COMPLETED: ['Pago', 'green'], SCHEDULED: ['Agendado', 'brand'], CANCELLED: ['Cancelado', 'slate'],

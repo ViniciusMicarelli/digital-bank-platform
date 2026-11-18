@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
-import { formatBRL, type Money } from '../lib/money'
+import { formatBRL, type Money } from '@bank/core'
 
 import { cx } from '../lib/format'
 

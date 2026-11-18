@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { ApiError, stepUp } from '../lib/api'
-import { errorMessage } from '../lib/errors'
+import { errorMessage } from '@bank/core'
 import { Alert, Button, Field, Modal } from './ui'
 
 let cached: { token: string; until: number } | null = null

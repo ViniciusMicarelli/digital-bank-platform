@@ -20,7 +20,10 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    "paths": { "@bank/core": ["../../packages/ts-core/src/index.ts"] }
   },
-  "include": ["src"]
+  "include": ["src", "../../packages/ts-core/src"],
+  "exclude": ["../../packages/ts-core/src/**/*.test.ts"]
 }

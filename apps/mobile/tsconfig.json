@@ -1,0 +1,12 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@bank/core": ["../../packages/ts-core/src/index.ts"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "../../packages/ts-core/src"],
+  "exclude": ["node_modules", "../../packages/ts-core/src/**/*.test.ts", "e2e", "playwright.config.ts"]
+}

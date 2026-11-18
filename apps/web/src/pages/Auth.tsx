@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import { Brand } from '../components/Layout'
 import { Alert, Button, Field } from '../components/ui'
 import { ApiError, login, register } from '../lib/api'
-import { errorMessage } from '../lib/errors'
+import { errorMessage } from '@bank/core'
 
 function AuthShell({ title, children }: { title: string; children: ReactNode }) {
   return (

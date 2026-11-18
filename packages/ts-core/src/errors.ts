@@ -1,4 +1,4 @@
-import { ApiError } from './api'
+import { ApiError } from './client'
 
 // What each API error code means to a customer.
 const messages: Record<string, string> = {

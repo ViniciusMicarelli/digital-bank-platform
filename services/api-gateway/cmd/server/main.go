@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -40,6 +41,11 @@ func limiters(log *slog.Logger) httpapi.Options {
 	rps := float64(config.Int("RATE_LIMIT_RPS", 20))
 	authRPS := float64(config.Int("AUTH_RATE_LIMIT_RPS", 2))
 	opts := httpapi.Options{Sandbox: config.String("SANDBOX", "false") == "true"}
+	for _, o := range strings.Split(config.String("CORS_ALLOWED_ORIGINS", ""), ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			opts.AllowedOrigins = append(opts.AllowedOrigins, o)
+		}
+	}
 	if addr := config.String("REDIS_ADDR", ""); addr != "" {
 		client := redis.NewClient(&redis.Options{Addr: addr})
 		opts.Limiter = ratelimit.NewRedis(client, "rl:", rps, int(rps*2), log)

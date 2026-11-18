@@ -6,9 +6,9 @@ import { useStepUp } from '../components/StepUp'
 import {Alert, Badge, Button, Empty, Field, Loading, Modal, PageTitle, Panel, Sandbox, Select, Toggle } from '../components/ui'
 import { cx } from '../lib/format'
 import { api } from '../lib/api'
-import { errorMessage } from '../lib/errors'
-import { formatBRL } from '../lib/money'
-import type { Card, CardDetails, CardToken } from '../lib/types'
+import { errorMessage } from '@bank/core'
+import { formatBRL } from '@bank/core'
+import type { Card, CardDetails, CardToken } from '@bank/core'
 
 const wallets: Record<string, string> = { APPLE_PAY: 'Apple Pay', GOOGLE_PAY: 'Google Pay', SAMSUNG_PAY: 'Samsung Pay', MERCHANT: 'Loja' }
 

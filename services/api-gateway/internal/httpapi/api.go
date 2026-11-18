@@ -54,6 +54,10 @@ type Options struct {
 	// default to in-memory limiters; use ratelimit.Redis to share them
 	// across replicas.
 	Limiter, AuthLimiter ratelimit.Limiter
+	// AllowedOrigins may call the API from a browser on another origin
+	// (CORS), e.g. the mobile app running on the web. Native apps and the
+	// web app (same origin) do not need it. Empty: none.
+	AllowedOrigins []string
 }
 
 type API struct {
@@ -157,7 +161,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/accounts/{id}/pix/transfers/{transferID}/refunds", a.authenticated(a.owned(a.refundPix)))
 	// MaxBytesHandler copies the request, so it wraps observe (which must see
 	// the request the mux routes, to read its Pattern).
-	return http.MaxBytesHandler(observe(a.log, mux), 64<<10)
+	return cors(a.opts.AllowedOrigins, http.MaxBytesHandler(observe(a.log, mux), 64<<10))
 }
 
 // ---- helpers ----

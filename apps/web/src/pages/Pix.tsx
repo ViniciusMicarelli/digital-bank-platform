@@ -7,9 +7,9 @@ import { MoneyField } from '../components/MoneyField'
 import {Alert, Amount, Badge, Button, Empty, Field, Loading, Modal, PageTitle, Panel, Sandbox, Select, Tabs, Toggle } from '../components/ui'
 import { dateTimeBR } from '../lib/format'
 import { api, newIdempotencyKey } from '../lib/api'
-import { errorMessage } from '../lib/errors'
-import { formatBRL, type Money } from '../lib/money'
-import type { Party, PixKey, PixTransfer } from '../lib/types'
+import { errorMessage } from '@bank/core'
+import { formatBRL, type Money } from '@bank/core'
+import type { Party, PixKey, PixTransfer } from '@bank/core'
 
 type Tab = 'enviar' | 'cobrar' | 'pagar' | 'chaves' | 'historico'
 

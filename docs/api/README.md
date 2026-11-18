@@ -27,6 +27,7 @@
 | 503 | A dependency is down; retry with the same key | `RETRY_LATER` |
 
 - **Pagination**: `?limit=` and an opaque `?cursor=` (`next_cursor` in the response).
+- **CORS**: browsers on another origin (e.g. the mobile app's web build) must be listed in the gateway's `CORS_ALLOWED_ORIGINS`; the web app is same-origin and native apps do not need it.
 - **Correlation**: send `X-Correlation-ID` to trace a request across services; it is echoed back.
 
 ## Endpoints

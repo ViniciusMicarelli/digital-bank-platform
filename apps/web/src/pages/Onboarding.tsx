@@ -5,9 +5,9 @@ import { keys, useAccounts, useProfile } from '../app/queries'
 import { Brand } from '../components/Layout'
 import { Alert, Badge, Button, Field, Loading, Panel, Sandbox, Select } from '../components/ui'
 import { api, logout } from '../lib/api'
-import { errorMessage } from '../lib/errors'
+import { errorMessage } from '@bank/core'
 import { maskCPF } from '../lib/format'
-import type { Profile } from '../lib/types'
+import type { Profile } from '@bank/core'
 
 const UFS = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ')
 

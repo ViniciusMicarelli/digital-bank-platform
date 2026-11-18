@@ -302,3 +302,22 @@ func TestWritesSurviveClientDisconnect(t *testing.T) {
 		t.Fatalf("post ctx err = %v (want nil), get ctx err = %v (want canceled)", postErr, getErr)
 	}
 }
+
+func TestCORS(t *testing.T) {
+	h := cors([]string{"http://localhost:8082"}, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusTeapot) }))
+	pre := httptest.NewRequest(http.MethodOptions, "/v1/accounts", nil)
+	pre.Header.Set("Origin", "http://localhost:8082")
+	pre.Header.Set("Access-Control-Request-Method", "POST")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, pre)
+	if rec.Code != http.StatusNoContent || !strings.Contains(rec.Header().Get("Access-Control-Allow-Headers"), "Idempotency-Key") {
+		t.Fatalf("preflight = %d %v", rec.Code, rec.Header())
+	}
+	other := httptest.NewRequest(http.MethodGet, "/v1/accounts", nil)
+	other.Header.Set("Origin", "https://evil.example")
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, other)
+	if rec.Header().Get("Access-Control-Allow-Origin") != "" || rec.Code != http.StatusTeapot {
+		t.Fatalf("unlisted origin got %v", rec.Header())
+	}
+}

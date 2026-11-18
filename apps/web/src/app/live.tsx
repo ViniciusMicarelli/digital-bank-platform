@@ -1,8 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type ReactNode } from 'react'
 import { ensureAccess } from '../lib/api'
-import { openStream } from '../lib/sse'
-import type { Notification } from '../lib/types'
+import { openStream } from '@bank/core'
+import type { Notification } from '@bank/core'
 import { LiveContext } from './contexts'
 
 interface Toast extends Notification {

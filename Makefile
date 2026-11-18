@@ -7,7 +7,7 @@ BUF_VERSION          := v1.75.0
 PROTOC_GEN_GO        := v1.36.12
 PROTOC_GEN_GO_GRPC   := v1.6.2
 
-.PHONY: help certs rotate-certs k8s-validate tf-validate infra-tools up up-obs demo web web-test web-e2e down test test-unit e2e cover lint fmt tidy generate tools run-%
+.PHONY: help certs rotate-certs k8s-validate tf-validate infra-tools up up-obs demo web web-test web-e2e mobile mobile-test mobile-e2e down test test-unit e2e cover lint fmt tidy generate tools run-%
 
 help: ## List available targets
 	@grep -E '^[a-z%-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -35,6 +35,15 @@ web-test: ## Lint, typecheck, unit-test and build the web app
 
 web-e2e: ## Browser tests (Playwright) against the web image on :8081 (needs `make up`)
 	cd apps/web && BASE_URL=http://127.0.0.1:8081 npx playwright test
+
+mobile: ## Run the mobile app (Expo); open it with Expo Go on a phone on the same Wi-Fi (needs `make up`)
+	cd apps/mobile && npm install && npx expo start
+
+mobile-test: ## Lint, typecheck and check the mobile app
+	cd apps/mobile && npx expo lint && npm run typecheck && npx expo-doctor
+
+mobile-e2e: ## Browser tests of the mobile app's web build on a phone viewport (needs `make up`)
+	cd apps/mobile && EXPO_PUBLIC_API_URL=http://localhost:8000 npx expo export --platform web && npx playwright test
 
 demo: ## Walk through the public API with curl (needs `make up` and jq)
 	./scripts/demo.sh
