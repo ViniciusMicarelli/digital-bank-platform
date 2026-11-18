@@ -20,4 +20,5 @@ scrape_configs:
           - payment-service:9110
           - notification-service:9111
           - user-service:9112
+          - backoffice-service:9113
           - kms-service:9108

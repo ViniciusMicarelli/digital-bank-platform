@@ -9,7 +9,7 @@ import { Alert, Badge, Button, Field, PageTitle, Panel } from '../components/ui'
 import { api, logout } from '../lib/api'
 import { errorMessage, formatBRL } from '@bank/core'
 
-function TOTP() {
+export function TOTP({ onEnabled }: { onEnabled?: () => void } = {}) {
   const [enroll, setEnroll] = useState<{ secret: string; image: string } | null>(null)
   const [code, setCode] = useState('')
   const [msg, setMsg] = useState<{ tone: 'green' | 'red'; text: string } | null>(null)
@@ -20,7 +20,7 @@ function TOTP() {
   })
   const confirm = useMutation({
     mutationFn: () => api('POST', '/v1/auth/mfa/totp/confirm', { body: { code } }),
-    onSuccess: () => { setEnroll(null); setMsg({ tone: 'green', text: 'Autenticador ativado. Ele será pedido no login e nas ações sensíveis.' }) },
+    onSuccess: () => { setEnroll(null); setMsg({ tone: 'green', text: 'Autenticador ativado. Ele será pedido no login e nas ações sensíveis.' }); onEnabled?.() },
     onError: (e) => setMsg({ tone: 'red', text: errorMessage(e) }),
   })
   return (

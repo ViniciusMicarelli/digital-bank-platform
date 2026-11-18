@@ -41,7 +41,7 @@
 | `POST` | `/v1/auth/step-up` | `{password, totp_code?}` → `step_up_token` (5 min), sent as `X-Step-Up-Token` on sensitive actions (🔐) |
 | `POST` | `/v1/auth/mfa/totp` | Start TOTP enrollment → `{secret, otpauth_uri}` |
 | `POST` | `/v1/auth/mfa/totp/confirm` | `{code}` → enables TOTP |
-| `GET` | `/v1/me` | Who is signed in: `{customer_id, role}` (`CUSTOMER` or `ANALYST`) |
+| `GET` | `/v1/me` | Who is signed in: `{customer_id, role, mfa}` (`CUSTOMER` or `ANALYST`; `mfa` when the session has a second factor) |
 | `GET` · `PUT` | `/v1/me/profile` | Profile `{full_name, cpf, birth_date, phone, address{postal_code, street, number, complement, district, city, state}}` (CPF masked in answers) |
 | `POST` | `/v1/me/kyc` | Start identity verification → `kyc_status` (`APPROVED`, `REJECTED`, `MANUAL_REVIEW`, `PENDING`) |
 | `POST` | `/v1/sandbox/kyc/review` | *(sandbox)* `{approve, reason?}` decide a manual review |
@@ -98,10 +98,15 @@
 | `GET` | `/v1/backoffice/kyc/reviews` | 👤 Verifications in manual review, oldest first |
 | `POST` | `/v1/backoffice/kyc/reviews/{customerID}` | 👤 Decide `{approve, reason}` (reason required to reject); the analyst is recorded |
 | `GET` | `/v1/backoffice/customers/{customerID}` | 👤 Profile, verification and accounts with balances |
-| `POST` | `/v1/backoffice/accounts/{id}/block` · `/unblock` | 👤 Block `{reason}` / unblock an account |
+| `POST` | `/v1/backoffice/accounts/{id}/block` | 👤 Block `{reason}` |
+| `POST` | `/v1/backoffice/accounts/{id}/unblock` | 👤 Ask to unblock `{reason}` → 202 with a four-eyes approval (`ACCOUNT_NOT_BLOCKED`, `APPROVAL_ALREADY_PENDING`) |
+| `GET` | `/v1/backoffice/approvals` | 👤 Four-eyes requests (`?status=PENDING` by default, or `APPROVED`, `EXECUTED`, `REJECTED`, `FAILED`, `EXPIRED`, `ALL`), with the account and its customer |
+| `POST` | `/v1/backoffice/approvals/{id}/approve` · `/reject` | 👤 The second analyst's decision `{reason}` (required to reject); approving runs the action → `EXECUTED` or `FAILED` (`SAME_ANALYST`, `APPROVAL_NOT_PENDING`, `APPROVAL_EXPIRED`) |
+| `GET` | `/v1/backoffice/audit` | 👤 Audit trail, newest first (`?target_id=`, `?actor_id=`, `?limit=`) |
+| `GET` | `/v1/backoffice/audit/verify` | 👤 Recompute the hash chain → `{intact, events, broken_at}` |
 | `GET` | `/healthz`, `/metrics` | Health and Prometheus metrics |
 
-👤 Back office: the access token's `role` must be `ANALYST` (403 `STAFF_ONLY` otherwise); every request is logged with the analyst id.
+👤 Back office: the access token's `role` must be `ANALYST` (403 `STAFF_ONLY`) and the session must have a second factor (403 `MFA_REQUIRED`). Actions are written to the audit trail first and refused when it is unavailable (503 `AUDIT_UNAVAILABLE`).
 
 `scripts/demo.sh` (`make demo`) walks through all of them.
 

@@ -46,7 +46,9 @@ func (k SigningKey) JWK() JWK {
 }
 
 // SignAccessToken issues a short-lived token whose subject is the customer.
-func SignAccessToken(k SigningKey, customerID uuid.UUID, role Role, now time.Time) (string, time.Time, error) {
+// amr (RFC 8176) says how the session was authenticated: "pwd", plus "otp"
+// when the user has TOTP enabled (logins then require the code).
+func SignAccessToken(k SigningKey, customerID uuid.UUID, role Role, amr []string, now time.Time) (string, time.Time, error) {
 	exp := now.Add(AccessTokenTTL)
 	if role == "" {
 		role = RoleCustomer
@@ -59,7 +61,7 @@ func SignAccessToken(k SigningKey, customerID uuid.UUID, role Role, now time.Tim
 		NotBefore: jwt.NewNumericDate(now),
 		ExpiresAt: jwt.NewNumericDate(exp),
 		ID:        uuid.NewString(),
-	}, Role: role})
+	}, Role: role, AMR: amr})
 	tok.Header["kid"] = k.Kid
 	s, err := tok.SignedString(k.Private)
 	return s, exp, err
@@ -141,7 +143,18 @@ const (
 // AccessClaims are the access token's claims: who, and with which role.
 type AccessClaims struct {
 	jwt.RegisteredClaims
-	Role Role `json:"role,omitempty"`
+	Role Role     `json:"role,omitempty"`
+	AMR  []string `json:"amr,omitempty"`
+}
+
+// SessionAMR is how a user with these credentials signs in: TOTP enabled
+// means every login carries the code. A session that enabled TOTP after
+// logging in proved the code at confirmation, so it counts as well.
+func (c Credentials) SessionAMR() []string {
+	if c.TOTPEnabled {
+		return []string{"pwd", "otp"}
+	}
+	return []string{"pwd"}
 }
 
 // Locked reports whether logins are refused at now.

@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -54,13 +55,19 @@ func main() {
 		os.Exit(1)
 	}
 	app := application.New(pgstore.NewStore(pool), box, log)
-	// Development / demo: a back-office analyst from the environment.
-	if email := config.String("BOOTSTRAP_ANALYST_EMAIL", ""); email != "" {
-		if _, err := app.EnsureAnalyst(ctx, email, config.String("BOOTSTRAP_ANALYST_PASSWORD", ""), "Analista Digital Bank"); err != nil {
+	// Development / demo: back-office analysts from the environment, as
+	// "email:TOTPSECRET" pairs (the back office requires MFA, and four-eyes
+	// approvals need two analysts).
+	for _, entry := range strings.Split(config.String("BOOTSTRAP_ANALYSTS", ""), ",") {
+		email, secret, _ := strings.Cut(strings.TrimSpace(entry), ":")
+		if email == "" {
+			continue
+		}
+		if _, err := app.EnsureAnalyst(ctx, email, config.String("BOOTSTRAP_ANALYST_PASSWORD", ""), "Analista Digital Bank", secret); err != nil {
 			log.Error("bootstrap analyst", "error", err)
 			os.Exit(1)
 		}
-		log.Info("back-office analyst ready", "email", email)
+		log.Info("back-office analyst ready", "email", email, "mfa", secret != "")
 	}
 	if err := app.EnsureSigningKey(ctx); err != nil {
 		log.Error("signing key", "error", err)

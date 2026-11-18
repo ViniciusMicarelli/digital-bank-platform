@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
+	backofficev1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/backoffice/v1"
 	cardv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/card/v1"
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
 	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
@@ -44,6 +45,7 @@ type Clients struct {
 	Payments      paymentv1.PaymentServiceClient
 	Notifications notificationv1.NotificationServiceClient
 	Users         userv1.UserServiceClient
+	BackOffice    backofficev1.BackOfficeServiceClient
 }
 
 type Options struct {
@@ -109,6 +111,11 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/backoffice/customers/{customerID}", a.staff(a.customerFile))
 	mux.HandleFunc("POST /v1/backoffice/accounts/{id}/block", a.staff(a.blockAccount))
 	mux.HandleFunc("POST /v1/backoffice/accounts/{id}/unblock", a.staff(a.unblockAccount))
+	mux.HandleFunc("GET /v1/backoffice/approvals", a.staff(a.approvals))
+	mux.HandleFunc("POST /v1/backoffice/approvals/{id}/approve", a.staff(a.decideApproval(true)))
+	mux.HandleFunc("POST /v1/backoffice/approvals/{id}/reject", a.staff(a.decideApproval(false)))
+	mux.HandleFunc("GET /v1/backoffice/audit", a.staff(a.auditTrail))
+	mux.HandleFunc("GET /v1/backoffice/audit/verify", a.staff(a.verifyAudit))
 	mux.HandleFunc("GET /v1/me/profile", a.authenticated(a.getProfile))
 	mux.HandleFunc("PUT /v1/me/profile", a.authenticated(a.putProfile))
 	mux.HandleFunc("POST /v1/me/kyc", a.authenticated(a.submitKYC))

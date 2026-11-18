@@ -254,23 +254,24 @@ func TestStepUp(t *testing.T) {
 }
 
 func TestAnalystRole(t *testing.T) {
-	svc, _, _ := setup(t)
+	svc, _, now := setup(t)
 	ctx := context.Background()
-	role := func(token string) domain.Role {
+	claimsOf := func(token string) *domain.AccessClaims {
 		claims := &domain.AccessClaims{}
 		_, _, _ = jwt.NewParser().ParseUnverified(token, claims)
-		return claims.Role
+		return claims
 	}
+	role := func(token string) domain.Role { return claimsOf(token).Role }
 	_, _ = svc.Register(ctx, "cliente@example.com", "correct horse battery staple", "Cliente Um")
 	_, pair, err := svc.Login(ctx, "cliente@example.com", "correct horse battery staple", "")
 	if err != nil || role(pair.AccessToken) != domain.RoleCustomer {
 		t.Fatalf("customer token role = %q %v", role(pair.AccessToken), err)
 	}
-	id, err := svc.EnsureAnalyst(ctx, "Analista@Bank.dev", "correct horse battery staple", "Analista")
+	id, err := svc.EnsureAnalyst(ctx, "Analista@Bank.dev", "correct horse battery staple", "Analista", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, err := svc.EnsureAnalyst(ctx, "analista@bank.dev", "correct horse battery staple", "Analista")
+	again, err := svc.EnsureAnalyst(ctx, "analista@bank.dev", "correct horse battery staple", "Analista", "")
 	if err != nil || again != id {
 		t.Fatalf("bootstrap is idempotent: %v %v", again, err)
 	}
@@ -281,5 +282,28 @@ func TestAnalystRole(t *testing.T) {
 	refreshed, err := svc.Refresh(ctx, pair.RefreshToken)
 	if err != nil || role(refreshed.AccessToken) != domain.RoleAnalyst {
 		t.Fatalf("the role survives a refresh: %q %v", role(refreshed.AccessToken), err)
+	}
+	if amr := claimsOf(pair.AccessToken).AMR; len(amr) != 1 || amr[0] != "pwd" {
+		t.Fatalf("password-only session amr = %v", amr)
+	}
+
+	// With a TOTP secret the analyst signs in with the code, and the token says so.
+	secret := domain.NewTOTPSecret()
+	if _, err := svc.EnsureAnalyst(ctx, "analista@bank.dev", "correct horse battery staple", "Analista", secret); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := svc.Login(ctx, "analista@bank.dev", "correct horse battery staple", ""); !errors.Is(err, domain.ErrMFARequired) {
+		t.Fatalf("login without the code: %v", err)
+	}
+	code, _ := domain.TOTPCode(secret, domain.TOTPStep(*now))
+	_, pair, err = svc.Login(ctx, "analista@bank.dev", "correct horse battery staple", code)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if amr := claimsOf(pair.AccessToken).AMR; len(amr) != 2 || amr[1] != "otp" {
+		t.Fatalf("MFA session amr = %v", amr)
+	}
+	if _, err := svc.EnsureAnalyst(ctx, "outra@bank.dev", "correct horse battery staple", "Outra", "not base32!"); err == nil {
+		t.Fatal("a bad TOTP secret must be refused")
 	}
 }

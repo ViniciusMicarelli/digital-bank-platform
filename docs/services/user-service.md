@@ -16,7 +16,7 @@ Onboarding: the customer's profile and **KYC** (know your customer). An account 
 | Bureau down: the verification stays `PENDING` and a worker asks again | ✅ |
 | Manual review queue (`ListKycReviews`, oldest first) decided by an analyst in the back office (`ReviewKyc` records `reviewed_by`); the sandbox still lets the customer play the analyst | ✅ |
 | account-service asks `GetIdentity` before opening an account (`KYC_REQUIRED`, `DOCUMENT_MISMATCH`) | ✅ |
-| Document photos and liveness (selfie), address proof, back-office for analysts, periodic re-verification | planned |
+| Document photos and liveness (selfie), address proof, periodic re-verification | planned |
 
 ## KYC States
 

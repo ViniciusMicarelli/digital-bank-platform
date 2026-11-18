@@ -18,6 +18,7 @@ import (
 	"google.golang.org/grpc"
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
+	backofficev1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/backoffice/v1"
 	cardv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/card/v1"
 	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
@@ -83,6 +84,7 @@ func main() {
 	payments := dial("PAYMENT_ADDR", "127.0.0.1:9010")
 	notifications := dial("NOTIFICATION_ADDR", "127.0.0.1:9011")
 	users := dial("USER_ADDR", "127.0.0.1:9012")
+	backoffice := dial("BACKOFFICE_ADDR", "127.0.0.1:9013")
 
 	identityClient := identityv1.NewIdentityServiceClient(identity)
 	verifier := auth.NewVerifier(func(ctx context.Context) ([]auth.JWK, error) {
@@ -108,6 +110,7 @@ func main() {
 		Payments:      paymentv1.NewPaymentServiceClient(payments),
 		Notifications: notificationv1.NewNotificationServiceClient(notifications),
 		Users:         userv1.NewUserServiceClient(users),
+		BackOffice:    backofficev1.NewBackOfficeServiceClient(backoffice),
 	}, verifier, log, limiters(log))
 
 	mux := http.NewServeMux()

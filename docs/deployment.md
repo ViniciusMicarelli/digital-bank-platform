@@ -61,6 +61,7 @@ Envelope encryption: identity-service (signing keys, TOTP seeds), account-servic
 | Pix recovery | pix-service | 5 s | Resumes transfers stuck mid-flow |
 | Orphan reservations | card-service | 5 s | Releases reservations of authorizations answered `91` |
 | KYC retries | user-service | 10 s | Asks the bureau again for verifications left pending |
+| Approval recovery | backoffice-service | 30 s | Expires four-eyes requests after 24 h; retries approved actions that did not settle |
 | Notification deliveries | notification-service | 1 s | Sends pending pushes and e-mails (simulated), up to 5 attempts |
 | Boleto recovery | payment-service | 5 s | Resumes payments stuck mid-flow; runs scheduled payments on their day |
 | Invoice cycle | credit-service | 30 s | Closes invoices, moves unpaid ones to the next with charges, posts charges, expires holds, settles stuck payments |

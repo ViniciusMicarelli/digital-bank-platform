@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -85,29 +86,40 @@ func (v *Verifier) key(ctx context.Context, kid string) (ed25519.PublicKey, erro
 
 // Verify returns the customer id (subject) of a valid access token.
 func (v *Verifier) Verify(ctx context.Context, token string) (string, error) {
-	sub, _, err := v.VerifyAccess(ctx, token)
-	return sub, err
+	p, err := v.VerifyAccess(ctx, token)
+	return p.Subject, err
 }
 
 // RoleAnalyst marks back-office staff in the access token's role claim.
 const RoleAnalyst = "ANALYST"
 
-// VerifyAccess returns the subject and the role ("CUSTOMER" or "ANALYST")
-// of a valid access token.
-func (v *Verifier) VerifyAccess(ctx context.Context, token string) (string, string, error) {
+// Principal is who an access token belongs to.
+type Principal struct {
+	Subject string
+	// "CUSTOMER" or "ANALYST".
+	Role string
+	// MFA is true when the session was opened with a second factor
+	// (the token's amr has "otp").
+	MFA bool
+}
+
+// VerifyAccess returns the principal of a valid access token.
+func (v *Verifier) VerifyAccess(ctx context.Context, token string) (Principal, error) {
 	claims := &accessClaims{}
 	if err := v.parse(ctx, token, Audience, claims); err != nil || claims.Subject == "" {
-		return "", "", ErrInvalidToken
+		return Principal{}, ErrInvalidToken
 	}
-	if claims.Role == "" {
-		claims.Role = "CUSTOMER"
+	p := Principal{Subject: claims.Subject, Role: claims.Role, MFA: slices.Contains(claims.AMR, "otp")}
+	if p.Role == "" {
+		p.Role = "CUSTOMER"
 	}
-	return claims.Subject, claims.Role, nil
+	return p, nil
 }
 
 type accessClaims struct {
 	jwt.RegisteredClaims
-	Role string `json:"role"`
+	Role string   `json:"role"`
+	AMR  []string `json:"amr"`
 }
 
 // VerifyStepUp returns the customer id of a valid step-up token (a fresh

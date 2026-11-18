@@ -168,7 +168,14 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - KYC manual review queue and decisions with the analyst recorded; customer file (profile, verification, accounts with balances); account block (with a reason) and unblock.
 - Back-office area in the web app (`/backoffice`): queue, customer file, decision, account actions; analysts land there after signing in, customers cannot open it.
 
+## Phase 23 — Back office: MFA, audit trail and four-eyes ✅
+
+- Access tokens say how the session was authenticated (`amr`); the back office requires a second factor (`MFA_REQUIRED`) and the web app walks an analyst through TOTP enrollment.
+- backoffice-service: append-only, hash-chained audit trail with chain verification; the gateway writes every staff action (and every look at a customer's file) before it runs and fails closed.
+- Four-eyes approvals: unblocking an account needs a second analyst; approved actions run right away and are retried after an outage; requests expire after 24 h.
+- Web back office: approvals panel, unblock requests, audit trail with the chain status on the customer file. Two development analysts with TOTP; the e2e and browser tests share the last TOTP step used, so no code is replayed.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.
-- Back office: disputes and chargebacks, staff SSO with mandatory MFA, four-eyes approval for sensitive actions.
+- Back office: card disputes and chargebacks, staff SSO (OIDC) with WebAuthn, more four-eyes actions.

@@ -70,7 +70,7 @@ func TestVerifyTOTP(t *testing.T) {
 func TestAccessToken(t *testing.T) {
 	k := NewSigningKey()
 	id := uuid.New()
-	tok, exp, err := SignAccessToken(k, id, RoleCustomer, time.Now())
+	tok, exp, err := SignAccessToken(k, id, RoleCustomer, []string{"pwd"}, time.Now())
 	if err != nil || time.Until(exp) > AccessTokenTTL {
 		t.Fatal(err)
 	}

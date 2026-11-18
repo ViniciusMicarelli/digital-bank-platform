@@ -76,24 +76,43 @@ func (s *Service) Register(ctx context.Context, email, password, fullName string
 
 // EnsureAnalyst creates a back-office analyst (or promotes an existing
 // user). Used to bootstrap development and demo environments; production
-// staff would come from the bank's identity provider.
-func (s *Service) EnsureAnalyst(ctx context.Context, email, password, name string) (uuid.UUID, error) {
+// staff would come from the bank's identity provider. A non-empty
+// totpSecret (base32) enables TOTP with it, since the back office requires
+// MFA; it lets scripts and tests compute the codes.
+func (s *Service) EnsureAnalyst(ctx context.Context, email, password, name, totpSecret string) (uuid.UUID, error) {
 	norm, err := domain.NormalizeEmail(email)
 	if err != nil {
 		return uuid.Nil, err
 	}
+	var id uuid.UUID
 	c, err := s.store.CredentialsByEmail(ctx, norm)
-	if errors.Is(err, domain.ErrNotFound) {
-		id, err := s.Register(ctx, norm, password, name)
-		if err != nil {
+	switch {
+	case errors.Is(err, domain.ErrNotFound):
+		if id, err = s.Register(ctx, norm, password, name); err != nil {
 			return uuid.Nil, err
 		}
-		return id, s.store.SetRole(ctx, id, domain.RoleAnalyst)
+	case err != nil:
+		return uuid.Nil, err
+	default:
+		id = c.CustomerID
 	}
-	if err != nil {
+	if err := s.store.SetRole(ctx, id, domain.RoleAnalyst); err != nil {
 		return uuid.Nil, err
 	}
-	return c.CustomerID, s.store.SetRole(ctx, c.CustomerID, domain.RoleAnalyst)
+	if totpSecret == "" {
+		return id, nil
+	}
+	if _, err := domain.TOTPCode(totpSecret, 0); err != nil {
+		return uuid.Nil, fmt.Errorf("analyst TOTP secret: %w", err)
+	}
+	return id, s.store.InTx(ctx, func(tx ports.Tx) error {
+		c, err := tx.CredentialsForUpdate(ctx, id)
+		if err != nil {
+			return err
+		}
+		c.TOTPSecretEnc, c.TOTPEnabled = s.box.Seal([]byte(totpSecret), totpAAD(id)), true
+		return tx.SaveCredentials(ctx, c)
+	})
 }
 
 // Login checks the password (and the TOTP code when enabled) and starts a
@@ -146,7 +165,7 @@ func (s *Service) Login(ctx context.Context, email, password, code string) (uuid
 			return err
 		}
 		customer = c.CustomerID
-		pair, _, err = s.issue(ctx, tx, c.CustomerID, uuid.Must(uuid.NewV7()), c.Role, now)
+		pair, _, err = s.issue(ctx, tx, c.CustomerID, uuid.Must(uuid.NewV7()), c, now)
 		return err
 	})
 	if err != nil {
@@ -245,7 +264,7 @@ func (s *Service) Refresh(ctx context.Context, token string) (TokenPair, error) 
 			return err
 		}
 		var nextID uuid.UUID
-		if pair, nextID, err = s.issue(ctx, tx, rt.CustomerID, rt.FamilyID, c.Role, now); err != nil {
+		if pair, nextID, err = s.issue(ctx, tx, rt.CustomerID, rt.FamilyID, c, now); err != nil {
 			return err
 		}
 		return tx.RevokeRefreshToken(ctx, rt.ID, &nextID)
@@ -271,12 +290,12 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 }
 
 // issue signs an access token and stores a new refresh token in family.
-func (s *Service) issue(ctx context.Context, tx ports.Tx, customer, family uuid.UUID, role domain.Role, now time.Time) (TokenPair, uuid.UUID, error) {
+func (s *Service) issue(ctx context.Context, tx ports.Tx, customer, family uuid.UUID, c domain.Credentials, now time.Time) (TokenPair, uuid.UUID, error) {
 	key, err := s.signingKey(ctx)
 	if err != nil {
 		return TokenPair{}, uuid.Nil, err
 	}
-	access, accessExp, err := domain.SignAccessToken(key, customer, role, now)
+	access, accessExp, err := domain.SignAccessToken(key, customer, c.Role, c.SessionAMR(), now)
 	if err != nil {
 		return TokenPair{}, uuid.Nil, err
 	}

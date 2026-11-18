@@ -1,0 +1,140 @@
+syntax = "proto3";
+
+package bank.backoffice.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// BackOfficeService keeps what bank staff do accountable: a tamper-evident
+// audit trail (append-only, hash-chained) and four-eyes approvals, where a
+// sensitive action requested by one analyst only runs once a different
+// analyst approves it.
+service BackOfficeService {
+  // Appends an event to the audit trail. Callers fail closed: a staff action
+  // is refused when its audit event cannot be written.
+  rpc RecordAudit(RecordAuditRequest) returns (RecordAuditResponse);
+  // Newest first, filtered by target and/or actor.
+  rpc ListAudit(ListAuditRequest) returns (ListAuditResponse);
+  // Recomputes the hash chain; reports the first event that does not match.
+  rpc VerifyAudit(VerifyAuditRequest) returns (VerifyAuditResponse);
+
+  // Opens a four-eyes approval (PENDING). Fails with FAILED_PRECONDITION and
+  // reason APPROVAL_ALREADY_PENDING when the same action is already waiting.
+  rpc RequestApproval(RequestApprovalRequest) returns (RequestApprovalResponse);
+  rpc ListApprovals(ListApprovalsRequest) returns (ListApprovalsResponse);
+  // Approves (and runs) or rejects a pending approval. Fails with
+  // FAILED_PRECONDITION and reason SAME_ANALYST, APPROVAL_NOT_PENDING or
+  // APPROVAL_EXPIRED.
+  rpc DecideApproval(DecideApprovalRequest) returns (DecideApprovalResponse);
+}
+
+message AuditEvent {
+  // Position in the chain, from 1.
+  int64 seq = 1;
+  string actor_id = 2;
+  // e.g. KYC_APPROVED, ACCOUNT_BLOCKED, CUSTOMER_FILE_VIEWED.
+  string action = 3;
+  // e.g. customer, account, approval.
+  string target_type = 4;
+  string target_id = 5;
+  map<string, string> details = 6;
+  google.protobuf.Timestamp at = 7;
+  // Hex SHA-256 of the previous event's hash and this event's fields.
+  string hash = 8;
+  string prev_hash = 9;
+}
+
+message RecordAuditRequest {
+  string actor_id = 1;
+  string action = 2;
+  string target_type = 3;
+  string target_id = 4;
+  map<string, string> details = 5;
+}
+
+message RecordAuditResponse {
+  AuditEvent event = 1;
+}
+
+message ListAuditRequest {
+  string target_id = 1;
+  string actor_id = 2;
+  int32 limit = 3;
+}
+
+message ListAuditResponse {
+  repeated AuditEvent events = 1;
+}
+
+message VerifyAuditRequest {}
+
+message VerifyAuditResponse {
+  bool intact = 1;
+  int64 events = 2;
+  // The first event whose hash does not match (0 when intact).
+  int64 broken_at = 3;
+}
+
+enum ApprovalKind {
+  APPROVAL_KIND_UNSPECIFIED = 0;
+  // Unblock an account blocked by an analyst or by fraud rules.
+  APPROVAL_KIND_UNBLOCK_ACCOUNT = 1;
+}
+
+enum ApprovalStatus {
+  APPROVAL_STATUS_UNSPECIFIED = 0;
+  APPROVAL_STATUS_PENDING = 1;
+  // Approved; the action is running (retried until it settles).
+  APPROVAL_STATUS_APPROVED = 2;
+  APPROVAL_STATUS_EXECUTED = 3;
+  APPROVAL_STATUS_REJECTED = 4;
+  // Approved, but the action itself failed (failure_reason).
+  APPROVAL_STATUS_FAILED = 5;
+  APPROVAL_STATUS_EXPIRED = 6;
+}
+
+message Approval {
+  string id = 1;
+  ApprovalKind kind = 2;
+  string target_id = 3;
+  string reason = 4;
+  string requested_by = 5;
+  ApprovalStatus status = 6;
+  string decided_by = 7;
+  string decision_reason = 8;
+  string failure_reason = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp decided_at = 11;
+  google.protobuf.Timestamp expires_at = 12;
+}
+
+message RequestApprovalRequest {
+  ApprovalKind kind = 1;
+  string target_id = 2;
+  string reason = 3;
+  string requested_by = 4;
+}
+
+message RequestApprovalResponse {
+  Approval approval = 1;
+}
+
+message ListApprovalsRequest {
+  // Unspecified lists every status.
+  ApprovalStatus status = 1;
+  int32 limit = 2;
+}
+
+message ListApprovalsResponse {
+  repeated Approval approvals = 1;
+}
+
+message DecideApprovalRequest {
+  string id = 1;
+  string approver_id = 2;
+  bool approve = 3;
+  string reason = 4;
+}
+
+message DecideApprovalResponse {
+  Approval approval = 1;
+}

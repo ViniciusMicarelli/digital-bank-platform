@@ -25,19 +25,26 @@ Not yet: a KMS for the key-encryption keys, TLS for Postgres and Kafka, certific
 
 ### Staff (back office)
 
-Bank staff sign in through the same identity-service with role `ANALYST`, carried in the access token. The gateway's `/v1/backoffice/*` routes refuse any other role (403 `STAFF_ONLY`) and log every request with the analyst id; KYC decisions store the analyst (`reviewed_by`) and account blocks carry the analyst in their reason. Planned: staff from the bank's SSO with mandatory MFA and four-eyes approval for sensitive actions.
+Bank staff sign in through the same identity-service with role `ANALYST`, carried in the access token together with how the session was authenticated (`amr`: `pwd`, plus `otp` when TOTP is enabled).
+
+- **MFA is mandatory.** The gateway's `/v1/backoffice/*` routes refuse any other role (403 `STAFF_ONLY`) and analyst sessions without a second factor (403 `MFA_REQUIRED`); the web app walks such an analyst through TOTP enrollment.
+- **Audit trail, fail closed.** Every action (and every look at a customer's file) is written to the backoffice-service trail before it runs; if the trail is unavailable the action is refused (503 `AUDIT_UNAVAILABLE`). The trail is append-only (database triggers) and hash-chained, so even someone able to bypass the triggers breaks the chain, and `GET /v1/backoffice/audit/verify` finds where.
+- **Four-eyes.** Unblocking an account is a request that a *different* analyst must approve; the requester cannot (checked in the domain and by a database constraint).
+- KYC decisions also store the analyst (`reviewed_by`) and account blocks carry the analyst in their reason.
+
+Planned: staff from the bank's SSO (OIDC) with phishing-resistant MFA (WebAuthn).
 
 ### Who may call whom (mTLS)
 
 | Service | Allowed callers |
 |---|---|
 | ledger-service | account-service, transaction-service |
-| account-service | api-gateway, transaction-service, pix-service, card-service, credit-service, notification-service |
+| account-service | api-gateway, transaction-service, pix-service, card-service, credit-service, notification-service, backoffice-service |
 | user-service | api-gateway, account-service |
 | transaction-service | api-gateway, pix-service, card-service, credit-service, payment-service |
 | credit-service | api-gateway, card-service |
 | kms-service | identity-service, account-service, card-service, pix-service, user-service |
-| pix-service, statement-service, identity-service, card-service, payment-service, notification-service | api-gateway |
+| pix-service, statement-service, identity-service, card-service, payment-service, notification-service, backoffice-service | api-gateway |
 
 Unary and streaming RPCs go through the same check (`mtls.Authorize` / `mtls.AuthorizeStream`); only the health service is open to every workload.
 

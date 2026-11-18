@@ -51,6 +51,7 @@ The platform is designed as a cloud-native, event-driven system optimized for fi
 │   ├── payment-service/   # ✅ boletos
 │   ├── notification-service/ # ✅ notifications and live stream
 │   ├── user-service/      # ✅ onboarding and KYC
+│   ├── backoffice-service/ # ✅ staff audit trail and four-eyes approvals
 │   └── kms-service/       # ✅ envelope encryption
 ├── tests/e2e/             # end-to-end tests against docker compose
 └── infrastructure/        # docker (Postgres init), monitoring (Prometheus, alerts, Grafana)
@@ -87,6 +88,7 @@ flowchart LR
         CRE[credit-service]
         STM[statement-service]
         NOT[notification-service]
+        BO[backoffice-service]
     end
 
     WEB & AND & IOS -->|HTTPS / REST| GW
@@ -99,6 +101,8 @@ flowchart LR
     GW -->|gRPC| CRD
     GW -->|gRPC| CRE
     GW -->|gRPC| STM
+    GW -->|gRPC| BO
+    BO -->|gRPC| ACC
 
     TRX -->|gRPC| LED
     PIX -->|call| TRX

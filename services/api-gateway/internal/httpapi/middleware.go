@@ -99,17 +99,26 @@ type customerKey struct{}
 
 type roleKey struct{}
 
-func role(ctx context.Context) string {
-	r, _ := ctx.Value(roleKey{}).(string)
-	return r
+func role(ctx context.Context) string { return principal(ctx).Role }
+
+func principal(ctx context.Context) auth.Principal {
+	p, _ := ctx.Value(roleKey{}).(auth.Principal)
+	return p
 }
 
-// staff lets only back-office analysts through (403 for customers). Every
-// back-office request is logged with the analyst and the route (audit).
+// staff lets only back-office analysts who signed in with MFA through (403
+// STAFF_ONLY for customers, MFA_REQUIRED for a password-only session).
+// Every back-office request is logged with the analyst and the route; the
+// actions themselves go to the audit trail (backoffice-service).
 func (a *API) staff(next http.HandlerFunc) http.HandlerFunc {
 	return a.authenticated(func(w http.ResponseWriter, r *http.Request) {
 		if role(r.Context()) != auth.RoleAnalyst {
 			writeError(w, r.Context(), http.StatusForbidden, "STAFF_ONLY", "this area is for bank staff")
+			return
+		}
+		if !principal(r.Context()).MFA {
+			writeError(w, r.Context(), http.StatusForbidden, "MFA_REQUIRED",
+				"the back office requires MFA: enroll TOTP at POST /v1/auth/mfa/totp, then sign in again")
 			return
 		}
 		a.log.InfoContext(r.Context(), "back-office request", "analyst_id", customerID(r.Context()), "method", r.Method, "path", r.URL.Path)
@@ -130,17 +139,18 @@ func (a *API) authenticated(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, r.Context(), http.StatusUnauthorized, "UNAUTHENTICATED", "missing bearer token")
 			return
 		}
-		customer, role, err := a.auth.VerifyAccess(r.Context(), token)
+		p, err := a.auth.VerifyAccess(r.Context(), token)
 		if err != nil {
 			writeError(w, r.Context(), http.StatusUnauthorized, "UNAUTHENTICATED", err.Error())
 			return
 		}
+		customer := p.Subject
 		if !a.limiter.Allow(r.Context(), "cust:"+customer) {
 			w.Header().Set("Retry-After", "1")
 			writeError(w, r.Context(), http.StatusTooManyRequests, "RATE_LIMITED", "too many requests")
 			return
 		}
-		ctx := context.WithValue(context.WithValue(r.Context(), customerKey{}, customer), roleKey{}, role)
+		ctx := context.WithValue(context.WithValue(r.Context(), customerKey{}, customer), roleKey{}, p)
 		next(w, r.WithContext(ctx))
 	}
 }

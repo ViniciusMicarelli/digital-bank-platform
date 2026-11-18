@@ -111,7 +111,7 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/account-service.pem
       TLS_KEY: /certs/account-service-key.pem
-      ALLOWED_CALLERS: api-gateway,transaction-service,pix-service,card-service,credit-service,notification-service,dev-client
+      ALLOWED_CALLERS: api-gateway,transaction-service,pix-service,card-service,credit-service,notification-service,backoffice-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/account?sslmode=disable
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -150,6 +150,29 @@ services:
       kms-service: { condition: service_healthy }
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
+
+  backoffice-service:
+    build: { context: ., args: { SERVICE: backoffice-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./infrastructure/certs:/certs:ro
+    environment:
+      TLS_CA: /certs/ca.pem
+      TLS_CERT: /certs/backoffice-service.pem
+      TLS_KEY: /certs/backoffice-service-key.pem
+      ALLOWED_CALLERS: api-gateway,dev-client
+      DATABASE_URL: postgres://bank:bank@postgres:5432/backoffice?sslmode=disable
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      GRPC_ADDR: ":9013"
+      ACCOUNT_ADDR: account-service:9002
+    ports: ["9013:9013"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      account-service: { condition: service_healthy }
 
   transaction-service:
     build: { context: ., args: { SERVICE: transaction-service } }
@@ -243,7 +266,9 @@ services:
       - ./infrastructure/certs:/certs:ro
     environment:
       # Development / demo back-office analyst (production staff come from SSO).
-      BOOTSTRAP_ANALYST_EMAIL: analista@digitalbank.dev
+      # Development analysts as email:TOTP secret (the back office requires
+      # MFA; four-eyes approvals need two). Never in production.
+      BOOTSTRAP_ANALYSTS: analista@digitalbank.dev:JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP,revisora@digitalbank.dev:KRSXG5CTMVRXEZLUKRSXG5CTMVRXEZLU
       BOOTSTRAP_ANALYST_PASSWORD: correct horse battery staple
       KMS_ADDR: kms-service:9008
       TLS_CA: /certs/ca.pem
@@ -399,6 +424,7 @@ services:
       PAYMENT_ADDR: payment-service:9010
       NOTIFICATION_ADDR: notification-service:9011
       USER_ADDR: user-service:9012
+      BACKOFFICE_ADDR: backoffice-service:9013
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     ports: ["8000:8080"]
     depends_on:
@@ -412,6 +438,7 @@ services:
       credit-service: { condition: service_healthy }
       payment-service: { condition: service_healthy }
       notification-service: { condition: service_healthy }
+      backoffice-service: { condition: service_healthy }
 
   web:
     build: { context: ., dockerfile: apps/web/Dockerfile }

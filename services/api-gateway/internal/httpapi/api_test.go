@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
+	backofficev1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/backoffice/v1"
 	cardv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/card/v1"
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
 	identityv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1"
@@ -93,8 +95,11 @@ type harness struct {
 	sign    func(sub string) string
 	stepUp  func(sub string) string
 	analyst func(sub string) string
-	txs     *fakeTxs
-	account string
+	// analystNoMFA signs an analyst session opened without a second factor.
+	analystNoMFA func(sub string) string
+	backoffice   *fakeBackOffice
+	txs          *fakeTxs
+	account      string
 }
 
 func newHarness(t *testing.T, opts Options) harness {
@@ -102,15 +107,16 @@ func newHarness(t *testing.T, opts Options) harness {
 	pub, priv, _ := ed25519.GenerateKey(rand.Reader)
 	jwk := auth.JWK{Kid: "test", Kty: "OKP", Crv: "Ed25519", X: base64.RawURLEncoding.EncodeToString(pub)}
 	verifier := auth.NewVerifier(func(context.Context) ([]auth.JWK, error) { return []auth.JWK{jwk}, nil })
-	signAs := func(aud, role string) func(string) string {
+	signAs := func(aud, role string, amr ...string) func(string) string {
 		return func(sub string) string {
 			tok := jwt.NewWithClaims(jwt.SigningMethodEdDSA, struct {
 				jwt.RegisteredClaims
-				Role string `json:"role,omitempty"`
+				Role string   `json:"role,omitempty"`
+				AMR  []string `json:"amr,omitempty"`
 			}{jwt.RegisteredClaims{
 				Subject: sub, Issuer: auth.Issuer, Audience: jwt.ClaimStrings{aud},
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute)),
-			}, role})
+			}, role, amr})
 			tok.Header["kid"] = "test"
 			s, _ := tok.SignedString(priv)
 			return s
@@ -120,17 +126,19 @@ func newHarness(t *testing.T, opts Options) harness {
 	sign := signFor(auth.Audience)
 	account := uuid.NewString()
 	txs := &fakeTxs{}
+	bo := &fakeBackOffice{}
 	if opts.Limiter == nil {
 		opts.Limiter = ratelimit.NewMemory(1000, 1000)
 	}
 	api := New(Clients{
 		Identity: &fakeIdentity{sign: sign},
 		Accounts: &fakeAccounts{owners: map[string]string{account: "ana"}}, Txs: txs,
-		Cards: &fakeCards{account: account}, Users: &fakeUsers{},
+		Cards: &fakeCards{account: account}, Users: &fakeUsers{}, BackOffice: bo,
 	}, verifier, slog.New(slog.NewTextHandler(io.Discard, nil)), opts)
 	srv := httptest.NewServer(api.Handler())
 	t.Cleanup(srv.Close)
-	return harness{srv: srv, sign: sign, stepUp: signFor(auth.StepUpAudience), analyst: signAs(auth.Audience, auth.RoleAnalyst), txs: txs, account: account}
+	return harness{srv: srv, sign: sign, stepUp: signFor(auth.StepUpAudience), analyst: signAs(auth.Audience, auth.RoleAnalyst, "pwd", "otp"),
+		analystNoMFA: signAs(auth.Audience, auth.RoleAnalyst, "pwd"), backoffice: bo, txs: txs, account: account}
 }
 
 func (h harness) do(t *testing.T, method, path, customer, body string, headers map[string]string) (*http.Response, map[string]any) {
@@ -330,6 +338,10 @@ func TestCORS(t *testing.T) {
 
 type fakeUsers struct{ userv1.UserServiceClient }
 
+func (fakeUsers) ReviewKyc(_ context.Context, in *userv1.ReviewKycRequest, _ ...grpc.CallOption) (*userv1.ReviewKycResponse, error) {
+	return &userv1.ReviewKycResponse{Profile: &userv1.Profile{CustomerId: in.GetCustomerId(), KycStatus: "REJECTED"}}, nil
+}
+
 func (fakeUsers) ListKycReviews(context.Context, *userv1.ListKycReviewsRequest, ...grpc.CallOption) (*userv1.ListKycReviewsResponse, error) {
 	return &userv1.ListKycReviewsResponse{}, nil
 }
@@ -345,7 +357,67 @@ func TestBackOfficeIsStaffOnly(t *testing.T) {
 		t.Fatalf("analyst: %d", resp.StatusCode)
 	}
 	resp, body = h.do(t, "GET", "/v1/me", "", "", map[string]string{"Authorization": "Bearer " + h.analyst("staff-1")})
-	if resp.StatusCode != http.StatusOK || body["role"] != auth.RoleAnalyst {
+	if resp.StatusCode != http.StatusOK || body["role"] != auth.RoleAnalyst || body["mfa"] != true {
 		t.Fatalf("me = %d %v", resp.StatusCode, body)
+	}
+	// An analyst session without a second factor stays out.
+	resp, body = h.do(t, "GET", "/v1/backoffice/kyc/reviews", "", "", map[string]string{"Authorization": "Bearer " + h.analystNoMFA("staff-1")})
+	if resp.StatusCode != http.StatusForbidden || errCode(body) != "MFA_REQUIRED" {
+		t.Fatalf("analyst without MFA: %d %v", resp.StatusCode, body)
+	}
+}
+
+// fakeBackOffice records audit events; down makes the trail unavailable.
+type fakeBackOffice struct {
+	backofficev1.BackOfficeServiceClient
+	mu        sync.Mutex
+	down      bool
+	events    []*backofficev1.RecordAuditRequest
+	approvals int
+}
+
+func (f *fakeBackOffice) RecordAudit(_ context.Context, in *backofficev1.RecordAuditRequest, _ ...grpc.CallOption) (*backofficev1.RecordAuditResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.down {
+		return nil, status.Error(codes.Unavailable, "down")
+	}
+	f.events = append(f.events, in)
+	return &backofficev1.RecordAuditResponse{Event: &backofficev1.AuditEvent{Seq: int64(len(f.events))}}, nil
+}
+
+func (f *fakeBackOffice) RequestApproval(context.Context, *backofficev1.RequestApprovalRequest, ...grpc.CallOption) (*backofficev1.RequestApprovalResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.approvals++
+	return &backofficev1.RequestApprovalResponse{Approval: &backofficev1.Approval{Id: "ap-1"}}, nil
+}
+
+func TestBackOfficeAudit(t *testing.T) {
+	h := newHarness(t, Options{})
+	staff := map[string]string{"Authorization": "Bearer " + h.analyst("staff-1")}
+	// Fail closed: no audit trail, no action (BlockAccount is never reached).
+	h.backoffice.down = true
+	resp, body := h.do(t, "POST", "/v1/backoffice/accounts/"+h.account+"/block", "", `{"reason":"fraude"}`, staff)
+	if resp.StatusCode != http.StatusServiceUnavailable || errCode(body) != "AUDIT_UNAVAILABLE" {
+		t.Fatalf("block without the trail: %d %v", resp.StatusCode, body)
+	}
+	h.backoffice.down = false
+	resp, _ = h.do(t, "POST", "/v1/backoffice/kyc/reviews/cust-9", "", `{"approve":false,"reason":"documento ilegível"}`, staff)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("kyc decision: %d", resp.StatusCode)
+	}
+	if len(h.backoffice.events) != 1 || h.backoffice.events[0].GetAction() != "KYC_REJECT" ||
+		h.backoffice.events[0].GetActorId() != "staff-1" || h.backoffice.events[0].GetTargetId() != "cust-9" {
+		t.Fatalf("audit = %+v", h.backoffice.events)
+	}
+	// Unblocking goes through four-eyes, and only for a blocked account.
+	resp, body = h.do(t, "POST", "/v1/backoffice/accounts/"+h.account+"/unblock", "", `{}`, staff)
+	if resp.StatusCode != http.StatusBadRequest || errCode(body) != "REASON_REQUIRED" {
+		t.Fatalf("unblock without a reason: %d %v", resp.StatusCode, body)
+	}
+	resp, body = h.do(t, "POST", "/v1/backoffice/accounts/"+h.account+"/unblock", "", `{"reason":"cliente confirmou"}`, staff)
+	if resp.StatusCode != http.StatusUnprocessableEntity || errCode(body) != "ACCOUNT_NOT_BLOCKED" || h.backoffice.approvals != 0 {
+		t.Fatalf("unblock an active account: %d %v", resp.StatusCode, body)
 	}
 }
