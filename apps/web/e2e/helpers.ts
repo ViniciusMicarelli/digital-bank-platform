@@ -22,6 +22,8 @@ export function randomCPF(): string {
 export async function onboard(page: Page, name = 'Ana Souza') {
   const email = `web-${crypto.randomUUID().slice(0, 8)}@example.com`
   await page.goto('/criar-conta')
+  await page.waitForTimeout(1200) // entrance animation
+  await shot(page, '00-register')
   await page.getByLabel('Nome completo').fill(name)
   await page.getByLabel('E-mail').fill(email)
   await page.getByLabel('Senha').fill(PASSWORD)

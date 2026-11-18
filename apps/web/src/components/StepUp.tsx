@@ -52,7 +52,7 @@ export function useStepUp() {
   const modal = (
     <Modal open={open} onClose={close} title="Confirme que é você">
       <form onSubmit={submit} className="space-y-4">
-        <p className="text-sm text-slate-600">Por segurança, digite sua senha para continuar.</p>
+        <p className="text-sm text-fg-2">Por segurança, digite sua senha para continuar.</p>
         <Field label="Senha" type="password" autoComplete="current-password" required autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
         {needsTotp && <Field label="Código do autenticador" inputMode="numeric" maxLength={6} value={totp} onChange={(e) => setTotp(e.target.value.replace(/\D/g, ''))} />}
         <Alert>{error}</Alert>

@@ -1,17 +1,47 @@
 import { errorMessage, formatBRL, type Party, type PixKey } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Check, IdCard, KeyRound, Mail, QrCode, Send, Share2, Smartphone, type LucideIcon } from 'lucide-react-native'
 import QRCode from 'qrcode'
 import { useState } from 'react'
-import { Share, Text, View } from 'react-native'
+import { Share, View } from 'react-native'
+import Animated, { ZoomIn } from 'react-native-reanimated'
 import { SvgXml } from 'react-native-svg'
-import { Button, Card, Field, MoneyField, Muted, Notice, Row, Sandbox, Screen, Segmented } from '../../components/ui'
+import { Button, Card, Field, MoneyField, Muted, Notice, Row, Sandbox, Screen, Segmented, Txt } from '../../components/ui'
 import { api } from '../../lib/client'
 import { useAccount } from '../../lib/queries'
-import { colors } from '../../lib/theme'
+import { font, useTheme } from '../../lib/theme'
 
 type Tab = 'enviar' | 'receber' | 'pagar'
+const keyIcons: Record<string, LucideIcon> = { EMAIL: Mail, PHONE: Smartphone, CPF: IdCard, EVP: KeyRound }
 
-function Send({ accountId }: { accountId: string }) {
+function Avatar({ name }: { name: string }) {
+  const { c } = useTheme()
+  const p = name.split(' ').filter(Boolean)
+  return (
+    <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: c.credit, alignItems: 'center', justifyContent: 'center' }}>
+      <Txt tone="white" style={{ fontFamily: font.bold }}>{(p[0]?.[0] ?? '') + (p.at(-1)?.[0] ?? '')}</Txt>
+    </View>
+  )
+}
+
+function Success({ title, detail, onAgain }: { title: string; detail: string; onAgain: () => void }) {
+  const { c } = useTheme()
+  return (
+    <Card>
+      <View style={{ alignItems: 'center', gap: 10, paddingVertical: 10 }}>
+        <Animated.View entering={ZoomIn.springify().damping(12)} style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: c.brand, alignItems: 'center', justifyContent: 'center' }}>
+          <Check size={36} color={c.brandFg} strokeWidth={3} />
+        </Animated.View>
+        <Txt variant="heading">{title}</Txt>
+        <Txt variant="label" tone="fg2">{detail}</Txt>
+      </View>
+      <Button title="Novo Pix" variant="secondary" onPress={onAgain} />
+    </Card>
+  )
+}
+
+function SendPix({ accountId }: { accountId: string }) {
+  const { c } = useTheme()
   const qc = useQueryClient()
   const [key, setKey] = useState('')
   const [owner, setOwner] = useState<Party | null>(null)
@@ -29,9 +59,9 @@ function Send({ accountId }: { accountId: string }) {
     onError: (e) => setError(errorMessage(e)),
   })
   const reset = () => { setKey(''); setOwner(null); setDone(null); setError(''); setIdem(crypto.randomUUID()) }
-  if (done) return <Card title="Pix enviado ✓"><Text style={{ fontSize: 18 }}>{done}</Text><Button title="Novo Pix" variant="secondary" onPress={reset} /></Card>
+  if (done) return <Success title="Pix enviado ✓" detail={done} onAgain={reset} />
   return (
-    <Card title="Enviar Pix">
+    <Card title="Enviar Pix" icon={Send}>
       {!owner ? (
         <>
           <Field label="Chave Pix" autoCapitalize="none" placeholder="CPF, e-mail, celular ou aleatória" value={key} onChangeText={setKey} />
@@ -40,13 +70,16 @@ function Send({ accountId }: { accountId: string }) {
         </>
       ) : (
         <>
-          <View style={{ backgroundColor: colors.bg, borderRadius: 12, padding: 12 }}>
-            <Text style={{ fontWeight: '600' }}>{owner.name}</Text>
-            <Muted>{owner.document} · {owner.bank}</Muted>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface2, borderRadius: 16, padding: 12 }}>
+            <Avatar name={owner.name} />
+            <View style={{ flex: 1 }}>
+              <Txt variant="label" style={{ fontFamily: font.semibold }}>{owner.name}</Txt>
+              <Txt variant="caption" tone="muted">{owner.document} · {owner.bank}</Txt>
+            </View>
           </View>
           <MoneyField label="Valor" onValue={setAmount} />
           <Notice>{error}</Notice>
-          <Button title={`Enviar ${amount ? formatBRL(amount) : ''}`} disabled={!amount} loading={send.isPending} onPress={() => send.mutate()} />
+          <Button title={`Enviar ${amount ? formatBRL(amount) : ''}`} icon={Send} disabled={!amount} loading={send.isPending} onPress={() => send.mutate()} />
           <Button title="Voltar" variant="ghost" onPress={reset} />
         </>
       )}
@@ -55,6 +88,7 @@ function Send({ accountId }: { accountId: string }) {
 }
 
 function Receive({ accountId }: { accountId: string }) {
+  const { c } = useTheme()
   const qc = useQueryClient()
   const keys = useQuery({
     queryKey: ['pix', accountId, 'keys'],
@@ -83,8 +117,9 @@ function Receive({ accountId }: { accountId: string }) {
   })
   return (
     <>
-      <Card title="Minhas chaves">
-        {keys.data?.map((k) => <Row key={k.id} title={k.value} subtitle={k.type} />)}
+      <Card title="Minhas chaves" icon={KeyRound}>
+        {keys.data?.map((k) => <Row key={k.id} icon={keyIcons[k.type] ?? KeyRound} tone="brand" title={k.value}
+          subtitle={{ EMAIL: 'E-mail', PHONE: 'Celular', CPF: 'CPF', EVP: 'Chave aleatória' }[k.type]} />)}
         <Field label="Nova chave (e-mail)" keyboardType="email-address" autoCapitalize="none" value={email} onChangeText={setEmail} />
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <View style={{ flex: 1 }}><Button title="Cadastrar e-mail" variant="secondary" disabled={!email} onPress={() => add.mutate({ type: 'EMAIL', value: email.trim() })} /></View>
@@ -93,18 +128,20 @@ function Receive({ accountId }: { accountId: string }) {
         <Notice>{error}</Notice>
       </Card>
       {first && (
-        <Card title="Cobrar com QR Code">
+        <Card title="Cobrar com QR Code" icon={QrCode} index={1}>
           <MoneyField label="Valor (opcional)" onValue={(v) => { setAmount(v); setSvg(null) }} />
           {svg ? (
-            <View style={{ alignItems: 'center', gap: 10 }}>
-              <View accessibilityLabel="QR Code Pix"><SvgXml xml={svg.xml} width={220} height={220} /></View>
-              <Button title="Compartilhar Pix copia e cola" variant="secondary" onPress={() => Share.share({ message: svg.payload })} />
+            <View style={{ alignItems: 'center', gap: 12 }}>
+              <Animated.View entering={ZoomIn.duration(350)} accessibilityLabel="QR Code Pix" style={{ backgroundColor: '#fff', padding: 14, borderRadius: 24, borderWidth: 1, borderColor: c.line }}>
+                <SvgXml xml={svg.xml} width={210} height={210} />
+              </Animated.View>
+              <Button title="Compartilhar Pix copia e cola" icon={Share2} variant="secondary" onPress={() => Share.share({ message: svg.payload })} />
             </View>
-          ) : <Button title="Gerar QR Code" loading={qr.isPending} onPress={() => qr.mutate()} />}
+          ) : <Button title="Gerar QR Code" icon={QrCode} loading={qr.isPending} onPress={() => qr.mutate()} />}
           <Sandbox>
-            <Text>Receber um Pix de outro banco em {first.value}</Text>
+            <Txt variant="label" tone="fg2">Receber um Pix de outro banco em {first.value}</Txt>
             <Button title={amount ? `Receber ${formatBRL(amount)}` : 'Informe o valor acima'} disabled={!amount} loading={pixIn.isPending} onPress={() => pixIn.mutate()} />
-            {msg ? <Text style={{ color: colors.amber }}>{msg}</Text> : null}
+            {msg ? <Txt variant="label" tone="warning">{msg}</Txt> : null}
           </Sandbox>
         </Card>
       )}
@@ -128,12 +165,12 @@ function PayQR({ accountId }: { accountId: string }) {
     onSuccess: () => { setResult('Pago ✓'); qc.invalidateQueries({ queryKey: ['balance'] }) }, onError: (e) => setError(errorMessage(e)),
   })
   return (
-    <Card title="Pagar Pix copia e cola">
-      <Field label="Código" multiline numberOfLines={4} value={payload} onChangeText={setPayload} />
+    <Card title="Pagar Pix copia e cola" icon={QrCode}>
+      <Field label="Código" multiline numberOfLines={4} value={payload} onChangeText={setPayload} style={{ minHeight: 100, textAlignVertical: 'top' }} />
       {!info ? <Button title="Ler código" loading={decode.isPending} onPress={() => decode.mutate()} /> : (
         <>
-          <Text style={{ fontWeight: '600' }}>{info.receiver.name} · {info.receiver.bank}</Text>
-          {info.amount ? <Text style={{ fontSize: 22, fontWeight: '700' }}>{formatBRL(info.amount.amount)}</Text> : <MoneyField label="Valor" onValue={setAmount} />}
+          <Row icon={Send} tone="brand" title={info.receiver.name} subtitle={info.receiver.bank} />
+          {info.amount ? <Txt variant="title">{formatBRL(info.amount.amount)}</Txt> : <MoneyField label="Valor" onValue={setAmount} />}
           <Button title="Pagar" loading={pay.isPending} onPress={() => pay.mutate()} />
         </>
       )}
@@ -148,11 +185,12 @@ export default function Pix() {
   const [tab, setTab] = useState<Tab>('enviar')
   if (!account) return null
   return (
-    <Screen title="Pix">
+    <Screen title="Pix" subtitle="Transferências instantâneas, 24 horas por dia.">
       <Segmented<Tab> value={tab} onChange={setTab} options={[['enviar', 'Enviar'], ['receber', 'Receber'], ['pagar', 'Copia e cola']]} />
-      {tab === 'enviar' && <Send accountId={account.id} />}
+      {tab === 'enviar' && <SendPix accountId={account.id} />}
       {tab === 'receber' && <Receive accountId={account.id} />}
       {tab === 'pagar' && <PayQR accountId={account.id} />}
+      <Muted> </Muted>
     </Screen>
   )
 }

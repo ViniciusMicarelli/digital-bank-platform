@@ -154,6 +154,13 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Refresh token in the Keychain / Keystore (`expo-secure-store`, this device only); the phone finds the gateway at the Expo dev server's address.
 - The gateway allows listed browser origins (`CORS_ALLOWED_ORIGINS`) so the app's web build can call it; CI lints, typechecks and runs Playwright on that build at a phone viewport.
 
+## Phase 21 — Design system, themes and motion ✅
+
+- One design language for web and mobile: semantic color tokens with light and dark values (jade for money in and the brand, neutral for money out, red only for failures, amber for pending, violet for credit), Inter, Lucide icons.
+- Light and dark themes in both apps, following the system or chosen by the customer.
+- Realistic cards (chip, contactless, sheen, 3D flip to the back after step-up), balance and limit count-ups, staggered entrances, skeletons; GSAP on the web, Reanimated on mobile, both respecting reduced motion.
+- Browser tests run in both themes.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

@@ -2,7 +2,18 @@
 
 The customer app of the Digital Bank: onboarding with KYC, account, Pix (send, request with a QR Code, pay a QR Code, keys, refunds), debit and credit cards (step-up to reveal, controls, wallets), credit invoices, boletos and live notifications. Portuguese UI, built on the public REST API ([docs/api](../../docs/api/README.md)).
 
-React 19 · TypeScript · Vite · Tailwind CSS v4 · TanStack Query · React Router · Vitest · Playwright.
+React 19 · TypeScript · Vite · Tailwind CSS v4 · GSAP · Lucide · TanStack Query · React Router · Vitest · Playwright.
+
+## Design
+
+| | |
+|---|---|
+| Color with meaning | Semantic tokens ([`src/index.css`](src/index.css)): **jade** is the bank and money coming in; outgoing money stays neutral (as in current Brazilian banking apps); **red** only for failures and declines; **amber** for pending and scheduled; **violet** for credit products. Each token has a light and a dark value. |
+| Themes | Light and dark, following the system by default, with Sistema / Claro / Escuro in the sidebar and in Ajustes. `public/theme.js` applies the choice before the first paint (no flash; it is a file because the CSP forbids inline scripts). |
+| Type and icons | Inter (self-hosted, `@fontsource-variable/inter`) with tabular numbers for money; Lucide icons. |
+| Cards | [`BankCard`](src/components/BankCard.tsx): chip, contactless mark, a light sheen that follows the pointer and a 3D tilt, and a flip to the back with the number and CVV after step-up. Sizes are container-relative (`cqw`), so it stays proportional from the hero to the card page. |
+| Motion (GSAP) | Page transitions and staggered entrances ([`src/lib/motion.ts`](src/lib/motion.ts)), count-up balances and limits, a sliding tab indicator, toasts that spring in, an animated receipt check, floating cards on sign-in. Everything is skipped under `prefers-reduced-motion`. |
+| Loading | Skeleton rows instead of spinners. |
 
 ## Run
 

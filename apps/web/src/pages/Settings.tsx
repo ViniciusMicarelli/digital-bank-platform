@@ -3,10 +3,11 @@ import QRCode from 'qrcode'
 import { useState } from 'react'
 import { useAccount, useProfile } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
+import { KeyRound, LogOut, Palette, ShieldCheck, SlidersHorizontal, UserRound } from 'lucide-react'
+import { ThemeSwitch } from '../components/ThemeSwitch'
 import { Alert, Badge, Button, Field, PageTitle, Panel } from '../components/ui'
 import { api, logout } from '../lib/api'
-import { errorMessage } from '@bank/core'
-import { formatBRL } from '@bank/core'
+import { errorMessage, formatBRL } from '@bank/core'
 
 function TOTP() {
   const [enroll, setEnroll] = useState<{ secret: string; image: string } | null>(null)
@@ -23,18 +24,18 @@ function TOTP() {
     onError: (e) => setMsg({ tone: 'red', text: errorMessage(e) }),
   })
   return (
-    <Panel title="Verificação em duas etapas">
+    <Panel title="Verificação em duas etapas" icon={KeyRound}>
       {enroll ? (
         <form onSubmit={(e) => { e.preventDefault(); confirm.mutate() }} className="space-y-4">
-          <p className="text-sm text-slate-600">Escaneie com Google Authenticator, 1Password ou similar e digite o código.</p>
-          <img src={enroll.image} alt="QR Code do autenticador" className="rounded-xl ring-1 ring-slate-200" />
-          <p className="font-mono text-xs break-all text-slate-500">{enroll.secret}</p>
+          <p className="text-sm text-fg-2">Escaneie com Google Authenticator, 1Password ou similar e digite o código.</p>
+          <div className="w-fit rounded-2xl bg-white p-3 ring-1 ring-line"><img src={enroll.image} alt="QR Code do autenticador" className="size-44" /></div>
+          <p className="font-mono text-xs break-all text-muted">{enroll.secret}</p>
           <Field label="Código de 6 dígitos" inputMode="numeric" maxLength={6} required value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
           <Button type="submit" loading={confirm.isPending}>Ativar</Button>
         </form>
       ) : (
         <>
-          <p className="mb-4 text-sm text-slate-600">Além da senha, peça um código do seu celular para entrar.</p>
+          <p className="mb-4 text-sm text-fg-2">Além da senha, peça um código do seu celular para entrar.</p>
           <Button variant="secondary" loading={start.isPending} onClick={() => start.mutate()}>Configurar autenticador</Button>
         </>
       )}
@@ -59,12 +60,12 @@ function LimitsPanel({ accountId }: { accountId: string }) {
   })
   const l = limits.data
   return (
-    <Panel title="Limites de transação" action={!edit && <Button variant="ghost" onClick={() => setEdit({})}>Alterar</Button>}>
+    <Panel icon={SlidersHorizontal} title="Limites de transação" action={!edit && <Button variant="ghost" onClick={() => setEdit({})}>Alterar</Button>}>
       {l && !edit && (
         <dl className="grid grid-cols-3 gap-3 text-sm">
-          <div><dt className="text-slate-500">Por transação</dt><dd className="font-semibold">{formatBRL(l.limits.per_transaction)}</dd></div>
-          <div><dt className="text-slate-500">Por dia</dt><dd className="font-semibold">{formatBRL(l.limits.daily)}</dd><dd className="text-xs text-slate-400">usado {formatBRL(l.used.daily)}</dd></div>
-          <div><dt className="text-slate-500">À noite (20h–6h)</dt><dd className="font-semibold">{formatBRL(l.limits.nightly)}</dd><dd className="text-xs text-slate-400">usado {formatBRL(l.used.nightly)}</dd></div>
+          <div><dt className="text-muted">Por transação</dt><dd className="font-semibold">{formatBRL(l.limits.per_transaction)}</dd></div>
+          <div><dt className="text-muted">Por dia</dt><dd className="font-semibold">{formatBRL(l.limits.daily)}</dd><dd className="text-xs text-subtle">usado {formatBRL(l.used.daily)}</dd></div>
+          <div><dt className="text-muted">À noite (20h–6h)</dt><dd className="font-semibold">{formatBRL(l.limits.nightly)}</dd><dd className="text-xs text-subtle">usado {formatBRL(l.used.nightly)}</dd></div>
         </dl>
       )}
       {edit && (
@@ -87,23 +88,27 @@ export function SettingsPage() {
     <div className="space-y-6">
       <PageTitle>Ajustes</PageTitle>
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title={<span className="flex items-center gap-2">Meus dados {profile?.kyc_status === 'APPROVED' && <Badge tone="green">Verificado</Badge>}</span>}>
+        <Panel icon={UserRound} title={<span className="flex items-center gap-2">Meus dados {profile?.kyc_status === 'APPROVED' && <Badge tone="green">Verificado</Badge>}</span>}>
           {profile && (
             <dl className="space-y-2 text-sm">
-              <div className="flex justify-between gap-4"><dt className="text-slate-500">Nome</dt><dd className="text-right font-medium">{profile.full_name}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-slate-500">CPF</dt><dd className="font-medium">{profile.cpf}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-slate-500">Celular</dt><dd className="font-medium">{profile.phone || '—'}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-slate-500">Endereço</dt>
+              <div className="flex justify-between gap-4"><dt className="text-muted">Nome</dt><dd className="text-right font-medium">{profile.full_name}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted">CPF</dt><dd className="font-medium">{profile.cpf}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted">Celular</dt><dd className="font-medium">{profile.phone || '—'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-muted">Endereço</dt>
                 <dd className="text-right font-medium">{profile.address.street}, {profile.address.number} · {profile.address.city}/{profile.address.state}</dd></div>
-              {account && <div className="flex justify-between gap-4"><dt className="text-slate-500">Conta</dt><dd className="font-medium">Ag. {account.branch} · {account.number}</dd></div>}
+              {account && <div className="flex justify-between gap-4"><dt className="text-muted">Conta</dt><dd className="font-medium">Ag. {account.branch} · {account.number}</dd></div>}
             </dl>
           )}
         </Panel>
         <TOTP />
         {account && <LimitsPanel accountId={account.id} />}
-        <Panel title="Sessão">
-          <p className="mb-4 text-sm text-slate-600">Encerra a sessão neste navegador e invalida o token de renovação.</p>
-          <Button variant="danger" onClick={() => logout()}>Sair</Button>
+        <Panel title="Aparência" icon={Palette}>
+          <p className="mb-4 text-sm text-fg-2">Siga o sistema ou escolha o tema claro ou escuro.</p>
+          <ThemeSwitch />
+        </Panel>
+        <Panel title="Sessão" icon={ShieldCheck}>
+          <p className="mb-4 text-sm text-fg-2">Encerra a sessão neste navegador e invalida o token de renovação.</p>
+          <Button variant="danger" icon={LogOut} onClick={() => logout()}>Sair</Button>
         </Panel>
       </div>
     </div>

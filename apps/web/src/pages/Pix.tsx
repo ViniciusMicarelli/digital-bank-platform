@@ -1,15 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
-import { useEffect, useState, type FormEvent } from 'react'
+import { Check, Copy, IdCard, KeyRound, Mail, QrCode, Smartphone, Trash2, type LucideIcon } from 'lucide-react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { gsap, reducedMotion, useGSAP } from '../lib/motion'
 import { useSearchParams } from 'react-router'
 import { useAccount } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
-import {Alert, Amount, Badge, Button, Empty, Field, Loading, Modal, PageTitle, Panel, Sandbox, Select, Tabs, Toggle } from '../components/ui'
+import { Alert, Amount, Badge, Button, Empty, Field, IconTile, Loading, Modal, PageTitle, Panel, Sandbox, Select, Tabs, Toggle } from '../components/ui'
 import { dateTimeBR } from '../lib/format'
 import { api, newIdempotencyKey } from '../lib/api'
-import { errorMessage } from '@bank/core'
-import { formatBRL, type Money } from '@bank/core'
-import type { Party, PixKey, PixTransfer } from '@bank/core'
+import { errorMessage, formatBRL, type Money, type Party, type PixKey, type PixTransfer } from '@bank/core'
 
 type Tab = 'enviar' | 'cobrar' | 'pagar' | 'chaves' | 'historico'
 
@@ -21,13 +21,27 @@ function usePixKeys(accountId?: string) {
   })
 }
 
+const keyIcons: Record<string, LucideIcon> = { EMAIL: Mail, PHONE: Smartphone, CPF: IdCard, EVP: KeyRound }
+
+function Avatar({ name }: { name: string }) {
+  const p = name.split(' ').filter(Boolean)
+  return <span className="grid size-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-credit text-sm font-bold text-white">{(p[0]?.[0] ?? '') + (p.at(-1)?.[0] ?? '')}</span>
+}
+
 function Receipt({ t, title }: { t: PixTransfer; title: string }) {
+  const root = useRef<HTMLDivElement>(null)
+  useGSAP(() => {
+    if (reducedMotion()) return
+    gsap.timeline()
+      .from('[data-check]', { scale: 0, rotate: -90, duration: 0.6, ease: 'back.out(2)' })
+      .from('[data-line]', { y: 10, autoAlpha: 0, stagger: 0.07, duration: 0.4, ease: 'power2.out' }, '-=0.2')
+  }, { scope: root })
   return (
-    <div className="space-y-2 text-center">
-      <div className="mx-auto grid size-12 place-items-center rounded-full bg-emerald-50 text-xl text-emerald-700">✓</div>
-      <p className="font-semibold">{title}</p>
-      <p className="tabular text-3xl font-bold">{formatBRL(t.amount)}</p>
-      <p className="text-sm text-slate-600">{t.counterparty.name} · {t.counterparty.bank}</p>
+    <div ref={root} className="space-y-2 py-4 text-center">
+      <div data-check className="mx-auto mb-4 grid size-16 place-items-center rounded-full bg-brand text-brand-fg shadow-[0_10px_30px_-8px_var(--brand)]"><Check className="size-8" strokeWidth={3} /></div>
+      <p data-line className="font-semibold text-fg">{title}</p>
+      <p data-line className="tabular text-4xl font-bold tracking-tight text-fg">{formatBRL(t.amount)}</p>
+      <p data-line className="text-sm text-fg-2">{t.counterparty.name} · {t.counterparty.bank}</p>
       {t.status !== 'COMPLETED' && <Badge tone="amber">Em processamento</Badge>}
     </div>
   )
@@ -67,9 +81,9 @@ function SendPix({ accountId }: { accountId: string }) {
         </form>
       ) : (
         <form onSubmit={(e) => { e.preventDefault(); send.mutate() }} className="space-y-4">
-          <div className="rounded-xl bg-slate-50 p-4 text-sm">
-            <p className="font-semibold">{owner.name}</p>
-            <p className="text-slate-600">{owner.document} · {owner.bank}</p>
+          <div className="flex items-center gap-3 rounded-2xl bg-surface-2 p-4 text-sm">
+            <Avatar name={owner.name} />
+            <div className="min-w-0"><p className="truncate font-semibold text-fg">{owner.name}</p><p className="text-muted">{owner.document} · {owner.bank}</p></div>
           </div>
           <MoneyField label="Valor" onValue={setAmount} />
           <Field label="Mensagem (opcional)" maxLength={140} value={description} onChange={(e) => setDescription(e.target.value)} />
@@ -102,10 +116,12 @@ function ChargePix({ accountId, keys }: { accountId: string; keys: PixKey[] }) {
     <Panel title="Cobrar com QR Code">
       {qr ? (
         <div className="space-y-4 text-center">
-          <img src={qr.image} alt="QR Code Pix" className="mx-auto rounded-xl ring-1 ring-slate-200" />
-          <p className="text-sm text-slate-600">{amount ? formatBRL(amount) : 'Valor livre'} · {oneTime ? 'uso único, vale 1 hora' : 'pode ser pago várias vezes'}</p>
+          <div className="mx-auto w-fit rounded-3xl bg-white p-4 shadow-card ring-1 ring-line">
+            <img src={qr.image} alt="QR Code Pix" className="size-56" />
+          </div>
+          <p className="text-sm text-fg-2">{amount ? formatBRL(amount) : 'Valor livre'} · {oneTime ? 'uso único, vale 1 hora' : 'pode ser pago várias vezes'}</p>
           <div className="flex justify-center gap-2">
-            <Button variant="secondary" onClick={async () => { await navigator.clipboard.writeText(qr.payload); setCopied(true) }}>
+            <Button variant="secondary" icon={copied ? Check : Copy} onClick={async () => { await navigator.clipboard.writeText(qr.payload); setCopied(true) }}>
               {copied ? 'Copiado!' : 'Copiar Pix copia e cola'}
             </Button>
             <Button variant="ghost" onClick={() => { setQr(null); setCopied(false) }}>Nova cobrança</Button>
@@ -119,7 +135,7 @@ function ChargePix({ accountId, keys }: { accountId: string; keys: PixKey[] }) {
           <MoneyField label="Valor (opcional)" optional onValue={setAmount} hint="Sem valor, quem paga escolhe." />
           <Toggle label="Uso único" description="O QR Code só pode ser pago uma vez e expira em 1 hora." checked={oneTime} onChange={setOneTime} />
           <Alert>{error}</Alert>
-          <Button type="submit" loading={create.isPending}>Gerar QR Code</Button>
+          <Button type="submit" icon={QrCode} loading={create.isPending}>Gerar QR Code</Button>
         </form>
       )}
     </Panel>
@@ -153,18 +169,18 @@ function PayQR({ accountId }: { accountId: string }) {
       {!decoded ? (
         <form onSubmit={(e) => { e.preventDefault(); decode.mutate() }} className="space-y-4">
           <label className="block">
-            <span className="mb-1 block text-sm font-medium text-slate-700">Pix copia e cola</span>
+            <span className="mb-1 block text-sm font-medium text-fg-2">Pix copia e cola</span>
             <textarea required rows={4} value={payload} onChange={(e) => setPayload(e.target.value)}
-              className="block w-full rounded-xl border-0 px-3 py-2.5 font-mono text-xs ring-1 ring-slate-200 focus:ring-2 focus:ring-brand-500 focus:outline-none" />
+              className="block w-full rounded-xl border-0 bg-surface px-3.5 py-3 font-mono text-xs text-fg ring-1 ring-line-strong focus:ring-2 focus:ring-brand focus:outline-none" />
           </label>
           <Alert>{error}</Alert>
           <Button type="submit" loading={decode.isPending}>Ler código</Button>
         </form>
       ) : (
         <div className="space-y-4">
-          <div className="rounded-xl bg-slate-50 p-4 text-sm">
+          <div className="rounded-xl bg-surface-2 p-4 text-sm">
             <p className="font-semibold">{decoded.receiver.name}</p>
-            <p className="text-slate-600">{decoded.receiver.document} · {decoded.receiver.bank}</p>
+            <p className="text-fg-2">{decoded.receiver.document} · {decoded.receiver.bank}</p>
             {decoded.amount && <p className="tabular mt-2 text-2xl font-bold">{formatBRL(decoded.amount)}</p>}
           </div>
           {!decoded.amount && <MoneyField label="Valor" onValue={setAmount} />}
@@ -192,14 +208,15 @@ function Keys({ accountId, keys }: { accountId: string; keys: PixKey[] }) {
     <div className="grid gap-6 lg:grid-cols-2">
       <Panel title="Minhas chaves">
         {keys.length === 0 ? <Empty>Nenhuma chave cadastrada.</Empty> : (
-          <ul className="divide-y divide-slate-100">
+          <ul className="-my-1 divide-y divide-line">
             {keys.map((k) => (
-              <li key={k.id} className="flex items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <Badge tone="brand">{k.type}</Badge>
-                  <p className="mt-1 truncate text-sm font-medium">{k.value}</p>
+              <li key={k.id} className="flex items-center gap-3 py-3">
+                <IconTile icon={keyIcons[k.type] ?? KeyRound} tone="brand" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-fg">{k.value}</p>
+                  <p className="text-xs text-muted">{{ EMAIL: 'E-mail', PHONE: 'Celular', CPF: 'CPF', EVP: 'Chave aleatória' }[k.type]}</p>
                 </div>
-                <Button variant="ghost" onClick={() => remove.mutate(k.id)}>Excluir</Button>
+                <Button variant="ghost" size="sm" icon={Trash2} onClick={() => remove.mutate(k.id)}>Excluir</Button>
               </li>
             ))}
           </ul>
@@ -247,12 +264,12 @@ function History({ accountId }: { accountId: string }) {
         <option value="outgoing">Enviados</option>
       </Select>}>
       {list.isLoading ? <Loading /> : !list.data?.length ? <Empty>Nada por aqui.</Empty> : (
-        <ul className="divide-y divide-slate-100">
+        <ul className="-my-1 divide-y divide-line">
           {list.data.map((t) => (
             <li key={t.id} className="flex items-center gap-3 py-3">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{t.counterparty.name}</p>
-                <p className="text-xs text-slate-500">{dateTimeBR(t.created_at)} · {t.status === 'COMPLETED' ? 'Concluído' : t.status}
+                <p className="text-xs text-muted">{dateTimeBR(t.created_at)} · {t.status === 'COMPLETED' ? 'Concluído' : t.status}
                   {t.refunded && t.refunded.amount !== '0.00' && ` · ${formatBRL(t.refunded)} devolvido`}</p>
               </div>
               <Amount value={t.amount} direction={direction === 'incoming' ? 'CREDIT' : 'DEBIT'} className="text-sm" />
@@ -265,7 +282,7 @@ function History({ accountId }: { accountId: string }) {
       )}
       <Modal open={!!refunding} onClose={() => setRefunding(null)} title="Devolver Pix">
         <form onSubmit={(e) => { e.preventDefault(); refund.mutate() }} className="space-y-4">
-          <p className="text-sm text-slate-600">Para {refunding?.counterparty.name}, até {formatBRL(refunding?.amount)}.</p>
+          <p className="text-sm text-fg-2">Para {refunding?.counterparty.name}, até {formatBRL(refunding?.amount)}.</p>
           <MoneyField label="Valor a devolver" onValue={setAmount} />
           <Alert>{error}</Alert>
           <Button type="submit" loading={refund.isPending} disabled={!amount}>Devolver</Button>
@@ -290,7 +307,7 @@ function ReceiveSandbox({ keys }: { keys: PixKey[] }) {
         <div className="flex-1"><MoneyField label={`Receber um Pix de outro banco em ${keys[0].value}`} onValue={setAmount} /></div>
         <Button type="submit" loading={receive.isPending} disabled={!amount}>Receber</Button>
       </form>
-      {msg && <p className="mt-2 text-sm text-amber-900">{msg}</p>}
+      {msg && <p className="mt-2 text-sm text-warning">{msg}</p>}
     </Sandbox>
   )
 }

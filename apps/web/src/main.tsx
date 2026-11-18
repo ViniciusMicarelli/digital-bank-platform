@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { SessionProvider } from './app/session'
+import { ThemeProvider } from './app/theme'
 import { ApiError } from './lib/api'
 import './index.css'
 
@@ -18,10 +19,12 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <ThemeProvider>
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
         <App />
       </QueryClientProvider>
     </SessionProvider>
+    </ThemeProvider>
   </StrictMode>,
 )

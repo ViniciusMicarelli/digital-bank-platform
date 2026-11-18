@@ -1,14 +1,23 @@
-import { Text, View } from 'react-native'
-import { colors } from '../lib/theme'
+import { LinearGradient } from 'expo-linear-gradient'
+import { View } from 'react-native'
+import { font } from '../lib/theme'
+import { Txt } from './ui'
 
-export function Brand() {
+export function Logo({ size = 40 }: { size?: number }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 24 }}>
-      <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 20 }}>D</Text>
-      </View>
-      <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text }}>Digital Bank</Text>
+    <View style={{ width: size, height: size, borderRadius: size * 0.28, backgroundColor: '#0b1220', alignItems: 'center', justifyContent: 'center' }}>
+      <LinearGradient colors={['#2ed3a0', '#00805f']} style={{ width: size * 0.42, height: size * 0.46, borderTopRightRadius: size * 0.24, borderBottomRightRadius: size * 0.24, padding: size * 0.08 }}>
+        <View style={{ flex: 1, backgroundColor: '#0b1220', borderTopRightRadius: size * 0.16, borderBottomRightRadius: size * 0.16 }} />
+      </LinearGradient>
     </View>
   )
 }
 
+export function Brand() {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <Logo />
+      <Txt variant="heading" style={{ fontSize: 20, fontFamily: font.bold }}>Digital Bank</Txt>
+    </View>
+  )
+}

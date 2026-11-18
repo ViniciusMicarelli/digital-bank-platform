@@ -2,12 +2,15 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { keys, useAccounts, useProfile } from '../app/queries'
-import { Brand } from '../components/Layout'
+import { Check, IdCard, Landmark, LogOut, ScanFace, ShieldCheck } from 'lucide-react'
+import { Brand } from '../components/Brand'
+import { ThemeSwitch } from '../components/ThemeSwitch'
+import { useReveal } from '../lib/motion'
 import { Alert, Badge, Button, Field, Loading, Panel, Sandbox, Select } from '../components/ui'
+import { cx } from '../lib/format'
 import { api, logout } from '../lib/api'
-import { errorMessage } from '@bank/core'
+import { errorMessage, type Profile } from '@bank/core'
 import { maskCPF } from '../lib/format'
-import type { Profile } from '@bank/core'
 
 const UFS = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ')
 
@@ -20,13 +23,19 @@ const reasons: Record<string, string> = {
 }
 
 function Steps({ step }: { step: number }) {
-  const names = ['Seus dados', 'Verificação', 'Conta']
+  const steps = [['Seus dados', IdCard], ['Verificação', ScanFace], ['Conta', Landmark]] as const
   return (
-    <ol className="mb-8 flex gap-2">
-      {names.map((n, i) => (
-        <li key={n} className="flex-1">
-          <div className={`h-1.5 rounded-full ${i <= step ? 'bg-brand-600' : 'bg-slate-200'}`} />
-          <p className={`mt-2 text-xs font-medium ${i <= step ? 'text-brand-700' : 'text-slate-400'}`}>{i + 1}. {n}</p>
+    <ol data-reveal className="mb-8 grid grid-cols-3 gap-3">
+      {steps.map(([name, Icon], i) => (
+        <li key={name} className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span className={cx('grid size-9 place-items-center rounded-full ring-2 transition-all duration-500',
+              i < step ? 'bg-brand text-brand-fg ring-brand' : i === step ? 'bg-brand-soft text-brand-strong ring-brand' : 'bg-surface text-subtle ring-line-strong')}>
+              {i < step ? <Check className="size-4" strokeWidth={3} /> : <Icon className="size-4" />}
+            </span>
+            {i < 2 && <span className="h-0.5 flex-1 overflow-hidden rounded-full bg-line"><span className={cx('block h-full bg-brand transition-all duration-700', i < step ? 'w-full' : 'w-0')} /></span>}
+          </div>
+          <p className={cx('text-xs font-semibold', i <= step ? 'text-fg' : 'text-subtle')}>{name}</p>
         </li>
       ))}
     </ol>
@@ -80,7 +89,7 @@ function ProfileForm({ profile, onSaved }: { profile: Profile | null; onSaved: (
         <Select label="UF" value={f.state} onChange={set('state')}>{UFS.map((u) => <option key={u}>{u}</option>)}</Select>
       </div>
       <Alert>{error}</Alert>
-      <Button type="submit" loading={save.isPending} className="w-full">Salvar e continuar</Button>
+      <Button type="submit" size="lg" loading={save.isPending} className="w-full">Salvar e continuar</Button>
     </form>
   )
 }
@@ -93,6 +102,7 @@ export function OnboardingPage() {
   const [editing, setEditing] = useState(false)
   const [error, setError] = useState('')
   const refresh = () => qc.invalidateQueries({ queryKey: keys.profile })
+  const scope = useReveal<HTMLElement>([profile.data?.kyc_status])
 
   const submitKYC = useMutation({ mutationFn: () => api('POST', '/v1/me/kyc'), onSuccess: refresh, onError: (e) => setError(errorMessage(e)) })
   const review = useMutation({
@@ -108,20 +118,24 @@ export function OnboardingPage() {
     onError: (e) => setError(errorMessage(e)),
   })
 
-  if (profile.isLoading || accounts.isLoading) return <Loading />
+  if (profile.isLoading || accounts.isLoading) return <div className="mx-auto max-w-xl p-10"><Loading /></div>
   const p = profile.data ?? null
   const status = p?.kyc_status
   const step = !p || editing || status === 'REJECTED' ? 0 : status === 'APPROVED' ? 2 : 1
 
   return (
-    <div className="min-h-full bg-slate-50">
-      <header className="flex items-center justify-between px-6 py-4">
+    <div className="min-h-full bg-bg">
+      <header className="flex items-center justify-between px-5 py-4 sm:px-8">
         <Brand />
-        <button onClick={() => logout()} className="text-sm text-slate-500 hover:text-slate-800">Sair</button>
+        <div className="flex items-center gap-2">
+          <ThemeSwitch compact />
+          <Button variant="ghost" size="sm" icon={LogOut} onClick={() => logout()}>Sair</Button>
+        </div>
       </header>
-      <main className="mx-auto max-w-xl px-4 py-6">
-        <h1 className="text-2xl font-bold tracking-tight">Vamos abrir sua conta</h1>
-        <p className="mt-1 mb-6 text-sm text-slate-500">Leva dois minutos. Seus dados são verificados com o bureau de identidade.</p>
+      <main ref={scope} className="mx-auto max-w-xl px-4 py-6 sm:py-10">
+        <p data-reveal className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wider text-brand-strong uppercase"><ShieldCheck className="size-4" /> Abertura de conta</p>
+        <h1 data-reveal className="text-3xl font-bold tracking-tight text-fg">Vamos abrir sua conta</h1>
+        <p data-reveal className="mt-2 mb-8 text-sm text-muted">Leva dois minutos. Seus dados são verificados com o bureau de identidade e protegidos com criptografia.</p>
         <Steps step={step} />
 
         {step === 0 && (
@@ -135,9 +149,9 @@ export function OnboardingPage() {
 
         {step === 1 && p && (
           <Panel title="Verificação de identidade">
-            <dl className="mb-5 grid grid-cols-2 gap-3 text-sm">
-              <div><dt className="text-slate-500">Nome</dt><dd className="font-medium">{p.full_name}</dd></div>
-              <div><dt className="text-slate-500">CPF</dt><dd className="font-medium">{p.cpf}</dd></div>
+            <dl className="mb-6 grid grid-cols-2 gap-3 rounded-2xl bg-surface-2 p-4 text-sm">
+              <div><dt className="text-xs text-muted">Nome</dt><dd className="font-semibold text-fg">{p.full_name}</dd></div>
+              <div><dt className="text-xs text-muted">CPF</dt><dd className="tabular font-semibold text-fg">{p.cpf}</dd></div>
             </dl>
             {status === 'NOT_STARTED' && (
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -150,7 +164,7 @@ export function OnboardingPage() {
               <div className="space-y-4">
                 <Alert tone="amber">Seu cadastro está em análise manual ({reasons[p.kyc_reason] ?? p.kyc_reason}). Avisamos assim que terminar.</Alert>
                 <Sandbox>
-                  <p className="mb-3 text-sm text-slate-600">Faça o papel do analista:</p>
+                  <p className="mb-3 text-sm text-fg-2">Faça o papel do analista:</p>
                   <div className="flex gap-2">
                     <Button loading={review.isPending} onClick={() => review.mutate(true)}>Aprovar</Button>
                     <Button variant="danger" loading={review.isPending} onClick={() => review.mutate(false)}>Recusar</Button>
@@ -163,10 +177,10 @@ export function OnboardingPage() {
         )}
 
         {step === 2 && (
-          <Panel title={<span className="flex items-center gap-2">Identidade verificada <Badge tone="green">Aprovado</Badge></span>}>
-            <p className="mb-5 text-sm text-slate-600">Tudo certo, {p!.full_name.split(' ')[0]}. Sua conta corrente será aberta com o nome e o CPF verificados.</p>
+          <Panel title={<span className="flex items-center gap-2">Identidade verificada <Badge tone="green"><Check className="size-3" /> Aprovado</Badge></span>}>
+            <p className="mb-5 text-sm text-fg-2">Tudo certo, {p!.full_name.split(' ')[0]}. Sua conta corrente será aberta com o nome e o CPF verificados.</p>
             <Alert>{error}</Alert>
-            <Button loading={open.isPending} onClick={() => open.mutate()} className="w-full">Abrir minha conta</Button>
+            <Button size="lg" loading={open.isPending} onClick={() => open.mutate()} className="w-full">Abrir minha conta</Button>
           </Panel>
         )}
       </main>

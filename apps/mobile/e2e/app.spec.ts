@@ -61,7 +61,7 @@ test('a new customer onboards, receives and sends Pix, and uses the card', async
   await expect(page.getByText('Pix enviado ✓').filter({ visible: true }).first()).toBeVisible()
 
   await page.getByRole('tab', { name: /Início/ }).filter({ visible: true }).first().click()
-  await expect(page.getByLabel('Saldo').filter({ visible: true })).toHaveText('R$ 210,00')
+  await expect(page.getByLabel('Saldo', { exact: true }).filter({ visible: true })).toHaveText('R$ 210,00')
   // The statement row (exact text), not the notification banner that mentions her.
   await expect(page.getByText('Maria Oliveira', { exact: true }).filter({ visible: true }).first()).toBeVisible()
   await shot(page, 'm03-home')

@@ -3,34 +3,14 @@ import { useState } from 'react'
 import { useAccount } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
 import { useStepUp } from '../components/StepUp'
-import {Alert, Badge, Button, Empty, Field, Loading, Modal, PageTitle, Panel, Sandbox, Select, Toggle } from '../components/ui'
+import { Eye, EyeOff, Globe, Lock, LockOpen, Nfc, Pause, Play, Plus, ShoppingCart, Smartphone, Trash2, Wifi } from 'lucide-react'
+import { BankCard } from '../components/BankCard'
+import { Alert, Badge, Button, Empty, Field, IconButton, IconTile, Loading, Modal, PageTitle, Panel, Sandbox, Select, Toggle } from '../components/ui'
 import { cx } from '../lib/format'
 import { api } from '../lib/api'
-import { errorMessage } from '@bank/core'
-import { formatBRL } from '@bank/core'
-import type { Card, CardDetails, CardToken } from '@bank/core'
+import { errorMessage, formatBRL, type Card, type CardDetails, type CardToken } from '@bank/core'
 
 const wallets: Record<string, string> = { APPLE_PAY: 'Apple Pay', GOOGLE_PAY: 'Google Pay', SAMSUNG_PAY: 'Samsung Pay', MERCHANT: 'Loja' }
-
-function CardArt({ card, details }: { card: Card; details?: CardDetails | null }) {
-  const pan = details?.pan.replace(/(\d{4})(?=\d)/g, '$1 ') ?? `•••• •••• •••• ${card.last4}`
-  return (
-    <div className={cx('relative aspect-[1.586] w-full max-w-sm overflow-hidden rounded-2xl p-5 text-white shadow-lg',
-      card.status === 'BLOCKED' ? 'bg-slate-500' : 'bg-gradient-to-br from-slate-800 via-brand-900 to-brand-600')}>
-      <div className="flex items-start justify-between">
-        <span className="text-sm font-semibold">Digital Bank</span>
-        <span className="text-xs tracking-wide uppercase opacity-80">{card.kind === 'VIRTUAL' ? 'Virtual' : 'Físico'}</span>
-      </div>
-      <p className="tabular mt-8 font-mono text-lg tracking-widest sm:text-xl">{pan}</p>
-      <div className="mt-6 flex items-end justify-between text-xs">
-        <div><p className="opacity-70">Titular</p><p className="font-semibold">{card.holder_name}</p></div>
-        <div><p className="opacity-70">Validade</p><p className="font-semibold">{String(card.expiry_month).padStart(2, '0')}/{String(card.expiry_year).slice(2)}</p></div>
-        {details && <div><p className="opacity-70">CVV</p><p className="font-semibold">{details.cvv}</p></div>}
-      </div>
-      {card.status === 'BLOCKED' && <span className="absolute inset-0 grid place-items-center bg-slate-900/40 text-lg font-bold">Bloqueado</span>}
-    </div>
-  )
-}
 
 function Wallets({ accountId, card, confirm }: { accountId: string; card: Card; confirm: () => Promise<string> }) {
   const qc = useQueryClient()
@@ -54,20 +34,20 @@ function Wallets({ accountId, card, confirm }: { accountId: string; card: Card; 
     onSuccess: refresh,
   })
   return (
-    <Panel title="Carteiras digitais" action={<Button variant="ghost" onClick={() => { setOpen(true); setCreated(null); setError('') }}>Adicionar</Button>}>
-      {!tokens.data?.length ? <Empty>Use o cartão no celular sem mostrar o número dele.</Empty> : (
-        <ul className="divide-y divide-slate-100">
+    <Panel title="Carteiras digitais" icon={Smartphone} action={<Button variant="ghost" size="sm" icon={Plus} onClick={() => { setOpen(true); setCreated(null); setError('') }}>Adicionar</Button>}>
+      {!tokens.data?.length ? <Empty icon={Smartphone}>Use o cartão no celular sem mostrar o número dele.</Empty> : (
+        <ul className="-my-1 divide-y divide-line">
           {tokens.data.map((t) => (
-            <li key={t.id} className="flex items-center gap-3 py-3">
-              <div className="flex-1">
-                <p className="text-sm font-medium">{wallets[t.wallet] ?? t.wallet} · {t.device_name}</p>
-                <p className="text-xs text-slate-500">Token final {t.last4}</p>
+            <li key={t.id} className="flex items-center gap-2 py-3">
+              <IconTile icon={Smartphone} tone={t.status === 'ACTIVE' ? 'brand' : 'amber'} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-fg">{wallets[t.wallet] ?? t.wallet} · {t.device_name}</p>
+                <p className="text-xs text-muted">Token final {t.last4}</p>
               </div>
               <Badge tone={t.status === 'ACTIVE' ? 'green' : 'amber'}>{t.status === 'ACTIVE' ? 'Ativo' : 'Suspenso'}</Badge>
-              <Button variant="ghost" onClick={() => act.mutate({ t, action: t.status === 'ACTIVE' ? 'suspend' : 'resume' })}>
-                {t.status === 'ACTIVE' ? 'Suspender' : 'Reativar'}
-              </Button>
-              <Button variant="ghost" onClick={() => act.mutate({ t, action: 'delete' })}>Remover</Button>
+              <IconButton icon={t.status === 'ACTIVE' ? Pause : Play} label={t.status === 'ACTIVE' ? 'Suspender' : 'Reativar'}
+                onClick={() => act.mutate({ t, action: t.status === 'ACTIVE' ? 'suspend' : 'resume' })} />
+              <IconButton icon={Trash2} label="Remover" className="hover:text-danger" onClick={() => act.mutate({ t, action: 'delete' })} />
             </li>
           ))}
         </ul>
@@ -76,7 +56,7 @@ function Wallets({ accountId, card, confirm }: { accountId: string; card: Card; 
         {created ? (
           <div className="space-y-3 text-sm">
             <Alert tone="green">Cartão adicionado ao {wallets[created.wallet]}.</Alert>
-            <p className="text-slate-600">Número do token (só a carteira recebe; mostrado aqui por ser o ambiente de testes):</p>
+            <p className="text-fg-2">Número do token (só a carteira recebe; mostrado aqui por ser o ambiente de testes):</p>
             <p className="font-mono text-base">{created.token_pan}</p>
           </div>
         ) : (
@@ -123,9 +103,9 @@ function SimulatePurchase({ card, reveal }: { card: Card; reveal: () => Promise<
         <Field label="Loja" value={merchant} onChange={(e) => setMerchant(e.target.value.toUpperCase())} />
         <Select label="Função" value={fn} onChange={(e) => setFn(e.target.value)}><option value="DEBIT">Débito</option><option value="CREDIT">Crédito</option></Select>
         <Select label="País" value={country} onChange={(e) => setCountry(e.target.value)}><option value="BR">Brasil</option><option value="US">Estados Unidos</option></Select>
-        <div className="sm:col-span-2"><Button type="submit" loading={buy.isPending} disabled={!amount}>Passar o cartão</Button></div>
+        <div className="sm:col-span-2"><Button type="submit" icon={ShoppingCart} loading={buy.isPending} disabled={!amount}>Passar o cartão</Button></div>
       </form>
-      {result && <p className="mt-3 text-sm text-amber-900">{result}</p>}
+      {result && <p className="mt-3 text-sm font-medium text-warning">{result}</p>}
     </Sandbox>
   )
 }
@@ -155,24 +135,30 @@ function CardView({ accountId, card }: { accountId: string; card: Card }) {
   const setControl = (k: keyof Card['controls']) => (v: boolean) => controls.mutate({ ...card.controls, [k]: v })
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      <div className="space-y-4">
-        <CardArt card={card} details={details} />
-        <div className="flex flex-wrap gap-2">
-          {details ? <Button variant="secondary" onClick={() => setDetails(null)}>Ocultar dados</Button>
-            : <Button variant="secondary" loading={show.isPending} onClick={() => show.mutate()} disabled={card.status !== 'ACTIVE'}>Ver dados do cartão</Button>}
-          <Button variant={card.status === 'ACTIVE' ? 'danger' : 'primary'} loading={block.isPending} onClick={() => block.mutate()}>
+      <div className="space-y-5">
+        <div data-reveal className="mx-auto max-w-md">
+          <BankCard holder={card.holder_name} last4={card.last4}
+            expiry={`${String(card.expiry_month).padStart(2, '0')}/${String(card.expiry_year).slice(2)}`}
+            skin={card.status === 'BLOCKED' ? 'blocked' : 'debit'} label={card.kind === 'VIRTUAL' ? 'Virtual' : 'Físico'}
+            revealed={details} />
+        </div>
+        <div data-reveal className="grid grid-cols-2 gap-3">
+          {details ? <Button variant="secondary" icon={EyeOff} onClick={() => setDetails(null)}>Ocultar dados</Button>
+            : <Button variant="secondary" icon={Eye} loading={show.isPending} onClick={() => show.mutate()} disabled={card.status !== 'ACTIVE'}>Ver dados do cartão</Button>}
+          <Button variant={card.status === 'ACTIVE' ? 'danger' : 'primary'} icon={card.status === 'ACTIVE' ? Lock : LockOpen} loading={block.isPending} onClick={() => block.mutate()}>
             {card.status === 'ACTIVE' ? 'Bloquear' : 'Desbloquear'}
           </Button>
         </div>
+        {card.status === 'BLOCKED' && <Alert tone="amber">Cartão bloqueado: compras são recusadas até você desbloquear.</Alert>}
         <Alert>{error}</Alert>
         <SimulatePurchase card={card} reveal={reveal} />
       </div>
       <div className="space-y-6">
-        <Panel title="Controles">
-          <div className="divide-y divide-slate-100">
-            <Toggle label="Compras online" checked={card.controls.online} onChange={setControl('online')} />
-            <Toggle label="Compras internacionais" checked={card.controls.international} onChange={setControl('international')} />
-            <Toggle label="Pagamento por aproximação" checked={card.controls.contactless} onChange={setControl('contactless')} />
+        <Panel title="Controles" icon={Lock}>
+          <div className="-my-2 divide-y divide-line">
+            <Toggle label="Compras online" description="Sites e aplicativos" checked={card.controls.online} onChange={setControl('online')} />
+            <Toggle label="Compras internacionais" description="Fora do Brasil" checked={card.controls.international} onChange={setControl('international')} />
+            <Toggle label="Pagamento por aproximação" description="Encostar o cartão na maquininha" checked={card.controls.contactless} onChange={setControl('contactless')} />
           </div>
         </Panel>
         <Wallets accountId={accountId} card={card} confirm={confirm} />
@@ -203,22 +189,24 @@ export function CardsPage() {
       <PageTitle subtitle="Débito na conta e, com o crédito ativo, também no crédito.">Cartões</PageTitle>
       {list.length === 0 ? (
         <Panel>
-          <Empty>Você ainda não tem cartão.</Empty>
-          <div className="flex justify-center gap-2">
-            <Button loading={issue.isPending} onClick={() => issue.mutate('VIRTUAL')}>Criar cartão virtual</Button>
-            <Button variant="secondary" loading={issue.isPending} onClick={() => issue.mutate('PHYSICAL')}>Pedir cartão físico</Button>
+          <Empty icon={Wifi}>Você ainda não tem cartão. O virtual fica pronto na hora.</Empty>
+          <div className="flex flex-wrap justify-center gap-2 pb-2">
+            <Button icon={Plus} loading={issue.isPending} onClick={() => issue.mutate('VIRTUAL')}>Criar cartão virtual</Button>
+            <Button variant="secondary" icon={Nfc} loading={issue.isPending} onClick={() => issue.mutate('PHYSICAL')}>Pedir cartão físico</Button>
           </div>
         </Panel>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2">
+          <div data-reveal className="flex flex-wrap items-center gap-2">
             {list.map((c) => (
               <button key={c.id} onClick={() => setSelected(c.id)}
-                className={cx('rounded-xl px-3 py-1.5 text-sm font-medium ring-1', c.id === card.id ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white ring-slate-200')}>
+                className={cx('flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold ring-1 transition',
+                  c.id === card.id ? 'bg-fg text-bg ring-fg' : 'bg-surface text-fg-2 ring-line hover:ring-line-strong')}>
+                {c.kind === 'VIRTUAL' ? <Globe className="size-4" /> : <Nfc className="size-4" />}
                 {c.kind === 'VIRTUAL' ? 'Virtual' : 'Físico'} •••• {c.last4}
               </button>
             ))}
-            <Button variant="ghost" loading={issue.isPending} onClick={() => issue.mutate('VIRTUAL')}>+ Novo virtual</Button>
+            <Button variant="ghost" size="sm" icon={Plus} loading={issue.isPending} onClick={() => issue.mutate('VIRTUAL')}>Novo virtual</Button>
           </div>
           <CardView key={card.id} accountId={account.id} card={card} />
         </>

@@ -65,20 +65,20 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 
 ## Web App
 
-A customer app in [`apps/web`](apps/web) (React, TypeScript, Tailwind): onboarding with KYC, Pix, cards, credit, boletos and notifications that arrive live. `make up` serves it on http://localhost:8081.
+A customer app in [`apps/web`](apps/web) (React, TypeScript, Tailwind, GSAP): onboarding with KYC, Pix, cards, credit, boletos and notifications that arrive live, in light and dark themes. `make up` serves it on http://localhost:8081.
 
-| | |
+| Light | Dark |
 |---|---|
-| ![Home](docs/images/web-home.png) | ![Cards](docs/images/web-cards.png) |
-| ![Boleto](docs/images/web-boleto.png) | <img src="docs/images/web-mobile.png" alt="Mobile" width="260"> |
+| ![Home, light theme](docs/images/web-home-light.png) | ![Home, dark theme](docs/images/web-home-dark.png) |
+| ![Sign up](docs/images/web-signup-light.png) | ![Card revealed with its back flipped](docs/images/web-cards-dark.png) |
 
 ## Mobile App
 
-The same bank on iOS and Android in [`apps/mobile`](apps/mobile) (Expo, React Native): onboarding, Pix with QR codes, cards with step-up, boletos, credit and live notifications, sharing the API client with the web app ([`packages/ts-core`](packages/ts-core)). `make mobile`, then scan the QR code with Expo Go.
+The same bank on iOS and Android in [`apps/mobile`](apps/mobile) (Expo, React Native, Reanimated), with the same design system and themes: onboarding, Pix with QR codes, cards with step-up, boletos, credit and live notifications, sharing the API client with the web app ([`packages/ts-core`](packages/ts-core)). `make mobile`, then scan the QR code with Expo Go.
 
 | | | |
 |---|---|---|
-| <img src="docs/images/mobile-home.png" alt="Home" width="240"> | <img src="docs/images/mobile-pix.png" alt="Pix" width="240"> | <img src="docs/images/mobile-cards.png" alt="Cards" width="240"> |
+| <img src="docs/images/mobile-home-light.png" alt="Home, light" width="240"> | <img src="docs/images/mobile-home-dark.png" alt="Home, dark" width="240"> | <img src="docs/images/mobile-pix-dark.png" alt="Pix QR Code, dark" width="240"> |
 
 ## What Is Interesting Here
 

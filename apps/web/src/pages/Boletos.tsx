@@ -1,13 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Barcode, Check, ReceiptText } from 'lucide-react'
 import { useState } from 'react'
 import { useAccount } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
-import {Alert, Amount, Badge, Button, Empty, Field, Loading, PageTitle, Panel, Sandbox, Select } from '../components/ui'
+import { Alert, Amount, Badge, Button, Empty, Field, Loading, PageTitle, Panel, Sandbox, Select } from '../components/ui'
 import { dateBR } from '../lib/format'
 import { api, newIdempotencyKey } from '../lib/api'
-import { errorMessage } from '@bank/core'
-import { addBRL, formatBRL } from '@bank/core'
-import type { BoletoPayment, BoletoQuote } from '@bank/core'
+import { errorMessage, addBRL, formatBRL, type BoletoPayment, type BoletoQuote } from '@bank/core'
 
 const statusLabel: Record<string, [string, 'green' | 'amber' | 'red' | 'slate' | 'brand']> = {
   COMPLETED: ['Pago', 'green'], SCHEDULED: ['Agendado', 'brand'], CANCELLED: ['Cancelado', 'slate'],
@@ -57,13 +56,13 @@ export function BoletosPage() {
   return (
     <div className="space-y-6">
       <PageTitle subtitle="Pague contas pela linha digitável, na hora ou agendado.">Boletos</PageTitle>
-      <Panel title="Pagar boleto">
+      <Panel title="Pagar boleto" icon={Barcode}>
         {done ? (
           <div className="space-y-3 text-center">
-            <div className="mx-auto grid size-12 place-items-center rounded-full bg-emerald-50 text-xl text-emerald-700">✓</div>
+            <div className="mx-auto grid size-16 place-items-center rounded-full bg-brand text-brand-fg shadow-[0_10px_30px_-8px_var(--brand)]"><Check className="size-8" strokeWidth={3} /></div>
             <p className="font-semibold">{done.status === 'SCHEDULED' ? `Agendado para ${dateBR(done.scheduled_for)}` : 'Boleto pago'}</p>
             <p className="tabular text-2xl font-bold">{formatBRL(done.amount)}</p>
-            <p className="text-sm text-slate-600">{done.payee.name}</p>
+            <p className="text-sm text-fg-2">{done.payee.name}</p>
             <Button variant="secondary" onClick={reset}>Pagar outro</Button>
           </div>
         ) : !quote ? (
@@ -75,16 +74,16 @@ export function BoletosPage() {
           </form>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-xl bg-slate-50 p-4 text-sm">
+            <div className="rounded-2xl bg-surface-2 p-4 text-sm">
               <p className="font-semibold">{quote.payee.name}</p>
-              <p className="text-slate-600">{quote.payee.document} · {quote.payee.bank}</p>
-              <p className="mt-2 font-mono text-xs break-all text-slate-500">{quote.formatted_line}</p>
+              <p className="text-fg-2">{quote.payee.document} · {quote.payee.bank}</p>
+              <p className="mt-2 font-mono text-xs break-all text-muted">{quote.formatted_line}</p>
             </div>
             <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-              <div><dt className="text-slate-500">Vencimento</dt><dd className="font-medium">{dateBR(quote.due_date)}</dd></div>
-              <div><dt className="text-slate-500">Valor</dt><dd className="font-medium">{formatBRL(quote.nominal)}</dd></div>
-              <div><dt className="text-slate-500">Multa + juros</dt><dd className="font-medium">{formatBRL(addBRL(quote.fine.amount, quote.interest.amount))}</dd></div>
-              <div><dt className="text-slate-500">Total hoje</dt><dd className="text-lg font-bold">{formatBRL(quote.total)}</dd></div>
+              <div><dt className="text-muted">Vencimento</dt><dd className="font-medium">{dateBR(quote.due_date)}</dd></div>
+              <div><dt className="text-muted">Valor</dt><dd className="font-medium">{formatBRL(quote.nominal)}</dd></div>
+              <div><dt className="text-muted">Multa + juros</dt><dd className="font-medium">{formatBRL(addBRL(quote.fine.amount, quote.interest.amount))}</dd></div>
+              <div><dt className="text-muted">Total hoje</dt><dd className="text-lg font-bold">{formatBRL(quote.total)}</dd></div>
             </dl>
             {quote.nominal.amount === '0.00' && <MoneyField label="Valor a pagar" onValue={setAmount} />}
             <Field label="Data do pagamento" type="date" min={todaySP()} max={quote.due_date || undefined} value={date} onChange={(e) => setDate(e.target.value)}
@@ -98,14 +97,14 @@ export function BoletosPage() {
         )}
       </Panel>
 
-      <Panel title="Pagamentos">
-        {payments.isLoading ? <Loading /> : !payments.data?.length ? <Empty>Nenhum boleto pago ainda.</Empty> : (
-          <ul className="divide-y divide-slate-100">
+      <Panel title="Pagamentos" icon={ReceiptText}>
+        {payments.isLoading ? <Loading /> : !payments.data?.length ? <Empty icon={Barcode}>Nenhum boleto pago ainda.</Empty> : (
+          <ul className="-my-1 divide-y divide-line">
             {payments.data.map((p) => (
               <li key={p.id} className="flex items-center gap-3 py-3">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{p.payee.name || 'Boleto'}</p>
-                  <p className="text-xs text-slate-500">{p.status === 'SCHEDULED' ? `para ${dateBR(p.scheduled_for)}` : dateBR(p.created_at)}{p.failure_reason && ` · ${p.failure_reason}`}</p>
+                  <p className="text-xs text-muted">{p.status === 'SCHEDULED' ? `para ${dateBR(p.scheduled_for)}` : dateBR(p.created_at)}{p.failure_reason && ` · ${p.failure_reason}`}</p>
                 </div>
                 <Badge tone={(statusLabel[p.status] ?? [p.status, 'slate'])[1]}>{(statusLabel[p.status] ?? [p.status])[0]}</Badge>
                 <Amount value={p.amount} className="w-24 text-right text-sm" />

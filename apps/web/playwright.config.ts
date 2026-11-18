@@ -11,7 +11,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   fullyParallel: true,
   reporter: process.env.CI ? 'github' : 'list',
-  use: { baseURL, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', trace: 'retain-on-failure' },
+  use: { baseURL, colorScheme: process.env.COLOR_SCHEME === 'dark' ? 'dark' : 'light', locale: 'pt-BR', timezoneId: 'America/Sao_Paulo', trace: 'retain-on-failure' },
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /mobile/ },
     { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /mobile/ },

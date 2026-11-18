@@ -2,7 +2,13 @@
 
 The Digital Bank on iOS and Android: onboarding with KYC, home with balance and statement (pull to refresh), Pix (send with key lookup, keys, QR Code request and share, copia e cola), cards (password sheet to reveal the number, controls, simulated purchases), boletos, credit and invoices, notifications that arrive live as a banner, and preferences.
 
-Expo SDK 58 · React Native · Expo Router · TanStack Query · `@bank/core` (shared with the web app, from [`packages/ts-core`](../../packages/ts-core)).
+Expo SDK 58 · React Native · Expo Router · Reanimated · TanStack Query · `@bank/core` (shared with the web app, from [`packages/ts-core`](../../packages/ts-core)).
+
+## Design
+
+The same semantic tokens as the web app (jade for the bank and money in, neutral for money out, red only for failures, amber for pending, violet for credit), with light and dark values in [`src/lib/theme.tsx`](src/lib/theme.tsx). The theme follows the system, or Sistema / Claro / Escuro in Mais › Aparência (saved on the device). Inter via `@expo-google-fonts/inter`, Lucide icons.
+
+GSAP needs a DOM, so the app animates with **Reanimated** (the React Native standard): cards enter in a cascade, buttons spring when pressed, the segmented control's indicator slides, the card flips to its back after step-up, notification banners slide in, balances count up, skeletons pulse while loading, and the sign-in cards float. Reanimated honors the system's reduced-motion setting.
 
 ## Run on a phone
 

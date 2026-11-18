@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router'
 import { LiveNotifications } from './app/live'
 import { useAccounts, useProfile } from './app/queries'
@@ -5,14 +6,18 @@ import { useSignedIn } from './app/contexts'
 import { Layout, MorePage } from './components/Layout'
 import { Loading } from './components/ui'
 import { LoginPage, RegisterPage } from './pages/Auth'
-import { BoletosPage } from './pages/Boletos'
-import { CardsPage } from './pages/Cards'
-import { CreditPage } from './pages/Credit'
 import { HomePage, StatementPage } from './pages/Home'
-import { NotificationsPage } from './pages/Notifications'
 import { OnboardingPage } from './pages/Onboarding'
-import { PixPage } from './pages/Pix'
-import { SettingsPage } from './pages/Settings'
+
+// Less visited screens load on demand (smaller first download).
+const page = <K extends string>(load: () => Promise<Record<K, React.ComponentType>>, name: K) =>
+  lazy(() => load().then((m) => ({ default: m[name] })))
+const PixPage = page(() => import('./pages/Pix'), 'PixPage')
+const CardsPage = page(() => import('./pages/Cards'), 'CardsPage')
+const CreditPage = page(() => import('./pages/Credit'), 'CreditPage')
+const BoletosPage = page(() => import('./pages/Boletos'), 'BoletosPage')
+const NotificationsPage = page(() => import('./pages/Notifications'), 'NotificationsPage')
+const SettingsPage = page(() => import('./pages/Settings'), 'SettingsPage')
 
 function SignedOut() {
   return useSignedIn() ? <Navigate to="/" replace /> : <Outlet />
@@ -54,7 +59,7 @@ export default function App() {
         <Route element={<SignedIn />}>
           <Route path="/cadastro" element={<Onboarding />} />
           <Route element={<Ready />}>
-            <Route element={<Layout />}>
+            <Route element={<Suspense fallback={<Loading />}><Layout /></Suspense>}>
               <Route index element={<HomePage />} />
               <Route path="/extrato" element={<StatementPage />} />
               <Route path="/pix" element={<PixPage />} />

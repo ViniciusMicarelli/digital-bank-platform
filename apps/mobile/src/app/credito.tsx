@@ -1,13 +1,34 @@
 import { ApiError, compareBRL, errorMessage, formatBRL, type CreditLine, type Invoice } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Text, View } from 'react-native'
-import { Button, Card, Loading, MoneyField, Muted, Notice, Row, Sandbox, Screen } from '../components/ui'
+import { View } from 'react-native'
+import { CalendarClock, Receipt, Wallet } from 'lucide-react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { Button, Card, Loading, MoneyField, Muted, Notice, Row, Sandbox, Screen, Txt } from '../components/ui'
+import { useCountUp } from '../lib/motion'
 import { api } from '../lib/client'
 import { date, useAccount } from '../lib/queries'
-import { colors } from '../lib/theme'
+import { creditGradient, font } from '../lib/theme'
 
 const label: Record<Invoice['status'], string> = { OPEN: 'Aberta', CLOSED: 'Fechada', PAID: 'Paga', OVERDUE: 'Vencida' }
+
+function CreditHero({ available, used, limit, pct }: { available: string; used: string; limit: string; pct: number }) {
+  const shown = useCountUp(Number(available))
+  return (
+    <LinearGradient colors={[...creditGradient]} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={{ borderRadius: 28, padding: 22, gap: 12, overflow: 'hidden' }}>
+      <View style={{ position: 'absolute', width: 240, height: 240, borderRadius: 120, top: -120, right: -80, backgroundColor: '#a48bff', opacity: 0.35 }} />
+      <Txt variant="label" style={{ color: '#ffffffb3' }}>Limite disponível</Txt>
+      <Txt variant="display" tone="white">{Math.abs(shown - Number(available)) < 0.005 ? formatBRL(available) : formatBRL(shown.toFixed(2))}</Txt>
+      <View style={{ height: 10, backgroundColor: '#ffffff26', borderRadius: 5, overflow: 'hidden' }}>
+        <LinearGradient colors={['#a48bff', '#2ed3a0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 10, width: `${pct}%`, borderRadius: 5 }} />
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <Txt variant="caption" style={{ color: '#ffffffb3' }}>Usado {formatBRL(used)}</Txt>
+        <Txt variant="caption" style={{ color: '#ffffffb3' }}>Limite {formatBRL(limit)}</Txt>
+      </View>
+    </LinearGradient>
+  )
+}
 
 export default function Credit() {
   const account = useAccount()
@@ -29,8 +50,8 @@ export default function Credit() {
   if (!line.data) {
     return (
       <Screen>
-        <Card title="Ativar crédito"><Muted>Limite inicial de R$ 1.000,00, fatura fechando todo dia 10.</Muted><Notice>{error}</Notice>
-          <Button title="Ativar crédito" loading={activate.isPending} onPress={() => activate.mutate()} /></Card>
+        <Card title="Ativar crédito" icon={Wallet}><Muted>Limite inicial de R$ 1.000,00, fatura fechando todo dia 10.</Muted><Notice>{error}</Notice>
+          <Button title="Ativar crédito" variant="credit" loading={activate.isPending} onPress={() => activate.mutate()} /></Card>
       </Screen>
     )
   }
@@ -38,22 +59,17 @@ export default function Credit() {
   const pct = Math.min(100, (Number(l.used.amount) / Number(l.limit.amount)) * 100)
   return (
     <Screen>
-      <Card>
-        <Muted>Limite disponível</Muted>
-        <Text style={{ fontSize: 30, fontWeight: '700' }}>{formatBRL(l.available)}</Text>
-        <View style={{ height: 8, backgroundColor: '#f1f5f9', borderRadius: 4 }}><View style={{ height: 8, width: `${pct}%`, backgroundColor: colors.brand, borderRadius: 4 }} /></View>
-        <Muted>Usado {formatBRL(l.used)} de {formatBRL(l.limit)}</Muted>
-      </Card>
+      <CreditHero available={l.available.amount} used={l.used.amount} limit={l.limit.amount} pct={pct} />
       {toPay && compareBRL(toPay.remaining.amount, '0.00') > 0 && (
-        <Card title={`Fatura a pagar · vence ${date(toPay.due_date)}`}>
-          <Text style={{ fontSize: 22, fontWeight: '700' }}>{formatBRL(toPay.remaining)}</Text>
+        <Card title={`Fatura a pagar · vence ${date(toPay.due_date)}`} icon={CalendarClock} index={1}>
+          <Txt variant="heading" style={{ fontSize: 22 }}>{formatBRL(toPay.remaining)}</Txt>
           <MoneyField label="Pagar" onValue={setAmount} />
           <Notice>{error}</Notice>
-          <Button title="Pagar com saldo" disabled={!amount} loading={pay.isPending} onPress={() => pay.mutate()} />
+          <Button title="Pagar com saldo" variant="credit" disabled={!amount} loading={pay.isPending} onPress={() => pay.mutate()} />
         </Card>
       )}
-      <Card title="Faturas">
-        {invoices.data?.map((i) => <Row key={i.id} title={`Fechamento ${date(i.closing_date)}`} subtitle={label[i.status]} right={<Text>{formatBRL(i.total)}</Text>} />)}
+      <Card title="Faturas" icon={Receipt} index={2}>
+        {invoices.data?.map((i) => <Row key={i.id} icon={Receipt} tone={i.status === 'PAID' ? 'green' : i.status === 'OVERDUE' ? 'red' : i.status === 'CLOSED' ? 'amber' : 'credit'} title={`Fechamento ${date(i.closing_date)}`} subtitle={label[i.status]} right={<Txt variant="label" style={{ fontFamily: font.semibold }}>{formatBRL(i.total)}</Txt>} />)}
       </Card>
       <Sandbox>
         <Button title="Fechar a fatura agora" variant="secondary" loading={cycle.isPending} onPress={() => cycle.mutate('CLOSE')} />

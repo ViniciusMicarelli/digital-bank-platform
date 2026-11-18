@@ -53,6 +53,7 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
           BASE_URL=http://127.0.0.1:8081 npx playwright test
+          COLOR_SCHEME=dark BASE_URL=http://127.0.0.1:8081 npx playwright test
       - name: Mobile app (web build) against the stack
         working-directory: apps/mobile
         run: |
