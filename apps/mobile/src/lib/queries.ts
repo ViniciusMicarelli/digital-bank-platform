@@ -37,6 +37,8 @@ export function useStatement(id?: string, limit = 30) {
   return useQuery({
     queryKey: ['statement', id, limit],
     enabled: !!id,
+    // The statement is a projection that can trail the events; keep it fresh.
+    refetchInterval: 10_000,
     queryFn: async () => (await api<{ items: FeedItem[] }>('GET', `/v1/accounts/${id}/statement?limit=${limit}`)).items,
   })
 }

@@ -21,7 +21,8 @@ test('onboarding, Pix in and out with live notifications', async ({ page }) => {
 
   await page.goto('/')
   await expect(page.getByText('R$ 379,50').first()).toBeVisible()
-  await expect(page.getByText('Maria Oliveira').first()).toBeVisible()
+  // The statement row (exact text), not the toast that mentions her.
+  await expect(page.getByText('Maria Oliveira', { exact: true }).first()).toBeVisible()
   await shot(page, '03-home')
 
   await page.goto('/pix?aba=cobrar')

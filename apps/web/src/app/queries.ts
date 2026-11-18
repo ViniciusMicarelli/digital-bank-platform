@@ -54,5 +54,7 @@ export function useStatement(accountId?: string, pageSize = 20) {
     queryFn: ({ pageParam }) =>
       api<{ items: FeedItem[]; next_cursor: string }>('GET', `/v1/accounts/${accountId}/statement?limit=${pageSize}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`),
     getNextPageParam: (last) => last.next_cursor || undefined,
+    // The statement is a projection that can trail the events; keep it fresh.
+    refetchInterval: 10_000,
   })
 }
