@@ -28,9 +28,24 @@ ANA=$(token "ana-$SUFFIX")
 BRUNO=$(token "bruno-$SUFFIX")
 echo "access token: ${ANA:0:40}…"
 
-step "They open accounts"
-ANA_ACC=$(call POST /v1/accounts "$ANA" '{"holder_name":"Ana Souza","document":"529.982.247-25"}' "$(uuid)" | tee /dev/stderr | jq -r .id)
-BRUNO_ACC=$(call POST /v1/accounts "$BRUNO" '{"holder_name":"Bruno Lima","document":"111.444.777-35"}' "$(uuid)" | jq -r .id)
+step "Onboarding: no account before identity verification (KYC)"
+call POST /v1/accounts "$ANA" '{}' "$(uuid)" | jq -c .
+# cpf: a random valid CPF (the bureau simulator approves it).
+cpf() { python3 -c '
+import random
+d=[random.randint(3,9)]+[random.randint(0,9) for _ in range(8)]
+for n in (9,10): d.append(sum(d[i]*(n+1-i) for i in range(n))*10%11%10)
+print("".join(map(str,d)))'; }
+profile() { # profile TOKEN NAME
+  call PUT /v1/me/profile "$1" "{\"full_name\":\"$2\",\"cpf\":\"$(cpf)\",\"birth_date\":\"1990-05-20\",\"phone\":\"+5511912345678\",\"address\":{\"postal_code\":\"01310-100\",\"street\":\"Av. Paulista\",\"number\":\"1000\",\"city\":\"São Paulo\",\"state\":\"SP\"}}" >/dev/null
+  call POST /v1/me/kyc "$1" | jq -c '{full_name, cpf, kyc_status}'
+}
+profile "$ANA" "Ana Souza"
+profile "$BRUNO" "Bruno Lima"
+
+step "They open accounts (with the verified name and CPF)"
+ANA_ACC=$(call POST /v1/accounts "$ANA" '{}' "$(uuid)" | tee /dev/stderr | jq -r .id)
+BRUNO_ACC=$(call POST /v1/accounts "$BRUNO" '{}' "$(uuid)" | jq -r .id)
 
 step "Ana registers a Pix key and receives R\$ 500,00 from another bank (sandbox)"
 KEY="ana.$SUFFIX@example.com"

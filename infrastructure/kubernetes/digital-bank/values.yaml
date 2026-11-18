@@ -59,6 +59,7 @@ services:
     env:
       LEDGER_ADDR: ledger-service:9001
       KMS_ADDR: kms-service:9008
+      USER_ADDR: user-service:9012
   transaction-service:
     port: 9003
     metricsPort: 9103
@@ -115,10 +116,16 @@ services:
     callers: [api-gateway]
     env:
       ACCOUNT_ADDR: account-service:9002
+  user-service:
+    port: 9012
+    metricsPort: 9112
+    callers: [api-gateway, account-service]
+    env:
+      KMS_ADDR: kms-service:9008
   kms-service:
     port: 9008
     metricsPort: 9108
-    callers: [identity-service, account-service, card-service, pix-service]
+    callers: [identity-service, account-service, card-service, pix-service, user-service]
     autoscaling: { enabled: false }
     env: {}
   api-gateway:
@@ -135,4 +142,5 @@ services:
       CREDIT_ADDR: credit-service:9009
       PAYMENT_ADDR: payment-service:9010
       NOTIFICATION_ADDR: notification-service:9011
+      USER_ADDR: user-service:9012
       REDIS_ADDR: redis-master.redis.svc:6379

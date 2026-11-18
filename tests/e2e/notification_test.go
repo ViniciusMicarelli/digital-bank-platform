@@ -60,7 +60,7 @@ func waitFor(t *testing.T, lines <-chan string, prefix, contains string) string 
 
 func TestNotifications(t *testing.T) {
 	ana := login(t, "ana-notif-"+uuid.NewString()[:8])
-	_, acc := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza", "document": "529.982.247-25"}, idem())
+	_, acc := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza"}, idem())
 	accID := acc["id"].(string)
 	key := "ana." + uuid.NewString()[:8] + "@example.com"
 	ana.call("POST", "/v1/accounts/"+accID+"/pix/keys", map[string]string{"type": "EMAIL", "value": key}, nil)

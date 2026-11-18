@@ -18,8 +18,8 @@ func errorCode(body map[string]any) string {
 func TestQRCodeAndRefund(t *testing.T) {
 	ana := login(t, "ana-qr-"+uuid.NewString()[:8])
 	bruno := login(t, "bruno-qr-"+uuid.NewString()[:8])
-	_, a := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza", "document": "529.982.247-25"}, idem())
-	_, b := bruno.call("POST", "/v1/accounts", map[string]string{"holder_name": "Bruno Lima", "document": "111.444.777-35"}, idem())
+	_, a := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza"}, idem())
+	_, b := bruno.call("POST", "/v1/accounts", map[string]string{"holder_name": "Bruno Lima"}, idem())
 	anaID, brunoID := a["id"].(string), b["id"].(string)
 
 	anaKey := "ana." + uuid.NewString()[:8] + "@example.com"
@@ -96,8 +96,8 @@ func TestQRCodeAndRefund(t *testing.T) {
 func TestSameBankPixRefund(t *testing.T) {
 	ana := login(t, "ana-sb-"+uuid.NewString()[:8])
 	bruno := login(t, "bruno-sb-"+uuid.NewString()[:8])
-	_, a := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza", "document": "529.982.247-25"}, idem())
-	_, b := bruno.call("POST", "/v1/accounts", map[string]string{"holder_name": "Bruno Lima", "document": "111.444.777-35"}, idem())
+	_, a := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza"}, idem())
+	_, b := bruno.call("POST", "/v1/accounts", map[string]string{"holder_name": "Bruno Lima"}, idem())
 	anaID, brunoID := a["id"].(string), b["id"].(string)
 	anaKey := "ana." + uuid.NewString()[:8] + "@example.com"
 	brunoKey := "bruno." + uuid.NewString()[:8] + "@example.com"

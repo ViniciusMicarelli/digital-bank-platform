@@ -22,7 +22,7 @@ func newCustomer(t *testing.T, name, cpf, fund string) customer {
 	t.Helper()
 	slug := strings.ToLower(strings.ReplaceAll(name, " ", "."))
 	c := login(t, slug+"-"+uuid.NewString()[:8])
-	_, acc := c.call("POST", "/v1/accounts", map[string]string{"holder_name": name, "document": cpf}, idem())
+	_, acc := c.call("POST", "/v1/accounts", map[string]string{"holder_name": name}, idem())
 	id := acc["id"].(string)
 	key := slug + "." + uuid.NewString()[:8] + "@example.com"
 	c.call("POST", "/v1/accounts/"+id+"/pix/keys", map[string]string{"type": "EMAIL", "value": key}, nil)

@@ -21,6 +21,10 @@ var (
 	ErrBalanceNotZero      = errors.New("account balance is not zero")
 	ErrLimitExceeded       = errors.New("limit exceeded")
 	ErrIdempotencyConflict = errors.New("idempotency key reused with a different request")
+	// ErrKYCRequired: the customer's identity is not verified yet.
+	ErrKYCRequired = errors.New("verify your identity before opening an account")
+	// ErrDocumentMismatch: the CPF sent is not the verified one.
+	ErrDocumentMismatch = errors.New("the document does not match your verified identity")
 )
 
 // Branch is the single branch of this digital bank.

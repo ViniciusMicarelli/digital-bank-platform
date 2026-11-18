@@ -16,5 +16,6 @@ use (
 	./services/pix-service
 	./services/statement-service
 	./services/transaction-service
+	./services/user-service
 	./tests/e2e
 )

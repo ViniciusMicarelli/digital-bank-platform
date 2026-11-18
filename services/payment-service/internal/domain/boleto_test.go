@@ -19,6 +19,13 @@ func TestCheckDigits(t *testing.T) {
 }
 
 func TestBoletoRoundTrip(t *testing.T) {
+	for range 200 { // random free fields: cover many check digits
+		roundTrip(t)
+	}
+}
+
+func roundTrip(t *testing.T) {
+	t.Helper()
 	today := date(2026, 11, 17)
 	b, err := NewBoleto("341", date(2026, 12, 1), 150_75, RandomFreeField("12345"))
 	if err != nil {
@@ -33,10 +40,17 @@ func TestBoletoRoundTrip(t *testing.T) {
 		t.Fatalf("barcode = %+v %v", p2, err)
 	}
 	for i := range b.Line {
+		// Fields 1-3 have their own modulo 10 digits: every single typo is
+		// caught. Field 5 (due factor, amount) only has the general modulo 11
+		// digit, which maps remainders 0, 10 and 11 to 1, so when it is 1 a
+		// few typos collide (a FEBRABAN limitation, not ours).
+		if i > 32 && b.Line[32] == '1' {
+			continue
+		}
 		wrong := []byte(b.Line)
 		wrong[i] = '0' + (wrong[i]-'0'+1)%10
 		if _, err := ParseBoleto(string(wrong), today); err == nil {
-			t.Fatalf("a typo at position %d went unnoticed", i)
+			t.Fatalf("a typo at position %d went unnoticed in %s", i, b.Line)
 		}
 	}
 	if _, err := ParseBoleto("8"+b.Line, today); err == nil {

@@ -6,7 +6,7 @@ The lifecycle of customer checking accounts. It does **not** store balances: tho
 
 ## Capabilities
 
-- Open an account after KYC approval (branch + account number)
+- Open an account only after KYC approval (user-service `GetIdentity`): the holder name and CPF are the verified ones; a different CPF in the request is refused (`DOCUMENT_MISMATCH`); branch + account number
 - Block, unblock and close accounts
 - Transaction limits (daily, per transaction, night time) configurable by the customer
 - Balance queries (delegated to `ledger-service`)
@@ -55,7 +55,7 @@ If step 3 fails, retrying with the same key completes it. An orphan ledger accou
 
 | Publishes | Consumes |
 |---|---|
-| `account.opened` | `user.kyc.approved` (open account) |
+| `account.opened` | — (asks user-service synchronously when opening) |
 | `account.blocked` | |
 | `account.unblocked` | |
 | `account.closed` | |

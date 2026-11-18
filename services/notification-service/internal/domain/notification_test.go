@@ -43,12 +43,18 @@ func TestFromEvent(t *testing.T) {
 			"Compra aprovada", "Compra de R$ 42,00 em PADARIA no crédito."},
 		{"credit.invoice.closed", map[string]any{"account_id": acc, "remaining": 25000, "due_date": "2026-12-20"},
 			"Sua fatura fechou", "Fatura de R$ 250,00 com vencimento em 20/12/2026."},
+		{"user.kyc.approved", map[string]any{"customer_id": "c-1"}, "Cadastro aprovado",
+			"Sua identidade foi verificada. Você já pode abrir sua conta."},
 		{"transaction.completed", map[string]any{"type": "INTERNAL_TRANSFER", "to_account_id": acc, "amount_minor": 1000, "metadata": map[string]string{}},
 			"Transferência recebida", "Você recebeu uma transferência de R$ 10,00."},
 	}
 	for _, c := range cases {
 		ds, err := FromEvent(ev(t, c.typ, c.payload), time.Now())
-		if err != nil || len(ds) != 1 || ds[0].Title != c.title || ds[0].Body != c.body || ds[0].AccountID.String() != acc {
+		wantAccount := acc
+		if c.typ == "user.kyc.approved" {
+			wantAccount = uuid.Nil.String()
+		}
+		if err != nil || len(ds) != 1 || ds[0].Title != c.title || ds[0].Body != c.body || ds[0].AccountID.String() != wantAccount {
 			t.Errorf("%s: %+v %v", c.typ, ds, err)
 		}
 	}

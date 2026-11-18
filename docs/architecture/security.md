@@ -29,9 +29,10 @@ Not yet: a KMS for the key-encryption keys, TLS for Postgres and Kafka, certific
 |---|---|
 | ledger-service | account-service, transaction-service |
 | account-service | api-gateway, transaction-service, pix-service, card-service, credit-service, notification-service |
+| user-service | api-gateway, account-service |
 | transaction-service | api-gateway, pix-service, card-service, credit-service, payment-service |
 | credit-service | api-gateway, card-service |
-| kms-service | identity-service, account-service, card-service, pix-service |
+| kms-service | identity-service, account-service, card-service, pix-service, user-service |
 | pix-service, statement-service, identity-service, card-service, payment-service, notification-service | api-gateway |
 
 Unary and streaming RPCs go through the same check (`mtls.Authorize` / `mtls.AuthorizeStream`); only the health service is open to every workload.

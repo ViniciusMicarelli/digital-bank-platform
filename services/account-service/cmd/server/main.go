@@ -11,6 +11,7 @@ import (
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	ledgerv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/ledger/v1"
+	userv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/user/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
@@ -20,6 +21,7 @@ import (
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/adapters/grpcapi"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/adapters/ledger"
 	pgstore "github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/adapters/postgres"
+	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/adapters/users"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/application"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/migrations"
 )
@@ -63,6 +65,16 @@ func main() {
 		os.Exit(1)
 	}
 	app := application.New(store, ledger.New(ledgerv1.NewLedgerServiceClient(ledgerConn)), nil)
+	// Accounts only for customers whose identity user-service verified (KYC).
+	if addr := config.String("USER_ADDR", ""); addr != "" {
+		userConn, err := grpcserver.Dial(addr)
+		if err != nil {
+			log.Error("dial users", "error", err)
+			os.Exit(1)
+		}
+		defer userConn.Close()
+		app.RequireKYC(users.New(userv1.NewUserServiceClient(userConn)))
+	}
 	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
 
 	// Delete published outbox rows, old inbox rows, expired data.

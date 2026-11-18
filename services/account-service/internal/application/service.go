@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	doc "github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/document"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/outbox"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/account-service/internal/domain"
@@ -22,8 +23,13 @@ const (
 type Service struct {
 	store  ports.Store
 	ledger ports.Ledger
+	users  ports.Users
 	now    func() time.Time
 }
+
+// RequireKYC makes accounts open only for customers user-service verified,
+// with the verified name and CPF.
+func (s *Service) RequireKYC(users ports.Users) { s.users = users }
 
 // New builds the service. now may be nil (defaults to time.Now).
 func New(store ports.Store, ledger ports.Ledger, now func() time.Time) *Service {
@@ -37,6 +43,21 @@ func New(store ports.Store, ledger ports.Ledger, now func() time.Time) *Service 
 // then the account record. A crash between the two steps is fixed by retrying
 // with the same key; an orphan ledger account would only hold a zero balance.
 func (s *Service) OpenAccount(ctx context.Context, key, customerID, holderName, document string, currency money.Currency) (domain.Account, error) {
+	if s.users != nil {
+		id, err := s.users.Identity(ctx, customerID)
+		if err != nil {
+			return domain.Account{}, err
+		}
+		if id.KYCStatus != "APPROVED" {
+			return domain.Account{}, fmt.Errorf("%w (verification is %s)", domain.ErrKYCRequired, id.KYCStatus)
+		}
+		if document != "" {
+			if sent, err := doc.NormalizeCPF(document); err != nil || sent != id.CPF {
+				return domain.Account{}, domain.ErrDocumentMismatch
+			}
+		}
+		holderName, document = id.FullName, id.CPF
+	}
 	a, err := domain.NewAccount(key, customerID, holderName, document, currency)
 	if err != nil {
 		return domain.Account{}, err

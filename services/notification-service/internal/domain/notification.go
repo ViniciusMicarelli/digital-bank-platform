@@ -27,6 +27,7 @@ const (
 	CategoryCredit   Category = "CREDIT"
 	CategoryBoleto   Category = "BOLETO"
 	CategoryAccount  Category = "ACCOUNT"
+	CategoryProfile  Category = "PROFILE"
 )
 
 type Channel string
@@ -41,9 +42,12 @@ const (
 type Draft struct {
 	EventID   string
 	AccountID uuid.UUID
-	Category  Category
-	Title     string
-	Body      string
+	// CustomerID is set for notifications about the customer, not an
+	// account (onboarding); AccountID is then Nil.
+	CustomerID string
+	Category   Category
+	Title      string
+	Body       string
 	// Important ones (security, money that failed to move, bills) also go
 	// by e-mail when the customer allows it.
 	Important  bool
@@ -127,6 +131,7 @@ type payload struct {
 	PayeeName       string            `json:"payee_name"`
 	ScheduledFor    string            `json:"scheduled_for"`
 	Type            string            `json:"type"`
+	CustomerID      string            `json:"customer_id"`
 	ToAccountID     string            `json:"to_account_id"`
 	FromAccountID   string            `json:"from_account_id"`
 	Metadata        map[string]string `json:"metadata"`
@@ -212,6 +217,20 @@ func FromEvent(ev Event, now time.Time) ([]Draft, error) {
 	case "boleto.payment.failed", "boleto.payment.rejected":
 		d.Category, d.Title, d.Important = CategoryBoleto, "Boleto não pago", true
 		d.Body = fmt.Sprintf("O pagamento para %s não foi feito (%s).", p.PayeeName, p.FailureReason)
+	case "user.kyc.approved", "user.kyc.rejected", "user.kyc.review":
+		d.Category, d.Important, d.CustomerID = CategoryProfile, true, p.CustomerID
+		switch ev.Type {
+		case "user.kyc.approved":
+			d.Title, d.Body = "Cadastro aprovado", "Sua identidade foi verificada. Você já pode abrir sua conta."
+		case "user.kyc.rejected":
+			d.Title, d.Body = "Cadastro não aprovado", fmt.Sprintf("Não conseguimos verificar sua identidade (%s). Revise seus dados e envie de novo.", p.Reason)
+		default:
+			d.Title, d.Body = "Cadastro em análise", "Estamos analisando seus dados. Avisamos assim que terminar."
+		}
+		if d.CustomerID == "" {
+			return nil, nil
+		}
+		return []Draft{d}, nil
 	case "account.blocked":
 		d.Category, d.Title, d.Important = CategoryAccount, "Conta bloqueada", true
 		d.Body = "Sua conta foi bloqueada. Fale com a gente se não reconhece isso."

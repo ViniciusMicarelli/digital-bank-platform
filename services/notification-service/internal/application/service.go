@@ -49,7 +49,10 @@ func (s *Service) HandleEvent(ctx context.Context, ev outbox.Event) error {
 	}
 	ns := make([]domain.Notification, 0, len(drafts))
 	for _, d := range drafts {
-		customer, err := s.customer(ctx, d.AccountID)
+		customer, err := d.CustomerID, error(nil)
+		if customer == "" {
+			customer, err = s.customer(ctx, d.AccountID)
+		}
 		if errors.Is(err, domain.ErrNotFound) {
 			s.log.WarnContext(ctx, "notification for an unknown account dropped", "event", ev.Type, "account_id", d.AccountID)
 			continue

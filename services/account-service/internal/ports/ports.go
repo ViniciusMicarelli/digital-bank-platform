@@ -52,3 +52,15 @@ type Ledger interface {
 	CreateCustomerAccount(ctx context.Context, id uuid.UUID, currency money.Currency) error
 	Balance(ctx context.Context, id uuid.UUID) (Balance, error)
 }
+
+// Identity is a customer's identity as verified by user-service.
+type Identity struct {
+	KYCStatus string
+	FullName  string
+	CPF       string
+}
+
+// Users gives the verified identity of a customer (KYC).
+type Users interface {
+	Identity(ctx context.Context, customerID string) (Identity, error)
+}

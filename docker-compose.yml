@@ -63,7 +63,7 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/kms-service.pem
       TLS_KEY: /certs/kms-service-key.pem
-      ALLOWED_CALLERS: identity-service,account-service,card-service,pix-service,dev-client
+      ALLOWED_CALLERS: identity-service,account-service,card-service,pix-service,user-service,dev-client
       KMS_OPERATORS: dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/kms?sslmode=disable
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -117,12 +117,39 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
       GRPC_ADDR: ":9002"
       LEDGER_ADDR: ledger-service:9001
+      USER_ADDR: user-service:9012
     ports: ["9002:9002"]
     depends_on:
       kms-service: { condition: service_healthy }
       postgres: { condition: service_healthy }
       kafka: { condition: service_healthy }
       ledger-service: { condition: service_healthy }
+      user-service: { condition: service_healthy }
+
+  user-service:
+    build: { context: ., args: { SERVICE: user-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./infrastructure/certs:/certs:ro
+    environment:
+      KMS_ADDR: kms-service:9008
+      TLS_CA: /certs/ca.pem
+      TLS_CERT: /certs/user-service.pem
+      TLS_KEY: /certs/user-service-key.pem
+      ALLOWED_CALLERS: api-gateway,account-service,dev-client
+      DATABASE_URL: postgres://bank:bank@postgres:5432/users?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      GRPC_ADDR: ":9012"
+    ports: ["9012:9012"]
+    depends_on:
+      kms-service: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
 
   transaction-service:
     build: { context: ., args: { SERVICE: transaction-service } }
@@ -366,6 +393,7 @@ services:
       CREDIT_ADDR: credit-service:9009
       PAYMENT_ADDR: payment-service:9010
       NOTIFICATION_ADDR: notification-service:9011
+      USER_ADDR: user-service:9012
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     ports: ["8000:8080"]
     depends_on:

@@ -25,6 +25,8 @@ flowchart LR
     GW -->|gRPC| CRE[credit-service]
     GW -->|gRPC| PAY[payment-service]
     GW -->|gRPC stream| NTF[notification-service]
+    GW -->|gRPC| USR[user-service]
+    ACC -->|gRPC: verified identity| USR
     PAY -->|gRPC| TRX
     CRD -->|gRPC: credit purchases| CRE
     CRE -->|gRPC| TRX
@@ -54,6 +56,7 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 | [pix-service](docs/services/pix-service.md) | Pix keys, lookup, same-bank and cross-bank Pix, incoming Pix, BR Code QR codes, refunds |
 | [card-service](docs/services/card-service.md) | Debit and credit cards: vault with encrypted PANs, derived CVVs, wallet tokens, real-time authorization, clearing, reversal |
 | [credit-service](docs/services/credit-service.md) | Credit lines, holds for credit purchases, monthly invoices, payments, fines and interest |
+| [user-service](docs/services/user-service.md) | Onboarding: profile with encrypted CPF, KYC against a simulated bureau (approve, reject, manual review); accounts open only for verified customers |
 | [notification-service](docs/services/notification-service.md) | Notifications from domain events: in-app inbox, push / e-mail by preference, live Server-Sent Events across replicas |
 | [payment-service](docs/services/payment-service.md) | Boletos: check digits, due date factor, overdue charges, payment now or scheduled through a two-phase saga |
 | [statement-service](docs/services/statement-service.md) | CQRS read side: customer feed projected from Kafka |

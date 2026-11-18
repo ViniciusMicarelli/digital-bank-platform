@@ -219,6 +219,10 @@ func toStatus(err error) error {
 		return grpcserver.Error(codes.FailedPrecondition, ReasonInvalidTransition, err.Error())
 	case errors.Is(err, domain.ErrBalanceNotZero):
 		return grpcserver.Error(codes.FailedPrecondition, ReasonBalanceNotZero, err.Error())
+	case errors.Is(err, domain.ErrKYCRequired):
+		return grpcserver.Error(codes.FailedPrecondition, "KYC_REQUIRED", err.Error())
+	case errors.Is(err, domain.ErrDocumentMismatch):
+		return grpcserver.Error(codes.FailedPrecondition, "DOCUMENT_MISMATCH", err.Error())
 	case errors.Is(err, domain.ErrIdempotencyConflict):
 		return grpcserver.Error(codes.AlreadyExists, "IDEMPOTENCY_CONFLICT", err.Error())
 	}

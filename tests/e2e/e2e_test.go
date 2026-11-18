@@ -17,6 +17,7 @@ import (
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
+	userv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/user/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 )
 
@@ -31,6 +32,7 @@ type stack struct {
 	tx       txv1.TransactionServiceClient
 	pix      pixv1.PixServiceClient
 	feed     statementv1.StatementServiceClient
+	users    userv1.UserServiceClient
 }
 
 func addr(env, def string) string {
@@ -56,6 +58,7 @@ func connect(t *testing.T) stack {
 		tx:       txv1.NewTransactionServiceClient(dial(addr("TRANSACTION_ADDR", "127.0.0.1:9003"))),
 		pix:      pixv1.NewPixServiceClient(dial(addr("PIX_ADDR", "127.0.0.1:9004"))),
 		feed:     statementv1.NewStatementServiceClient(dial(addr("STATEMENT_ADDR", "127.0.0.1:9005"))),
+		users:    userv1.NewUserServiceClient(dial(addr("USER_ADDR", "127.0.0.1:9012"))),
 	}
 }
 
@@ -67,11 +70,21 @@ func ctx(t *testing.T) context.Context {
 
 func brl(minor int64) *commonv1.Money { return &commonv1.Money{MinorUnits: minor, Currency: "BRL"} }
 
-func openAccount(t *testing.T, s stack, name, cpf string) string {
+// openAccount onboards a new customer (profile + KYC in user-service, with
+// a fresh CPF) and opens their account.
+func openAccount(t *testing.T, s stack, name, _ string) string {
 	t.Helper()
+	customer := "cust-" + uuid.NewString()[:8]
+	if _, err := s.users.UpsertProfile(ctx(t), &userv1.UpsertProfileRequest{CustomerId: customer, FullName: name, Cpf: randomCPF(),
+		BirthDate: "1990-05-20", Address: &userv1.Address{PostalCode: "01310100", Street: "Av. Paulista", Number: "1000",
+			City: "São Paulo", State: "SP"}}); err != nil {
+		t.Fatalf("profile: %v", err)
+	}
+	if k, err := s.users.SubmitKyc(ctx(t), &userv1.SubmitKycRequest{CustomerId: customer}); err != nil || k.GetProfile().GetKycStatus() != "APPROVED" {
+		t.Fatalf("kyc: %v %v", k, err)
+	}
 	resp, err := s.accounts.OpenAccount(ctx(t), &accountv1.OpenAccountRequest{
-		IdempotencyKey: uuid.NewString(), CustomerId: "cust-" + uuid.NewString()[:8],
-		HolderName: name, Document: cpf,
+		IdempotencyKey: uuid.NewString(), CustomerId: customer, HolderName: name,
 	})
 	if err != nil {
 		t.Fatalf("open account: %v", err)

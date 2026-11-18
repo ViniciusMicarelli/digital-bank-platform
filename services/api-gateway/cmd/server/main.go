@@ -25,6 +25,7 @@ import (
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
+	userv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/user/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
@@ -75,6 +76,7 @@ func main() {
 	credit := dial("CREDIT_ADDR", "127.0.0.1:9009")
 	payments := dial("PAYMENT_ADDR", "127.0.0.1:9010")
 	notifications := dial("NOTIFICATION_ADDR", "127.0.0.1:9011")
+	users := dial("USER_ADDR", "127.0.0.1:9012")
 
 	identityClient := identityv1.NewIdentityServiceClient(identity)
 	verifier := auth.NewVerifier(func(ctx context.Context) ([]auth.JWK, error) {
@@ -99,6 +101,7 @@ func main() {
 		Credit:        creditv1.NewCreditServiceClient(credit),
 		Payments:      paymentv1.NewPaymentServiceClient(payments),
 		Notifications: notificationv1.NewNotificationServiceClient(notifications),
+		Users:         userv1.NewUserServiceClient(users),
 	}, verifier, log, limiters(log))
 
 	mux := http.NewServeMux()

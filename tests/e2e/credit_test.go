@@ -16,7 +16,7 @@ func errCode(body map[string]any) any {
 
 func TestCreditCard(t *testing.T) {
 	ana := login(t, "ana-credit-"+uuid.NewString()[:8])
-	_, acc := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza", "document": "529.982.247-25"}, idem())
+	_, acc := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza"}, idem())
 	accID := acc["id"].(string)
 	base := "/v1/accounts/" + accID
 	key := "ana." + uuid.NewString()[:8] + "@example.com"

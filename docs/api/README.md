@@ -22,7 +22,7 @@
 | 403 | Sensitive action without a fresh step-up token | `STEP_UP_REQUIRED` |
 | 404 | Not found, or not yours | `NOT_FOUND` |
 | 409 | Same key, different request; or still processing | `IDEMPOTENCY_CONFLICT`, `IN_PROGRESS` |
-| 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS`, `QR_CODE_UNAVAILABLE`, `REFUND_TOO_LARGE`, `NOT_REFUNDABLE`, `CHARGE_NOT_ALLOWED`, `MANDATE_NOT_ACTIVE`, `CREDIT_LINE_EXISTS`, `PAYMENT_TOO_LARGE`, `INVOICE_NOT_PAYABLE`, `BOLETO_ALREADY_PAID`, `BOLETO_EXPIRED`, `DUPLICATE_PAYMENT`, `SETTLEMENT_REJECTED`, `SCHEDULE_AFTER_DUE_DATE` |
+| 422 | Business refusal | `INSUFFICIENT_FUNDS`, `LIMIT_EXCEEDED`, `ACCOUNT_NOT_ACTIVE`, `RECEIVER_BANK_REJECTED`, `TOO_MANY_KEYS`, `QR_CODE_UNAVAILABLE`, `REFUND_TOO_LARGE`, `NOT_REFUNDABLE`, `CHARGE_NOT_ALLOWED`, `MANDATE_NOT_ACTIVE`, `CREDIT_LINE_EXISTS`, `PAYMENT_TOO_LARGE`, `INVOICE_NOT_PAYABLE`, `BOLETO_ALREADY_PAID`, `BOLETO_EXPIRED`, `DUPLICATE_PAYMENT`, `SETTLEMENT_REJECTED`, `SCHEDULE_AFTER_DUE_DATE`, `KYC_REQUIRED`, `DOCUMENT_MISMATCH`, `DOCUMENT_IN_USE`, `IDENTITY_LOCKED` |
 | 429 | Rate limited | `RATE_LIMITED` |
 | 503 | A dependency is down; retry with the same key | `RETRY_LATER` |
 
@@ -40,7 +40,10 @@
 | `POST` | `/v1/auth/step-up` | `{password, totp_code?}` → `step_up_token` (5 min), sent as `X-Step-Up-Token` on sensitive actions (🔐) |
 | `POST` | `/v1/auth/mfa/totp` | Start TOTP enrollment → `{secret, otpauth_uri}` |
 | `POST` | `/v1/auth/mfa/totp/confirm` | `{code}` → enables TOTP |
-| `POST` | `/v1/accounts` | Open an account `{holder_name, document}` · Idempotency-Key |
+| `GET` · `PUT` | `/v1/me/profile` | Profile `{full_name, cpf, birth_date, phone, address{postal_code, street, number, complement, district, city, state}}` (CPF masked in answers) |
+| `POST` | `/v1/me/kyc` | Start identity verification → `kyc_status` (`APPROVED`, `REJECTED`, `MANUAL_REVIEW`, `PENDING`) |
+| `POST` | `/v1/sandbox/kyc/review` | *(sandbox)* `{approve, reason?}` decide a manual review |
+| `POST` | `/v1/accounts` | Open an account (requires KYC; name and CPF come from the verified profile; `document`, if sent, must match) · Idempotency-Key |
 | `GET` | `/v1/accounts` | My accounts |
 | `GET` | `/v1/accounts/{id}` | Account details |
 | `GET` | `/v1/accounts/{id}/balance` | `available`, `posted`, `pending` |

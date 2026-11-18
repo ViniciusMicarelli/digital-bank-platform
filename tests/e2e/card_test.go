@@ -11,7 +11,7 @@ import (
 
 func TestDebitCard(t *testing.T) {
 	ana := login(t, "ana-card-"+uuid.NewString()[:8])
-	_, acc := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza", "document": "529.982.247-25"}, idem())
+	_, acc := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza"}, idem())
 	accID := acc["id"].(string)
 	key := "ana." + uuid.NewString()[:8] + "@example.com"
 	ana.call("POST", "/v1/accounts/"+accID+"/pix/keys", map[string]string{"type": "EMAIL", "value": key}, nil)
@@ -103,7 +103,7 @@ func TestDebitCard(t *testing.T) {
 
 func TestCardTokens(t *testing.T) {
 	ana := login(t, "ana-token-"+uuid.NewString()[:8])
-	_, acc := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza", "document": "529.982.247-25"}, idem())
+	_, acc := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza"}, idem())
 	accID := acc["id"].(string)
 	key := "ana." + uuid.NewString()[:8] + "@example.com"
 	ana.call("POST", "/v1/accounts/"+accID+"/pix/keys", map[string]string{"type": "EMAIL", "value": key}, nil)

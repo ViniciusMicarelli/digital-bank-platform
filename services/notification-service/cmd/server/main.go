@@ -58,7 +58,7 @@ func main() {
 			// A new deployment notifies what happens from (just before) now on.
 			Brokers: brokers, Group: "notification-service", NewGroupLookback: 10 * time.Minute,
 			Topics: []string{"bank.account.events", "bank.transaction.events", "bank.pix.events", "bank.card.events",
-				"bank.credit.events", "bank.payment.events"},
+				"bank.credit.events", "bank.payment.events", "bank.user.events"},
 		}, log, app.HandleEvent)()
 	}
 	go store.Listen(ctx, log, app.Wake)

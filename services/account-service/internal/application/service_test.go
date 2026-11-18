@@ -219,3 +219,31 @@ func TestConcurrentConsumeRespectsDailyLimit(t *testing.T) {
 		t.Fatalf("%d transactions passed a limit that allows 10", ok.Load())
 	}
 }
+
+type fakeUsers map[string]ports.Identity
+
+func (f fakeUsers) Identity(_ context.Context, customer string) (ports.Identity, error) {
+	if id, ok := f[customer]; ok {
+		return id, nil
+	}
+	return ports.Identity{KYCStatus: "NOT_STARTED"}, nil
+}
+
+func TestKYCRequired(t *testing.T) {
+	svc, _, _ := setup(t)
+	svc.RequireKYC(fakeUsers{
+		"ana":   {KYCStatus: "APPROVED", FullName: "Ana Souza", CPF: "52998224725"},
+		"bruno": {KYCStatus: "MANUAL_REVIEW", FullName: "Bruno Lima", CPF: "39053344705"},
+	})
+	ctx := context.Background()
+	if _, err := svc.OpenAccount(ctx, "k1", "bruno", "Bruno Lima", "", money.BRL); !errors.Is(err, domain.ErrKYCRequired) {
+		t.Fatalf("unverified customer: %v", err)
+	}
+	if _, err := svc.OpenAccount(ctx, "k2", "ana", "Ana", "390.533.447-05", money.BRL); !errors.Is(err, domain.ErrDocumentMismatch) {
+		t.Fatalf("someone else's CPF: %v", err)
+	}
+	a, err := svc.OpenAccount(ctx, "k3", "ana", "whatever the client says", "", money.BRL)
+	if err != nil || a.HolderName != "Ana Souza" || a.Document != "52998224725" {
+		t.Fatalf("verified customer = %+v %v", a, err)
+	}
+}

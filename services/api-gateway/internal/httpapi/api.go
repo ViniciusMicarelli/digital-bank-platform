@@ -24,6 +24,7 @@ import (
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
+	userv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/user/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/correlation"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
@@ -42,6 +43,7 @@ type Clients struct {
 	Credit        creditv1.CreditServiceClient
 	Payments      paymentv1.PaymentServiceClient
 	Notifications notificationv1.NotificationServiceClient
+	Users         userv1.UserServiceClient
 }
 
 type Options struct {
@@ -95,7 +97,11 @@ func (a *API) Handler() http.Handler {
 		mux.HandleFunc("POST /v1/sandbox/card-network/authorizations/{authID}/reverse", a.authenticated(a.networkReverse))
 		mux.HandleFunc("POST /v1/sandbox/accounts/{id}/credit/cycle", a.authenticated(a.owned(a.advanceCreditCycle)))
 		mux.HandleFunc("POST /v1/sandbox/boletos", a.authenticated(a.issueSandboxBoleto))
+		mux.HandleFunc("POST /v1/sandbox/kyc/review", a.authenticated(a.reviewKYC))
 	}
+	mux.HandleFunc("GET /v1/me/profile", a.authenticated(a.getProfile))
+	mux.HandleFunc("PUT /v1/me/profile", a.authenticated(a.putProfile))
+	mux.HandleFunc("POST /v1/me/kyc", a.authenticated(a.submitKYC))
 	mux.HandleFunc("GET /v1/notifications", a.authenticated(a.listNotifications))
 	mux.HandleFunc("POST /v1/notifications/read", a.authenticated(a.markNotificationsRead))
 	mux.HandleFunc("GET /v1/notifications/preferences", a.authenticated(a.notificationPreferences))

@@ -137,6 +137,10 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 
 - notification-service: consumes domain events and notifies customers (in-app inbox, simulated push/email), with per-customer preferences and a live stream (SSE) through the gateway.
 
-## Phase 18 — Onboarding and KYC
+## Phase 18 — Onboarding and KYC ✅
 
 - user-service: customer profile (CPF, birth date, address), KYC checks against a simulated bureau (approve, reject, manual review), and accounts can only be opened after KYC approval.
+
+## Next — Frontend
+
+The backend is complete. Next come the screens: a customer web app (onboarding, accounts, Pix, cards, credit invoices, boletos, live notifications through `/v1/notifications/stream`) built on the public REST API documented in [api/README.md](api/README.md).

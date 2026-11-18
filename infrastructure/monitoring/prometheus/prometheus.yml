@@ -19,4 +19,5 @@ scrape_configs:
           - credit-service:9109
           - payment-service:9110
           - notification-service:9111
+          - user-service:9112
           - kms-service:9108
