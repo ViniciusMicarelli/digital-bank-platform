@@ -7,6 +7,7 @@ import { useAccount } from '../app/queries'
 import { api, logout } from '../lib/api'
 import { cx } from '../lib/format'
 import { gsap, reducedMotion, useGSAP } from '../lib/motion'
+import { Aurora } from './Aurora'
 import { Brand } from './Brand'
 import { ThemeSwitch } from './ThemeSwitch'
 
@@ -55,17 +56,17 @@ export function Layout() {
 
   return (
     <div className="min-h-full lg:flex">
-      <aside className="sticky top-0 hidden h-screen w-[264px] shrink-0 flex-col border-r border-line bg-surface px-4 py-6 lg:flex">
+      <Aurora />
+      <aside className="glass sticky top-3 m-3 hidden h-[calc(100vh-1.5rem)] w-[260px] shrink-0 flex-col self-start rounded-[30px] px-3.5 py-6 lg:flex">
         <div className="px-2"><Brand /></div>
         <nav className="mt-9 flex flex-1 flex-col gap-1">
           {nav.filter((n) => n.desktop !== false).map((n) => (
             <NavLink key={n.to} to={n.to} end={n.to === '/'}
-              className={({ isActive }) => cx('group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',
-                isActive ? 'bg-brand-soft text-brand-strong' : 'text-muted hover:bg-surface-2 hover:text-fg')}>
+              className={({ isActive }) => cx('group relative flex items-center gap-3 rounded-full px-3.5 py-2.5 text-[14px] font-medium transition',
+                isActive ? 'glass-strong text-fg' : 'text-fg-2 hover:bg-surface-2 hover:text-fg')}>
               {({ isActive }) => (
                 <>
-                  {isActive && <span className="absolute top-2 bottom-2 -left-4 w-1 rounded-r-full bg-brand" />}
-                  <n.icon className="size-[18px]" strokeWidth={isActive ? 2.4 : 2} />
+                  <n.icon className={cx('size-[18px]', isActive && 'text-brand-strong')} strokeWidth={isActive ? 2.4 : 2} />
                   {n.label}
                   {n.to === '/notificacoes' && unread > 0 && (
                     <span className="ml-auto min-w-6 rounded-full bg-brand px-1.5 text-center text-[11px] leading-5 font-bold text-brand-fg">{unread}</span>
@@ -77,7 +78,7 @@ export function Layout() {
         </nav>
         <div className="mb-3 px-1"><ThemeSwitch compact /></div>
         {account && (
-          <div className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3">
+          <div className="flex items-center gap-3 rounded-[22px] bg-surface-2 p-3">
             <Initials name={account.holder_name} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-fg">{account.holder_name}</p>
@@ -91,14 +92,14 @@ export function Layout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-surface/80 px-4 py-3 backdrop-blur-xl lg:hidden">
+        <header className="glass sticky top-0 z-30 flex items-center justify-between rounded-none border-x-0 border-t-0 px-4 py-3 lg:hidden">
           <Brand />
           <NavLink to="/notificacoes" className="relative grid size-10 place-items-center rounded-xl text-fg-2" aria-label="Notificações">
             <Bell className="size-5" />
             {unread > 0 && <span className="absolute top-1.5 right-1.5 grid min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-fg">{unread}</span>}
           </NavLink>
         </header>
-        <main ref={main} className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-28 sm:px-6 lg:px-10 lg:py-10">
+        <main ref={main} className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-32 sm:px-6 lg:px-8 lg:py-9">
           <Suspense fallback={<div className="space-y-4"><div className="skeleton h-10 w-48 rounded-xl" /><div className="skeleton h-64 rounded-3xl" /></div>}>
             <Outlet />
           </Suspense>
@@ -111,11 +112,11 @@ export function Layout() {
         </p>
       </div>
 
-      <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 rounded-2xl border border-line bg-surface/85 p-1.5 shadow-lift backdrop-blur-xl lg:hidden">
+      <nav className="glass-strong fixed inset-x-3 bottom-4 z-40 grid grid-cols-5 rounded-full p-1.5 lg:hidden">
         {nav.filter((n) => n.mobile).map((n) => (
           <NavLink key={n.to} to={n.to} end={n.to === '/'}
-            className={({ isActive }) => cx('flex flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-semibold transition',
-              isActive ? 'bg-brand-soft text-brand-strong' : 'text-muted')}>
+            className={({ isActive }) => cx('flex flex-col items-center gap-0.5 rounded-full py-2 text-[10px] font-semibold transition',
+              isActive ? 'bg-surface-2 text-brand-strong' : 'text-fg-2')}>
             <n.icon aria-hidden className="size-5" />
             {n.label}
           </NavLink>
@@ -130,7 +131,7 @@ export function MorePage() {
   return (
     <div>
       <h1 data-reveal className="mb-6 text-[28px] font-bold tracking-tight">Mais</h1>
-      <ul data-reveal className="divide-y divide-line overflow-hidden rounded-3xl bg-surface shadow-card ring-1 ring-line">
+      <ul data-reveal className="glass divide-y divide-line overflow-hidden rounded-[28px]">
         {nav.filter((n) => !n.mobile).map((n) => (
           <li key={n.to}>
             <NavLink to={n.to} className="flex items-center gap-3 px-5 py-4 text-sm font-medium text-fg transition hover:bg-surface-2">

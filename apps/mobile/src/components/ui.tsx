@@ -8,6 +8,7 @@ import {
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { font, radius, useTheme, type Colors } from '../lib/theme'
+import { AuroraBackground, Glass } from './Glass'
 
 /** Themed text: variant sets size and weight. */
 export function Txt({ variant = 'body', tone = 'fg', style, ...rest }: TextProps & {
@@ -16,9 +17,9 @@ export function Txt({ variant = 'body', tone = 'fg', style, ...rest }: TextProps
 }) {
   const { c } = useTheme()
   const v: Record<string, TextStyle> = {
-    display: { fontSize: 36, fontFamily: font.bold, letterSpacing: -1 },
-    title: { fontSize: 28, fontFamily: font.bold, letterSpacing: -0.6 },
-    heading: { fontSize: 16, fontFamily: font.semibold, letterSpacing: -0.2 },
+    display: { fontSize: 38, fontFamily: font.bold, letterSpacing: -1.2 },
+    title: { fontSize: 34, fontFamily: font.bold, letterSpacing: -0.8 },
+    heading: { fontSize: 17, fontFamily: font.semibold, letterSpacing: -0.3 },
     body: { fontSize: 15, fontFamily: font.regular },
     label: { fontSize: 14, fontFamily: font.medium },
     caption: { fontSize: 12, fontFamily: font.regular },
@@ -41,6 +42,7 @@ export function Screen({ children, title, subtitle, refreshing, scroll = true }:
   )
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top']}>
+      <AuroraBackground />
       {scroll ? (
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={refreshing as never}>{body}</ScrollView>
       ) : <View style={styles.content}>{body}</View>}
@@ -74,19 +76,27 @@ export function Button({ title, onPress, variant = 'primary', loading, disabled,
 }) {
   const { c } = useTheme()
   const off = disabled || loading
-  const bg = { primary: c.brand, secondary: c.surface, danger: c.surface, ghost: 'transparent', credit: c.credit }[variant]
   const fg = { primary: c.brandFg, secondary: c.fg, danger: c.danger, ghost: c.brandStrong, credit: '#fff' }[variant]
-  const border = variant === 'secondary' ? c.lineStrong : variant === 'danger' ? c.dangerSoft : 'transparent'
+  const label = loading ? <ActivityIndicator color={fg} /> : (
+    <View style={styles.row}>
+      {Icon && <Icon size={18} color={fg} strokeWidth={2.2} />}
+      <Txt style={{ color: fg, fontFamily: font.semibold, fontSize: 16 }}>{title}</Txt>
+    </View>
+  )
+  if (variant === 'secondary' || variant === 'danger') {
+    return (
+      <Press onPress={onPress} disabled={off} accessibilityLabel={title} style={{ opacity: off ? 0.5 : 1 }}>
+        <Glass radius={999} interactive style={styles.button}>{label}</Glass>
+      </Press>
+    )
+  }
+  const bg = { primary: c.brand, ghost: 'transparent', credit: c.credit }[variant]
   return (
     <Press onPress={onPress} disabled={off} accessibilityLabel={title}
-      style={[styles.button, { backgroundColor: bg, borderColor: border, opacity: off ? 0.5 : 1 },
-        variant === 'primary' && { shadowColor: c.brand, shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 3 }]}>
-      {loading ? <ActivityIndicator color={fg} /> : (
-        <View style={styles.row}>
-          {Icon && <Icon size={18} color={fg} strokeWidth={2.2} />}
-          <Txt style={{ color: fg, fontFamily: font.semibold, fontSize: 15 }}>{title}</Txt>
-        </View>
-      )}
+      style={[styles.button, { backgroundColor: bg, opacity: off ? 0.5 : 1 },
+        variant !== 'ghost' && { shadowColor: bg, shadowOpacity: 0.4, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 3 }]}>
+      {variant !== 'ghost' && <View pointerEvents="none" style={styles.gloss} />}
+      {label}
     </Press>
   )
 }
@@ -96,10 +106,10 @@ export function Field({ label, hint, error, ...rest }: TextInputProps & { label:
   const [focused, setFocused] = useState(false)
   return (
     <View style={{ gap: 6 }}>
-      <Txt variant="label" tone="fg2">{label}</Txt>
+      <Txt variant="caption" tone="muted" style={{ marginLeft: 4, fontFamily: font.medium, fontSize: 13 }}>{label}</Txt>
       <TextInput accessibilityLabel={label} placeholderTextColor={c.subtle} {...rest}
         onFocus={(e) => { setFocused(true); rest.onFocus?.(e) }} onBlur={(e) => { setFocused(false); rest.onBlur?.(e) }}
-        style={[styles.input, { backgroundColor: c.surface, color: c.fg, borderColor: error ? c.danger : focused ? c.brand : c.lineStrong, borderWidth: focused ? 2 : 1 }]} />
+        style={[styles.input, { backgroundColor: focused ? c.glassStrong : c.surface2, color: c.fg, borderColor: error ? c.danger : focused ? c.brand : 'transparent', borderWidth: 2 }, rest.style]} />
       {(error || hint) ? <Txt variant="caption" tone={error ? 'danger' : 'muted'}>{error ?? hint}</Txt> : null}
     </View>
   )
@@ -119,10 +129,10 @@ export function MoneyField({ label, onValue, hint }: { label: string; onValue: (
 export function Card({ children, title, icon: Icon, action, index = 0, style }: {
   children: ReactNode; title?: string; icon?: LucideIcon; action?: ReactNode; index?: number; style?: StyleProp<ViewStyle>
 }) {
-  const { c, dark } = useTheme()
+  const { c } = useTheme()
   return (
-    <Animated.View entering={FadeInDown.delay(80 + index * 70).duration(450)}
-      style={[styles.card, { backgroundColor: c.surface, borderColor: c.line, shadowColor: c.shadow, shadowOpacity: dark ? 0 : 0.06 }, style]}>
+    <Animated.View entering={FadeInDown.delay(80 + index * 70).duration(450)} style={[styles.cardShadow, { shadowColor: c.shadow }]}>
+     <Glass radius={radius.xl} style={[styles.card, style]}>
       {(title || action) && (
         <View style={[styles.row, { justifyContent: 'space-between' }]}>
           <View style={styles.row}>
@@ -133,6 +143,7 @@ export function Card({ children, title, icon: Icon, action, index = 0, style }: 
         </View>
       )}
       {children}
+     </Glass>
     </Animated.View>
   )
 }
@@ -184,7 +195,7 @@ export type Tone = keyof ReturnType<typeof tileTones>
 export function IconTile({ icon: Icon, tone = 'slate', size = 40 }: { icon: LucideIcon; tone?: Tone; size?: number }) {
   const { c } = useTheme()
   const [bg, fg] = tileTones(c)[tone]
-  return <View style={{ width: size, height: size, borderRadius: size * 0.36, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}><Icon size={size * 0.45} color={fg} strokeWidth={2.2} /></View>
+  return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}><Icon size={size * 0.45} color={fg} strokeWidth={2.2} /></View>
 }
 
 export function Row({ title, subtitle, right, onPress, icon, tone }: { title: string; subtitle?: string; right?: ReactNode; onPress?: () => void; icon?: LucideIcon; tone?: Tone }) {
@@ -214,7 +225,7 @@ export function Segmented<T extends string>({ value, onChange, options }: { valu
   return (
     <View accessibilityRole="tablist" onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}
       style={[styles.segmented, { backgroundColor: c.surface2 }]}>
-      {seg > 0 && <Animated.View style={[styles.pill, { width: seg, backgroundColor: c.surface, shadowColor: c.shadow }, pill]} />}
+      {seg > 0 && <Animated.View style={[styles.pill, { width: seg, backgroundColor: c.glassStrong, borderColor: c.glassRim, shadowColor: c.shadow }, pill]} />}
       {options.map(([id, label]) => (
         <Pressable key={id} accessibilityRole="tab" accessibilityState={{ selected: value === id }} onPress={() => onChange(id)} style={styles.segment}>
           <Txt variant="label" tone={value === id ? 'fg' : 'muted'} style={{ fontFamily: font.semibold }}>{label}</Txt>
@@ -262,15 +273,17 @@ export function useStyles<T>(make: (c: Colors) => T): T {
 }
 
 export const styles = StyleSheet.create({
-  content: { padding: 16, paddingBottom: 56, gap: 14 },
+  content: { padding: 16, paddingBottom: 130, gap: 14 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  button: { borderRadius: radius.md, paddingVertical: 15, paddingHorizontal: 18, alignItems: 'center', borderWidth: 1 },
-  input: { borderRadius: radius.md, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, fontFamily: font.regular },
-  card: { borderRadius: radius.lg, padding: 18, gap: 12, borderWidth: 1, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 1 },
-  tileSm: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  button: { borderRadius: 999, paddingVertical: 15, paddingHorizontal: 20, alignItems: 'center', overflow: 'hidden' },
+  gloss: { position: 'absolute', top: 0, left: 0, right: 0, height: '50%', backgroundColor: 'rgba(255,255,255,0.18)' },
+  input: { borderRadius: 18, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, fontFamily: font.regular },
+  cardShadow: { shadowOpacity: 0.1, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 2 },
+  card: { padding: 18, gap: 12 },
+  tileSm: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   notice: { borderRadius: radius.md, padding: 12, flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  segmented: { flexDirection: 'row', borderRadius: radius.md, padding: 4 },
-  pill: { position: 'absolute', top: 4, bottom: 4, left: 4, borderRadius: 10, shadowOpacity: 0.08, shadowRadius: 6, elevation: 1 },
+  segmented: { flexDirection: 'row', borderRadius: 999, padding: 4 },
+  pill: { position: 'absolute', top: 4, bottom: 4, left: 4, borderRadius: 999, borderWidth: 1, shadowOpacity: 0.1, shadowRadius: 8, elevation: 1 },
   segment: { flex: 1, paddingVertical: 9, alignItems: 'center' },
-  sandbox: { borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.lg, padding: 14, gap: 10 },
+  sandbox: { borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.xl, padding: 16, gap: 10 },
 })

@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { keys, useAccounts, useProfile } from '../app/queries'
 import { Check, IdCard, Landmark, LogOut, ScanFace, ShieldCheck } from 'lucide-react'
+import { Aurora } from '../components/Aurora'
 import { Brand } from '../components/Brand'
 import { ThemeSwitch } from '../components/ThemeSwitch'
 import { useReveal } from '../lib/motion'
@@ -124,7 +125,8 @@ export function OnboardingPage() {
   const step = !p || editing || status === 'REJECTED' ? 0 : status === 'APPROVED' ? 2 : 1
 
   return (
-    <div className="min-h-full bg-bg">
+    <div className="min-h-full">
+      <Aurora />
       <header className="flex items-center justify-between px-5 py-4 sm:px-8">
         <Brand />
         <div className="flex items-center gap-2">
@@ -134,7 +136,7 @@ export function OnboardingPage() {
       </header>
       <main ref={scope} className="mx-auto max-w-xl px-4 py-6 sm:py-10">
         <p data-reveal className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wider text-brand-strong uppercase"><ShieldCheck className="size-4" /> Abertura de conta</p>
-        <h1 data-reveal className="text-3xl font-bold tracking-tight text-fg">Vamos abrir sua conta</h1>
+        <h1 data-reveal className="text-[34px] font-bold tracking-[-0.02em] text-fg">Vamos abrir sua conta</h1>
         <p data-reveal className="mt-2 mb-8 text-sm text-muted">Leva dois minutos. Seus dados são verificados com o bureau de identidade e protegidos com criptografia.</p>
         <Steps step={step} />
 

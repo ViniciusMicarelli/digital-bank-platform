@@ -1,5 +1,5 @@
 import { Nfc } from 'lucide-react'
-import { useRef } from 'react'
+import { useId, useRef } from 'react'
 import { cx } from '../lib/format'
 import { gsap, reducedMotion, useGSAP } from '../lib/motion'
 
@@ -12,14 +12,15 @@ const skins: Record<CardSkin, string> = {
 }
 
 function Chip() {
+  const id = useId()
   return (
     <svg viewBox="0 0 40 30" aria-hidden className="h-auto w-[12cqw]">
       <defs>
-        <linearGradient id="chip" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#f6e7b0" /><stop offset=".5" stopColor="#d4b062" /><stop offset="1" stopColor="#f3dc96" />
         </linearGradient>
       </defs>
-      <rect x="0.5" y="0.5" width="39" height="29" rx="5" fill="url(#chip)" stroke="#a88a43" strokeOpacity=".5" />
+      <rect x="0.5" y="0.5" width="39" height="29" rx="5" fill={`url(#${id})`} stroke="#a88a43" strokeOpacity=".5" />
       <path d="M0 10h12m16 0h12M0 20h12m16 0h12M12 0v30m16-30v30M12 10h16v10H12z" stroke="#8a6d2c" strokeOpacity=".55" fill="none" />
     </svg>
   )

@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { AuthHero } from '../components/AuthHero'
+import { AuroraBackground, Glass } from '../components/Glass'
 import { Button, Field, Notice, Txt } from '../components/ui'
 import { client } from '../lib/client'
 import { font, useTheme } from '../lib/theme'
@@ -31,9 +32,11 @@ export default function Login() {
   }
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: c.bg }}>
+      <AuroraBackground />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
         <AuthHero title="Bem-vindo de volta" subtitle="Entre para ver seu saldo e movimentar sua conta." />
-        <Animated.View entering={FadeInDown.delay(500).duration(500)} style={{ padding: 20, gap: 14 }}>
+        <Animated.View entering={FadeInDown.delay(500).duration(500)} style={{ marginTop: -26, marginHorizontal: 14 }}>
+         <Glass strong radius={30} style={{ padding: 20, gap: 14 }}>
           <Field label="E-mail" keyboardType="email-address" autoCapitalize="none" autoComplete="email" value={email} onChangeText={setEmail} />
           <Field label="Senha" secureTextEntry autoComplete="current-password" value={password} onChangeText={setPassword} onSubmitEditing={submit} />
           {needsTotp && <Field label="Código do autenticador" keyboardType="number-pad" maxLength={6} value={totp} onChangeText={setTotp} />}
@@ -43,6 +46,7 @@ export default function Login() {
             <Txt variant="label" tone="muted">Ainda não tem conta?</Txt>
             <Link href="/criar-conta"><Txt variant="label" tone="brandStrong" style={{ fontFamily: font.semibold }}>Criar conta</Txt></Link>
           </View>
+         </Glass>
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>

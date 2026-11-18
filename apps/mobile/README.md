@@ -8,6 +8,8 @@ Expo SDK 58 · React Native · Expo Router · Reanimated · TanStack Query · `@
 
 The same semantic tokens as the web app (jade for the bank and money in, neutral for money out, red only for failures, amber for pending, violet for credit), with light and dark values in [`src/lib/theme.tsx`](src/lib/theme.tsx). The theme follows the system, or Sistema / Claro / Escuro in Mais › Aparência (saved on the device). Inter via `@expo-google-fonts/inter`, Lucide icons.
 
+Surfaces are glass ([`Glass.tsx`](src/components/Glass.tsx)): **Apple's Liquid Glass** (`expo-glass-effect`) on iOS 26, a system-material blur (`expo-blur`) on older iOS and the web build, and a translucent fill on Android, over a soft aurora background. The tab bar is a floating glass capsule; buttons are pills, inputs are filled iOS fields, the home has the round shortcut carousel, my cards and the credit invoice.
+
 GSAP needs a DOM, so the app animates with **Reanimated** (the React Native standard): cards enter in a cascade, buttons spring when pressed, the segmented control's indicator slides, the card flips to its back after step-up, notification banners slide in, balances count up, skeletons pulse while loading, and the sign-in cards float. Reanimated honors the system's reduced-motion setting.
 
 ## Run on a phone

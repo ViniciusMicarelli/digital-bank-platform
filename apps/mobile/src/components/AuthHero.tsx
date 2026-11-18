@@ -39,7 +39,7 @@ export function AuthHero({ title, subtitle }: { title: string; subtitle: string 
 }
 
 const st = StyleSheet.create({
-  hero: { paddingHorizontal: 22, paddingTop: 64, paddingBottom: 28, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden', gap: 18 },
+  hero: { paddingHorizontal: 22, paddingTop: 64, paddingBottom: 52, borderBottomLeftRadius: 32, borderBottomRightRadius: 32, overflow: 'hidden', gap: 18 },
   glow: { position: 'absolute', width: 320, height: 320, borderRadius: 160, top: -140, right: -120, backgroundColor: '#2ed3a0', opacity: 0.22 },
   cards: { height: 170, marginVertical: 6 },
   cardBack: { position: 'absolute', width: '68%', right: 0, top: 0, opacity: 0.9 },

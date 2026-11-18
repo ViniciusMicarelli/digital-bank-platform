@@ -6,7 +6,8 @@ import { Platform, useColorScheme } from 'react-native'
 // money in; outgoing money stays neutral; danger only for failures; warning
 // for pending; credit products are violet.
 const light = {
-  bg: '#f4f6f8', surface: '#ffffff', surface2: '#f0f2f5', surface3: '#e6e9ee',
+  bg: '#eef1f5', surface: '#ffffff', surface2: 'rgba(118,128,150,0.1)', surface3: 'rgba(118,128,150,0.2)',
+  glass: 'rgba(255,255,255,0.6)', glassStrong: 'rgba(255,255,255,0.8)', glassRim: 'rgba(255,255,255,0.75)',
   fg: '#0b1220', fg2: '#354052', muted: '#667085', subtle: '#98a2b3',
   line: '#e7eaef', lineStrong: '#d0d5dd',
   brand: '#00a37a', brandStrong: '#00805f', brandSoft: '#e2f6ef', brandFg: '#ffffff',
@@ -18,7 +19,8 @@ const light = {
 }
 
 const dark: typeof light = {
-  bg: '#07090d', surface: '#0e1219', surface2: '#151a23', surface3: '#1d2430',
+  bg: '#05070b', surface: '#11151d', surface2: 'rgba(255,255,255,0.07)', surface3: 'rgba(255,255,255,0.13)',
+  glass: 'rgba(30,34,44,0.55)', glassStrong: 'rgba(30,34,44,0.78)', glassRim: 'rgba(255,255,255,0.1)',
   fg: '#f2f4f7', fg2: '#cdd3dd', muted: '#8d96a8', subtle: '#5d6676',
   line: '#1e2531', lineStrong: '#2b3342',
   brand: '#2ed3a0', brandStrong: '#63e3bb', brandSoft: '#0d2b22', brandFg: '#03140e',
@@ -35,6 +37,11 @@ export type ThemeMode = 'system' | 'light' | 'dark'
 /** Hero surfaces (balance, cards) are ink with jade light in both themes. */
 export const heroGradient = ['#0b1220', '#13233a'] as const
 export const creditGradient = ['#1a1240', '#0b1220'] as const
+/** The aurora behind the glass: soft jade to violet. */
+export const aurora = {
+  light: ['#d4f5e9', '#eef1f5', '#e9e4fc'] as const,
+  dark: ['#062119', '#05070b', '#170f33'] as const,
+}
 export const font = { regular: 'Inter_400Regular', medium: 'Inter_500Medium', semibold: 'Inter_600SemiBold', bold: 'Inter_700Bold' }
 export const radius = { sm: 10, md: 14, lg: 22, xl: 28 }
 

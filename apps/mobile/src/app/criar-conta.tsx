@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { AuthHero } from '../components/AuthHero'
+import { AuroraBackground, Glass } from '../components/Glass'
 import { Button, Field, Notice, Txt } from '../components/ui'
 import { client } from '../lib/client'
 import { font, useTheme } from '../lib/theme'
@@ -28,9 +29,11 @@ export default function Register() {
   const strength = Math.min(4, Math.floor(f.password.length / 5))
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: c.bg }}>
+      <AuroraBackground />
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
         <AuthHero title="Abra sua conta" subtitle="Sem tarifa de manutenção. Leva dois minutos." />
-        <Animated.View entering={FadeInDown.delay(500).duration(500)} style={{ padding: 20, gap: 14 }}>
+        <Animated.View entering={FadeInDown.delay(500).duration(500)} style={{ marginTop: -26, marginHorizontal: 14 }}>
+         <Glass strong radius={30} style={{ padding: 20, gap: 14 }}>
           <Field label="Nome completo" autoComplete="name" value={f.name} onChangeText={(name) => setF({ ...f, name })} />
           <Field label="E-mail" keyboardType="email-address" autoCapitalize="none" value={f.email} onChangeText={(email) => setF({ ...f, email })} />
           <Field label="Senha" secureTextEntry hint="De 10 a 128 caracteres. Uma frase é ótima." value={f.password} onChangeText={(password) => setF({ ...f, password })} />
@@ -43,6 +46,7 @@ export default function Register() {
             <Txt variant="label" tone="muted">Já tem conta?</Txt>
             <Link href="/entrar"><Txt variant="label" tone="brandStrong" style={{ fontFamily: font.semibold }}>Entrar</Txt></Link>
           </View>
+         </Glass>
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>

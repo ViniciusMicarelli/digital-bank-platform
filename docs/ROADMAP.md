@@ -158,6 +158,7 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 
 - One design language for web and mobile: semantic color tokens with light and dark values (jade for money in and the brand, neutral for money out, red only for failures, amber for pending, violet for credit), Inter, Lucide icons.
 - Light and dark themes in both apps, following the system or chosen by the customer.
+- Apple-style components over Liquid Glass (native `GlassView` on iOS 26, blur elsewhere) and an aurora background; the familiar digital-bank home (round shortcuts, my cards, invoice, activity).
 - Realistic cards (chip, contactless, sheen, 3D flip to the back after step-up), balance and limit count-ups, staggered entrances, skeletons; GSAP on the web, Reanimated on mobile, both respecting reduced motion.
 - Browser tests run in both themes.
 

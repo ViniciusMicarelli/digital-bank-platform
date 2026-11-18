@@ -1,13 +1,14 @@
-import { addBRL, ApiError, formatBRL, type Card, type CreditLine, type FeedItem } from '@bank/core'
+import { addBRL, ApiError, formatBRL, type Card, type CreditLine, type FeedItem, type Invoice } from '@bank/core'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Barcode, CreditCard, Eye, EyeOff, FileText, QrCode, ShoppingBag, Undo2, Wallet, type LucideIcon,
+  ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Barcode, Bell, ChevronRight, CreditCard, Eye, EyeOff, FileText, QrCode, ShoppingBag, Sparkles,
+  Undo2, Wallet, Zap, type LucideIcon,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { useAccount, useBalance, useStatement } from '../app/queries'
 import { BankCard } from '../components/BankCard'
-import { Amount, Button, Empty, IconTile, Loading, Panel } from '../components/ui'
+import { Amount, Button, Empty, IconTile, Loading, Panel, Skeleton } from '../components/ui'
 import { api } from '../lib/api'
 import { cx, dateTimeBR, typeLabels } from '../lib/format'
 import { useCountUp } from '../lib/motion'
@@ -33,61 +34,77 @@ export function FeedRow({ item }: { item: FeedItem }) {
 
 const cents = (amount?: string) => (amount ? Number(amount) : 0)
 
-function Balance({ accountLabel }: { accountLabel: string }) {
-  const account = useAccount()
-  const balance = useBalance(account?.id)
-  const feed = useStatement(account?.id, 50)
-  const [hidden, setHidden] = useState(false)
-  const available = balance.data?.available.amount
-  const ref = useCountUp(cents(available), (n) => formatBRL(n.toFixed(2)))
-
-  // This month's money in and out, from the statement.
-  const [month] = useState(() => new Date().toISOString().slice(0, 7))
-  const items = (feed.data?.pages.flatMap((p) => p.items) ?? []).filter((i) => i.occurred_at.startsWith(month))
-  const sum = (d: FeedItem['direction']) => addBRL('0.00', ...items.filter((i) => i.direction === d).map((i) => i.amount.amount))
-
+function Initials({ name }: { name?: string }) {
+  const p = (name ?? '').split(' ').filter(Boolean)
   return (
-    <section data-reveal className="hero-surface relative overflow-hidden rounded-[28px] p-6 text-white shadow-lift sm:p-8">
-      <div aria-hidden className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-[#2ed3a0]/20 blur-3xl" />
-      <div className="relative flex items-center justify-between">
-        <p className="text-sm font-medium text-white/70">Saldo disponível</p>
-        <button onClick={() => setHidden(!hidden)} aria-label={hidden ? 'Mostrar saldo' : 'Ocultar saldo'}
-          className="grid size-9 place-items-center rounded-xl bg-white/10 text-white/80 transition hover:bg-white/20">
-          {hidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-        </button>
-      </div>
-      <p className="tabular relative mt-2 text-[40px] leading-none font-bold tracking-tight sm:text-5xl">
-        {balance.isLoading ? <span className="inline-block h-11 w-56 animate-pulse rounded-xl bg-white/10" /> : hidden ? 'R$ ••••••' : <span ref={ref}>{formatBRL(available)}</span>}
-      </p>
-      {!hidden && balance.data && balance.data.pending.amount !== '0.00' && (
-        <p className="relative mt-2 text-sm text-white/60">{formatBRL(balance.data.pending)} reservado em compras e Pix em andamento</p>
-      )}
-      <div className="relative mt-7 grid grid-cols-2 gap-3 sm:max-w-md">
-        <div className="rounded-2xl bg-white/[0.07] p-3.5 ring-1 ring-white/10 backdrop-blur">
-          <p className="flex items-center gap-1.5 text-xs text-white/60"><ArrowDownLeft className="size-3.5 text-[#2ed3a0]" /> Entradas no mês</p>
-          <p className="tabular mt-1 font-semibold">{hidden ? '••••' : formatBRL(sum('CREDIT'))}</p>
-        </div>
-        <div className="rounded-2xl bg-white/[0.07] p-3.5 ring-1 ring-white/10 backdrop-blur">
-          <p className="flex items-center gap-1.5 text-xs text-white/60"><ArrowUpRight className="size-3.5" /> Saídas no mês</p>
-          <p className="tabular mt-1 font-semibold">{hidden ? '••••' : formatBRL(sum('DEBIT'))}</p>
-        </div>
-      </div>
-      <p className="relative mt-6 text-xs text-white/50">{accountLabel}</p>
-    </section>
+    <span className="gloss grid size-12 place-items-center rounded-full bg-gradient-to-br from-brand to-credit text-[15px] font-bold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.4)]">
+      {(p[0]?.[0] ?? '') + (p.at(-1)?.[0] ?? '')}
+    </span>
   )
 }
 
-const actions: [string, string, LucideIcon][] = [
-  ['/pix?aba=enviar', 'Enviar Pix', ArrowUpRight],
+function Account({ hidden }: { hidden: boolean }) {
+  const account = useAccount()
+  const balance = useBalance(account?.id)
+  const feed = useStatement(account?.id, 50)
+  const available = balance.data?.available.amount
+  const ref = useCountUp(cents(available), (n) => formatBRL(n.toFixed(2)))
+  const [month] = useState(() => new Date().toISOString().slice(0, 7))
+  const items = (feed.data?.pages.flatMap((p) => p.items) ?? []).filter((i) => i.occurred_at.startsWith(month))
+  const sum = (d: FeedItem['direction']) => addBRL('0.00', ...items.filter((i) => i.direction === d).map((i) => i.amount.amount))
+  return (
+    <Link to="/extrato" data-reveal className="glass group block rounded-[30px] p-6 transition hover:-translate-y-0.5 sm:p-7">
+      <div className="flex items-center justify-between">
+        <p className="text-[17px] font-semibold text-fg">Conta</p>
+        <ChevronRight className="size-5 text-subtle transition group-hover:translate-x-0.5" />
+      </div>
+      <p className="mt-1 text-[13px] text-muted">Saldo disponível</p>
+      <p className="tabular mt-0.5 text-[40px] leading-tight font-bold tracking-[-0.03em] text-fg">
+        {balance.isLoading ? <span className="skeleton inline-block h-10 w-52 align-middle" /> : hidden ? 'R$ ••••••' : <span ref={ref}>{formatBRL(available)}</span>}
+      </p>
+      {!hidden && balance.data && balance.data.pending.amount !== '0.00' && (
+        <p className="mt-1 text-[13px] text-muted">{formatBRL(balance.data.pending)} reservado em compras e Pix em andamento</p>
+      )}
+      <div className="mt-5 flex flex-wrap gap-2">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-positive-soft px-3 py-1.5 text-xs font-semibold text-positive">
+          <ArrowDownLeft className="size-3.5" /> Entradas no mês {hidden ? '••••' : formatBRL(sum('CREDIT'))}
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-xs font-semibold text-fg-2">
+          <ArrowUpRight className="size-3.5" /> Saídas no mês {hidden ? '••••' : formatBRL(sum('DEBIT'))}
+        </span>
+      </div>
+    </Link>
+  )
+}
+
+const shortcuts: [string, string, LucideIcon][] = [
+  ['/pix', 'Área Pix', Zap],
+  ['/boletos', 'Pagar', Barcode],
+  ['/pix?aba=enviar', 'Transferir', ArrowUpRight],
   ['/pix?aba=cobrar', 'Cobrar', QrCode],
-  ['/boletos', 'Pagar boleto', Barcode],
+  ['/credito', 'Crédito', Wallet],
   ['/cartoes', 'Cartões', CreditCard],
 ]
 
-function Products({ accountId }: { accountId: string }) {
-  const cards = useQuery({ queryKey: ['cards', accountId], queryFn: async () => (await api<{ cards: Card[] }>('GET', `/v1/accounts/${accountId}/cards`)).cards })
-  const credit = useQuery({
+function Shortcuts() {
+  return (
+    <div data-reveal className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-6 sm:px-0">
+      {shortcuts.map(([to, label, Icon]) => (
+        <Link key={to} to={to} className="group flex w-[72px] shrink-0 flex-col items-center gap-2 text-center sm:w-auto">
+          <span className="glass grid size-[68px] place-items-center rounded-full text-fg transition duration-300 group-hover:-translate-y-1 group-hover:text-brand-strong group-active:scale-90">
+            <Icon className="size-6" strokeWidth={2} />
+          </span>
+          <span className="text-[13px] leading-tight font-medium text-fg">{label}</span>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+function useCredit(accountId?: string) {
+  const line = useQuery({
     queryKey: ['credit', accountId],
+    enabled: !!accountId,
     queryFn: async () => {
       try {
         return await api<CreditLine>('GET', `/v1/accounts/${accountId}/credit`)
@@ -97,39 +114,55 @@ function Products({ accountId }: { accountId: string }) {
       }
     },
   })
-  const card = cards.data?.[0]
-  const line = credit.data
-  const pct = line ? Math.min(100, (Number(line.used.amount) / Number(line.limit.amount)) * 100) : 0
+  const invoices = useQuery({
+    queryKey: ['invoices', accountId],
+    enabled: !!line.data,
+    queryFn: async () => (await api<{ invoices: Invoice[] }>('GET', `/v1/accounts/${accountId}/credit/invoices`)).invoices,
+  })
+  return { line: line.data, current: invoices.data?.find((i) => i.status === 'OPEN'), loading: line.isLoading }
+}
+
+function CreditSection({ accountId, hidden }: { accountId: string; hidden: boolean }) {
+  const { line, current, loading } = useCredit(accountId)
+  if (loading) return <Panel><Skeleton className="h-24" /></Panel>
+  if (!line) {
+    return (
+      <Link to="/credito" data-reveal className="glass flex items-center gap-4 rounded-[30px] p-5 transition hover:-translate-y-0.5">
+        <IconTile icon={Sparkles} tone="credit" className="size-12" />
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold text-fg">Ative seu cartão de crédito</p>
+          <p className="text-[13px] text-muted">Limite de R$ 1.000,00 no mesmo cartão. Sem anuidade.</p>
+        </div>
+        <ChevronRight className="size-5 text-subtle" />
+      </Link>
+    )
+  }
+  const pct = Math.min(100, (Number(line.used.amount) / Number(line.limit.amount)) * 100)
   return (
-    <div className="space-y-6">
-      <Panel title="Seu cartão" icon={CreditCard} action={<Link to="/cartoes" className="text-sm font-semibold text-brand-strong">Gerenciar</Link>}>
-        {card ? (
-          <Link to="/cartoes" className="block">
-            <BankCard holder={card.holder_name} last4={card.last4} expiry={`${String(card.expiry_month).padStart(2, '0')}/${String(card.expiry_year).slice(2)}`}
-              skin={card.status === 'BLOCKED' ? 'blocked' : line ? 'credit' : 'debit'} label={line ? 'Débito e crédito' : 'Débito'} />
-          </Link>
-        ) : (
-          <Empty icon={CreditCard}>Crie um cartão virtual para comprar online agora mesmo.</Empty>
-        )}
-      </Panel>
-      <Panel title="Crédito" icon={Wallet}>
-        {line ? (
-          <div>
-            <p className="text-xs text-muted">Limite disponível</p>
-            <p className="tabular mt-0.5 text-2xl font-bold text-fg">{formatBRL(line.available)}</p>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-3">
-              <div className="h-full rounded-full bg-gradient-to-r from-credit to-brand transition-all duration-700" style={{ width: `${pct}%` }} />
-            </div>
-            <p className="mt-2 text-xs text-muted">Usado {formatBRL(line.used)} de {formatBRL(line.limit)}</p>
-          </div>
-        ) : (
-          <div className="text-sm text-fg-2">
-            <p>Ative o crédito e use o mesmo cartão, com fatura mensal.</p>
-            <Link to="/credito"><Button variant="credit" size="sm" className="mt-3">Ativar crédito</Button></Link>
-          </div>
-        )}
-      </Panel>
-    </div>
+    <Link to="/credito" data-reveal className="glass group block rounded-[30px] p-6 transition hover:-translate-y-0.5">
+      <div className="flex items-center justify-between">
+        <p className="text-[17px] font-semibold text-fg">Cartão de crédito</p>
+        <ChevronRight className="size-5 text-subtle transition group-hover:translate-x-0.5" />
+      </div>
+      <p className="mt-1 text-[13px] text-muted">Fatura atual</p>
+      <p className="tabular text-[28px] font-bold tracking-tight text-credit">{hidden ? 'R$ ••••' : formatBRL(current?.total ?? '0.00')}</p>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
+        <div className="h-full rounded-full bg-gradient-to-r from-credit to-brand transition-all duration-700" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-2 text-[13px] text-muted">Limite disponível de {hidden ? '••••' : formatBRL(line.available)}</p>
+    </Link>
+  )
+}
+
+function CardPreview({ accountId }: { accountId: string }) {
+  const cards = useQuery({ queryKey: ['cards', accountId], queryFn: async () => (await api<{ cards: Card[] }>('GET', `/v1/accounts/${accountId}/cards`)).cards })
+  const card = cards.data?.[0]
+  if (!card) return null
+  return (
+    <Link to="/cartoes" data-reveal className="block">
+      <BankCard holder={card.holder_name} last4={card.last4} expiry={`${String(card.expiry_month).padStart(2, '0')}/${String(card.expiry_year).slice(2)}`}
+        skin={card.status === 'BLOCKED' ? 'blocked' : 'debit'} label={card.kind === 'VIRTUAL' ? 'Virtual' : 'Físico'} />
+    </Link>
   )
 }
 
@@ -137,30 +170,38 @@ export function HomePage() {
   const account = useAccount()
   const recent = useStatement(account?.id, 50)
   const items = (recent.data?.pages.flatMap((p) => p.items) ?? []).slice(0, 6)
+  const [hidden, setHidden] = useState(false)
   const [hour] = useState(() => new Date().getHours())
   const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
+  const round = 'glass grid size-11 place-items-center rounded-full text-fg-2 transition hover:text-fg active:scale-90'
 
   return (
     <div className="space-y-6">
-      <div data-reveal>
-        <p className="text-sm text-muted">{greeting},</p>
-        <h1 className="text-[28px] font-bold tracking-tight text-fg">{account?.holder_name.split(' ')[0]}</h1>
-      </div>
-      <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
-        <div className="min-w-0 space-y-6">
-          <Balance accountLabel={`Agência ${account?.branch} · Conta ${account?.number}`} />
-          <div data-reveal className="grid grid-cols-4 gap-2 sm:gap-3">
-            {actions.map(([to, label, Icon]) => (
-              <Link key={to} to={to}
-                className="group flex flex-col items-center gap-2.5 rounded-3xl bg-surface p-3 text-center shadow-card ring-1 ring-line transition hover:-translate-y-0.5 hover:shadow-lift sm:items-start sm:p-4 sm:text-left">
-                <span className="grid size-11 place-items-center rounded-2xl bg-brand-soft text-brand-strong transition group-hover:scale-110 group-hover:bg-brand group-hover:text-brand-fg">
-                  <Icon className="size-5" strokeWidth={2.2} />
-                </span>
-                <span className="text-xs font-semibold text-fg sm:text-sm">{label}</span>
-              </Link>
-            ))}
+      <header data-reveal className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Initials name={account?.holder_name} />
+          <div>
+            <p className="text-[13px] text-muted">{greeting},</p>
+            <h1 className="text-[22px] leading-tight font-bold tracking-tight text-fg">{account?.holder_name.split(' ')[0]}</h1>
           </div>
-          <Panel title="Últimas movimentações" action={<Link to="/extrato" className="text-sm font-semibold text-brand-strong">Ver extrato</Link>}>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setHidden(!hidden)} aria-label={hidden ? 'Mostrar saldo' : 'Ocultar saldo'} className={round}>
+            {hidden ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+          </button>
+          <Link to="/notificacoes" aria-label="Notificações" className={round}><Bell className="size-5" /></Link>
+        </div>
+      </header>
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+        <div className="min-w-0 space-y-6">
+          <Account hidden={hidden} />
+          <Shortcuts />
+          <Link to="/cartoes" data-reveal className="glass flex items-center gap-3 rounded-full px-5 py-4 text-[15px] font-semibold text-fg transition hover:-translate-y-0.5">
+            <CreditCard className="size-5 text-fg-2" /> Meus cartões <ChevronRight className="ml-auto size-5 text-subtle" />
+          </Link>
+          {account && <div className="xl:hidden"><CreditSection accountId={account.id} hidden={hidden} /></div>}
+          <Panel title="Movimentações" action={<Link to="/extrato" className="text-sm font-semibold text-brand-strong">Ver tudo</Link>}>
             {recent.isLoading ? <Loading /> : items.length === 0 ? (
               <div className="text-center">
                 <Empty icon={ArrowLeftRight}>Nenhuma movimentação ainda.</Empty>
@@ -171,7 +212,12 @@ export function HomePage() {
             )}
           </Panel>
         </div>
-        {account && <Products accountId={account.id} />}
+        {account && (
+          <aside className="hidden space-y-6 xl:block">
+            <CardPreview accountId={account.id} />
+            <CreditSection accountId={account.id} hidden={hidden} />
+          </aside>
+        )}
       </div>
     </div>
   )
@@ -199,7 +245,7 @@ export function StatementPage() {
   }, [])
   return (
     <div>
-      <h1 data-reveal className="mb-6 text-[28px] font-bold tracking-tight text-fg">Extrato</h1>
+      <h1 data-reveal className="mb-6 text-[34px] font-bold tracking-[-0.02em] text-fg">Extrato</h1>
       <Panel>
         {feed.isLoading ? <Loading rows={6} /> : items.length === 0 ? <Empty icon={ArrowLeftRight}>Nenhuma movimentação ainda.</Empty> : (
           <>

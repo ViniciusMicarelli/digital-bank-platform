@@ -65,7 +65,7 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 
 ## Web App
 
-A customer app in [`apps/web`](apps/web) (React, TypeScript, Tailwind, GSAP): onboarding with KYC, Pix, cards, credit, boletos and notifications that arrive live, in light and dark themes. `make up` serves it on http://localhost:8081.
+A customer app in [`apps/web`](apps/web) (React, TypeScript, Tailwind, GSAP, Liquid Glass styling): onboarding with KYC, Pix, cards, credit, boletos and notifications that arrive live, in light and dark themes. `make up` serves it on http://localhost:8081.
 
 | Light | Dark |
 |---|---|
@@ -74,7 +74,7 @@ A customer app in [`apps/web`](apps/web) (React, TypeScript, Tailwind, GSAP): on
 
 ## Mobile App
 
-The same bank on iOS and Android in [`apps/mobile`](apps/mobile) (Expo, React Native, Reanimated), with the same design system and themes: onboarding, Pix with QR codes, cards with step-up, boletos, credit and live notifications, sharing the API client with the web app ([`packages/ts-core`](packages/ts-core)). `make mobile`, then scan the QR code with Expo Go.
+The same bank on iOS and Android in [`apps/mobile`](apps/mobile) (Expo, React Native, Reanimated, native Liquid Glass on iOS 26), with the same design system and themes: onboarding, Pix with QR codes, cards with step-up, boletos, credit and live notifications, sharing the API client with the web app ([`packages/ts-core`](packages/ts-core)). `make mobile`, then scan the QR code with Expo Go.
 
 | | | |
 |---|---|---|

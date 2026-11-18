@@ -8,6 +8,7 @@ React 19 · TypeScript · Vite · Tailwind CSS v4 · GSAP · Lucide · TanStack 
 
 | | |
 |---|---|
+| Look | Apple-style components over Liquid Glass: translucent surfaces with a bright rim and a specular top edge (`.glass`, `.glass-strong` in [`src/index.css`](src/index.css)), floating over a slowly drifting aurora ([`Aurora.tsx`](src/components/Aurora.tsx)) that the blur refracts; pill buttons with a gloss, filled iOS inputs, the iOS switch, a glass segmented control, sheets that rise from the bottom on phones, large titles, SF Pro on Apple devices (Inter elsewhere). The home follows the familiar Brazilian digital-bank layout: greeting and avatar, the account balance with an eye to hide it, round shortcuts in a carousel, my cards, the credit invoice and limit, then the activity. With *Reduce transparency* on, surfaces turn opaque. |
 | Color with meaning | Semantic tokens ([`src/index.css`](src/index.css)): **jade** is the bank and money coming in; outgoing money stays neutral (as in current Brazilian banking apps); **red** only for failures and declines; **amber** for pending and scheduled; **violet** for credit products. Each token has a light and a dark value. |
 | Themes | Light and dark, following the system by default, with Sistema / Claro / Escuro in the sidebar and in Ajustes. `public/theme.js` applies the choice before the first paint (no flash; it is a file because the CSP forbids inline scripts). |
 | Type and icons | Inter (self-hosted, `@fontsource-variable/inter`) with tabular numbers for money; Lucide icons. |
