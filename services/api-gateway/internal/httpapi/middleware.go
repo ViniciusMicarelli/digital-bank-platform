@@ -45,6 +45,9 @@ func (r *statusRecorder) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 }
 
+// writeTimeout bounds a write request once detached from the client.
+const writeTimeout = 30 * time.Second
+
 // observe adds a correlation id, recovers panics, logs and records metrics.
 func observe(log *slog.Logger, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -56,6 +59,14 @@ func observe(log *slog.Logger, next http.Handler) http.Handler {
 		}
 		w.Header().Set("X-Correlation-ID", id)
 		ctx := correlation.WithID(r.Context(), id)
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			// A write (a Pix, a payment) finishes even if the client goes away
+			// mid-request (closed tab, lost signal): cancelling it halfway
+			// would leave the customer unsure whether money moved.
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
+			defer cancel()
+		}
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		// The mux sets Pattern on the request it routes, so keep that copy.
 		req := r.WithContext(ctx)

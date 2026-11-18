@@ -63,6 +63,15 @@ Each service owns its PostgreSQL database and follows a hexagonal layout (`domai
 | [identity-service](docs/services/identity-service.md) | Sign-up, login with argon2id + TOTP MFA, Ed25519 tokens via JWKS, rotating refresh tokens |
 | [api-gateway](docs/services/api-gateway.md) | Public REST API: token verification, ownership checks, idempotency keys, rate limits |
 
+## Web App
+
+A customer app in [`apps/web`](apps/web) (React, TypeScript, Tailwind): onboarding with KYC, Pix, cards, credit, boletos and notifications that arrive live. `make up` serves it on http://localhost:8081.
+
+| | |
+|---|---|
+| ![Home](docs/images/web-home.png) | ![Cards](docs/images/web-cards.png) |
+| ![Boleto](docs/images/web-boleto.png) | <img src="docs/images/web-mobile.png" alt="Mobile" width="260"> |
+
 ## What Is Interesting Here
 
 **Money is exact.** Amounts are `int64` minor units with overflow and currency checks; floats never appear, not even in JSON (`"amount": "10.50"`). → [`packages/go-common/money`](packages/go-common/money/money.go)

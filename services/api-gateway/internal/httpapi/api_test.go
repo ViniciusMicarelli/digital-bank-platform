@@ -284,3 +284,21 @@ func TestRevealRequiresStepUp(t *testing.T) {
 		t.Fatalf("with step-up: %d %v", resp.StatusCode, body)
 	}
 }
+
+func TestWritesSurviveClientDisconnect(t *testing.T) {
+	var postErr, getErr error
+	h := observe(slog.New(slog.NewTextHandler(io.Discard, nil)), http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			postErr = r.Context().Err()
+		} else {
+			getErr = r.Context().Err()
+		}
+	}))
+	gone, cancel := context.WithCancel(context.Background())
+	cancel() // the client disconnected
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/v1/x", nil).WithContext(gone))
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/v1/x", nil).WithContext(gone))
+	if postErr != nil || getErr == nil {
+		t.Fatalf("post ctx err = %v (want nil), get ctx err = %v (want canceled)", postErr, getErr)
+	}
+}

@@ -141,6 +141,13 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 
 - user-service: customer profile (CPF, birth date, address), KYC checks against a simulated bureau (approve, reject, manual review), and accounts can only be opened after KYC approval.
 
-## Next — Frontend
+## Phase 19 — Web app ✅
 
-The backend is complete. Next come the screens: a customer web app (onboarding, accounts, Pix, cards, credit invoices, boletos, live notifications through `/v1/notifications/stream`) built on the public REST API documented in [api/README.md](api/README.md).
+- Customer web app (`apps/web`): onboarding with KYC, account, Pix (send, QR Code request and payment, keys, refunds), cards (step-up, controls, wallets, simulated purchases), credit and invoices, boletos, notifications streamed live, settings (TOTP, limits).
+- Served by nginx with the API behind it (one origin, CSP); Playwright browser tests on desktop and mobile run in CI against that image.
+- Found on the way: a client that disconnects mid-request no longer cancels the write it started (the gateway detaches non-GET requests from the client, with a 30 s bound).
+
+## Next
+
+- Mobile app (`apps/mobile`) on the same API.
+- Back office for analysts (KYC reviews, disputes) and the planned items listed in each service doc.

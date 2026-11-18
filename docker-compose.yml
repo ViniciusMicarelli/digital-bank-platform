@@ -408,6 +408,12 @@ services:
       payment-service: { condition: service_healthy }
       notification-service: { condition: service_healthy }
 
+  web:
+    build: { context: ./apps/web }
+    ports: ["8081:8080"]
+    depends_on:
+      api-gateway: { condition: service_healthy }
+
   jaeger:
     image: jaegertracing/jaeger:2.11.0
     ports: ["16686:16686"]
