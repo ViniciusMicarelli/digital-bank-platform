@@ -86,7 +86,8 @@ type TxResult struct {
 
 type Transactions interface {
 	// Reserve consumes the limit and holds the amount (DEBIT_CARD_PURCHASE).
-	Reserve(ctx context.Context, key string, account uuid.UUID, amount money.Money, description string, metadata map[string]string) (TxResult, error)
+	// installments is 1 except for credit purchases split in installments.
+	Reserve(ctx context.Context, key string, account uuid.UUID, amount money.Money, installments int, description string, metadata map[string]string) (TxResult, error)
 	Complete(ctx context.Context, id uuid.UUID, amount *money.Money) (TxResult, error)
 	Compensate(ctx context.Context, id uuid.UUID, reason string) (TxResult, error)
 	// Refund gives money back for a cleared purchase (idempotent on key):

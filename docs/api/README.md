@@ -84,7 +84,7 @@
 | `GET` · `PUT` · `DELETE` | `/v1/accounts/{id}/savings/{boxID}` | A box with its `movements` / rename and set the goal `{name, goal?}` / close it, everything back to the account (Idempotency-Key) |
 | `POST` | `/v1/accounts/{id}/savings/{boxID}/deposits` · `/withdrawals` | `{amount}` (Idempotency-Key); 422 `INSUFFICIENT_FUNDS` with the movement when there is not enough |
 | `POST` | `/v1/sandbox/accounts/{id}/savings/{boxID}/yield` | *(sandbox)* Pay `{days}` of yield at once |
-| `POST` | `/v1/sandbox/card-network/authorizations` | *(sandbox)* Network authorization `{pan, expiry_month, expiry_year, cvv, amount, merchant_name, mcc, country, channel, function?}` (`function`: `DEBIT` default, or `CREDIT`) |
+| `POST` | `/v1/sandbox/card-network/authorizations` | *(sandbox)* Network authorization `{pan, expiry_month, expiry_year, cvv, amount, merchant_name, mcc, country, channel, function?}` (`function`: `DEBIT` default, or `CREDIT`; `installments`: 2 to 12 on credit) |
 | `POST` | `/v1/sandbox/card-network/authorizations/{id}/clear` · `/reverse` | *(sandbox)* Clearing `{amount?}` / merchant reversal |
 | `POST` | `/v1/sandbox/card-network/authorizations/{id}/refund` | *(sandbox)* Merchant refund `{amount, refund_reference?}` of a cleared purchase (`REFUND_TOO_LARGE`) |
 | `GET` | `/v1/notifications` | Inbox `?unread=true&before=<id>&limit=`, with `unread_count` |
@@ -99,6 +99,7 @@
 | `POST` | `/v1/accounts/{id}/credit` | Open the credit line `{closing_day?}` (Idempotency-Key) |
 | `GET` | `/v1/accounts/{id}/credit` | Limit, used, available |
 | `GET` | `/v1/accounts/{id}/credit/invoices` | Invoices, newest first |
+| `GET` | `/v1/accounts/{id}/credit/installments` | Installment purchases with installments to come: `{description, total, installments, billed, installment_amount, remaining}` (the line also has `upcoming_installments`) |
 | `GET` | `/v1/accounts/{id}/credit/invoices/{invoiceID}` | Invoice with its items |
 | `POST` | `/v1/accounts/{id}/credit/invoices/{invoiceID}/payments` | Pay `{amount}` from the account (Idempotency-Key) |
 | `POST` | `/v1/sandbox/accounts/{id}/credit/cycle` | *(sandbox)* `{action: CLOSE \| EXPIRE}` close the invoice now / make it overdue |

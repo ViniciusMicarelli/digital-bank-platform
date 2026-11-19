@@ -1274,7 +1274,9 @@ type Authorization struct {
 	// Refunded so far (merchant refunds and won disputes).
 	RefundedAmount *v1.Money `protobuf:"bytes,16,opt,name=refunded_amount,json=refundedAmount,proto3" json:"refunded_amount,omitempty"`
 	// The latest dispute of this purchase, if any.
-	Dispute       *Dispute `protobuf:"bytes,17,opt,name=dispute,proto3" json:"dispute,omitempty"`
+	Dispute *Dispute `protobuf:"bytes,17,opt,name=dispute,proto3" json:"dispute,omitempty"`
+	// 1 unless paid in installments on credit.
+	Installments  int32 `protobuf:"varint,18,opt,name=installments,proto3" json:"installments,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1428,6 +1430,13 @@ func (x *Authorization) GetDispute() *Dispute {
 	return nil
 }
 
+func (x *Authorization) GetInstallments() int32 {
+	if x != nil {
+		return x.Installments
+	}
+	return 0
+}
+
 type AuthorizeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Unique id from the network; retries reuse it.
@@ -1444,7 +1453,9 @@ type AuthorizeRequest struct {
 	Country string  `protobuf:"bytes,9,opt,name=country,proto3" json:"country,omitempty"`
 	Channel Channel `protobuf:"varint,10,opt,name=channel,proto3,enum=bank.card.v1.Channel" json:"channel,omitempty"`
 	// Debit by default.
-	Function      Function `protobuf:"varint,11,opt,name=function,proto3,enum=bank.card.v1.Function" json:"function,omitempty"`
+	Function Function `protobuf:"varint,11,opt,name=function,proto3,enum=bank.card.v1.Function" json:"function,omitempty"`
+	// Credit only: 2 to 12 interest-free installments (each at least R$ 5,00).
+	Installments  int32 `protobuf:"varint,12,opt,name=installments,proto3" json:"installments,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1554,6 +1565,13 @@ func (x *AuthorizeRequest) GetFunction() Function {
 		return x.Function
 	}
 	return Function_FUNCTION_UNSPECIFIED
+}
+
+func (x *AuthorizeRequest) GetInstallments() int32 {
+	if x != nil {
+		return x.Installments
+	}
+	return 0
 }
 
 type AuthorizeResponse struct {
@@ -3116,7 +3134,7 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\fexpiry_month\x18\x02 \x01(\x05R\vexpiryMonth\x12\x1f\n" +
 	"\vexpiry_year\x18\x03 \x01(\x05R\n" +
 	"expiryYear\x12\x10\n" +
-	"\x03cvv\x18\x04 \x01(\tR\x03cvv\"\xc7\x05\n" +
+	"\x03cvv\x18\x04 \x01(\tR\x03cvv\"\xeb\x05\n" +
 	"\rAuthorization\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12+\n" +
 	"\x11network_reference\x18\x02 \x01(\tR\x10networkReference\x12\x17\n" +
@@ -3136,7 +3154,8 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\btoken_id\x18\x0e \x01(\tR\atokenId\x122\n" +
 	"\bfunction\x18\x0f \x01(\x0e2\x16.bank.card.v1.FunctionR\bfunction\x12>\n" +
 	"\x0frefunded_amount\x18\x10 \x01(\v2\x15.bank.common.v1.MoneyR\x0erefundedAmount\x12/\n" +
-	"\adispute\x18\x11 \x01(\v2\x15.bank.card.v1.DisputeR\adispute\"\x8c\x03\n" +
+	"\adispute\x18\x11 \x01(\v2\x15.bank.card.v1.DisputeR\adispute\x12\"\n" +
+	"\finstallments\x18\x12 \x01(\x05R\finstallments\"\xb0\x03\n" +
 	"\x10AuthorizeRequest\x12+\n" +
 	"\x11network_reference\x18\x01 \x01(\tR\x10networkReference\x12\x10\n" +
 	"\x03pan\x18\x02 \x01(\tR\x03pan\x12!\n" +
@@ -3150,7 +3169,8 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\acountry\x18\t \x01(\tR\acountry\x12/\n" +
 	"\achannel\x18\n" +
 	" \x01(\x0e2\x15.bank.card.v1.ChannelR\achannel\x122\n" +
-	"\bfunction\x18\v \x01(\x0e2\x16.bank.card.v1.FunctionR\bfunction\"V\n" +
+	"\bfunction\x18\v \x01(\x0e2\x16.bank.card.v1.FunctionR\bfunction\x12\"\n" +
+	"\finstallments\x18\f \x01(\x05R\finstallments\"V\n" +
 	"\x11AuthorizeResponse\x12A\n" +
 	"\rauthorization\x18\x01 \x01(\v2\x1b.bank.card.v1.AuthorizationR\rauthorization\"h\n" +
 	"\fClearRequest\x12)\n" +

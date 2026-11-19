@@ -19,16 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CreditService_OpenCreditLine_FullMethodName = "/bank.credit.v1.CreditService/OpenCreditLine"
-	CreditService_GetCreditLine_FullMethodName  = "/bank.credit.v1.CreditService/GetCreditLine"
-	CreditService_ListInvoices_FullMethodName   = "/bank.credit.v1.CreditService/ListInvoices"
-	CreditService_GetInvoice_FullMethodName     = "/bank.credit.v1.CreditService/GetInvoice"
-	CreditService_PayInvoice_FullMethodName     = "/bank.credit.v1.CreditService/PayInvoice"
-	CreditService_ReserveCredit_FullMethodName  = "/bank.credit.v1.CreditService/ReserveCredit"
-	CreditService_CaptureCredit_FullMethodName  = "/bank.credit.v1.CreditService/CaptureCredit"
-	CreditService_ReleaseCredit_FullMethodName  = "/bank.credit.v1.CreditService/ReleaseCredit"
-	CreditService_RefundCredit_FullMethodName   = "/bank.credit.v1.CreditService/RefundCredit"
-	CreditService_AdvanceCycle_FullMethodName   = "/bank.credit.v1.CreditService/AdvanceCycle"
+	CreditService_OpenCreditLine_FullMethodName       = "/bank.credit.v1.CreditService/OpenCreditLine"
+	CreditService_GetCreditLine_FullMethodName        = "/bank.credit.v1.CreditService/GetCreditLine"
+	CreditService_ListInvoices_FullMethodName         = "/bank.credit.v1.CreditService/ListInvoices"
+	CreditService_GetInvoice_FullMethodName           = "/bank.credit.v1.CreditService/GetInvoice"
+	CreditService_PayInvoice_FullMethodName           = "/bank.credit.v1.CreditService/PayInvoice"
+	CreditService_ReserveCredit_FullMethodName        = "/bank.credit.v1.CreditService/ReserveCredit"
+	CreditService_CaptureCredit_FullMethodName        = "/bank.credit.v1.CreditService/CaptureCredit"
+	CreditService_ReleaseCredit_FullMethodName        = "/bank.credit.v1.CreditService/ReleaseCredit"
+	CreditService_RefundCredit_FullMethodName         = "/bank.credit.v1.CreditService/RefundCredit"
+	CreditService_ListInstallmentPlans_FullMethodName = "/bank.credit.v1.CreditService/ListInstallmentPlans"
+	CreditService_AdvanceCycle_FullMethodName         = "/bank.credit.v1.CreditService/AdvanceCycle"
 )
 
 // CreditServiceClient is the client API for CreditService service.
@@ -56,6 +57,8 @@ type CreditServiceClient interface {
 	// dispute): a credit on the open invoice and the limit freed. Idempotent
 	// on the key.
 	RefundCredit(ctx context.Context, in *RefundCreditRequest, opts ...grpc.CallOption) (*RefundCreditResponse, error)
+	// Installment purchases with installments still to come, newest first.
+	ListInstallmentPlans(ctx context.Context, in *ListInstallmentPlansRequest, opts ...grpc.CallOption) (*ListInstallmentPlansResponse, error)
 	// Sandbox: close the open invoice now, or make the closed one overdue.
 	AdvanceCycle(ctx context.Context, in *AdvanceCycleRequest, opts ...grpc.CallOption) (*AdvanceCycleResponse, error)
 }
@@ -158,6 +161,16 @@ func (c *creditServiceClient) RefundCredit(ctx context.Context, in *RefundCredit
 	return out, nil
 }
 
+func (c *creditServiceClient) ListInstallmentPlans(ctx context.Context, in *ListInstallmentPlansRequest, opts ...grpc.CallOption) (*ListInstallmentPlansResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListInstallmentPlansResponse)
+	err := c.cc.Invoke(ctx, CreditService_ListInstallmentPlans_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *creditServiceClient) AdvanceCycle(ctx context.Context, in *AdvanceCycleRequest, opts ...grpc.CallOption) (*AdvanceCycleResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AdvanceCycleResponse)
@@ -193,6 +206,8 @@ type CreditServiceServer interface {
 	// dispute): a credit on the open invoice and the limit freed. Idempotent
 	// on the key.
 	RefundCredit(context.Context, *RefundCreditRequest) (*RefundCreditResponse, error)
+	// Installment purchases with installments still to come, newest first.
+	ListInstallmentPlans(context.Context, *ListInstallmentPlansRequest) (*ListInstallmentPlansResponse, error)
 	// Sandbox: close the open invoice now, or make the closed one overdue.
 	AdvanceCycle(context.Context, *AdvanceCycleRequest) (*AdvanceCycleResponse, error)
 	mustEmbedUnimplementedCreditServiceServer()
@@ -231,6 +246,9 @@ func (UnimplementedCreditServiceServer) ReleaseCredit(context.Context, *ReleaseC
 }
 func (UnimplementedCreditServiceServer) RefundCredit(context.Context, *RefundCreditRequest) (*RefundCreditResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RefundCredit not implemented")
+}
+func (UnimplementedCreditServiceServer) ListInstallmentPlans(context.Context, *ListInstallmentPlansRequest) (*ListInstallmentPlansResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListInstallmentPlans not implemented")
 }
 func (UnimplementedCreditServiceServer) AdvanceCycle(context.Context, *AdvanceCycleRequest) (*AdvanceCycleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AdvanceCycle not implemented")
@@ -418,6 +436,24 @@ func _CreditService_RefundCredit_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CreditService_ListInstallmentPlans_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListInstallmentPlansRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CreditServiceServer).ListInstallmentPlans(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CreditService_ListInstallmentPlans_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CreditServiceServer).ListInstallmentPlans(ctx, req.(*ListInstallmentPlansRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CreditService_AdvanceCycle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AdvanceCycleRequest)
 	if err := dec(in); err != nil {
@@ -478,6 +514,10 @@ var CreditService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RefundCredit",
 			Handler:    _CreditService_RefundCredit_Handler,
+		},
+		{
+			MethodName: "ListInstallmentPlans",
+			Handler:    _CreditService_ListInstallmentPlans_Handler,
 		},
 		{
 			MethodName: "AdvanceCycle",

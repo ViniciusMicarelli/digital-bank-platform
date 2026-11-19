@@ -79,13 +79,14 @@ function SimulatePurchase({ card, reveal }: { card: Card; reveal: () => Promise<
   const [amount, setAmount] = useState<string | null>(null)
   const [merchant, setMerchant] = useState('PADARIA SAO JOSE')
   const [fn, setFn] = useState('DEBIT')
+  const [installments, setInstallments] = useState('1')
   const [country, setCountry] = useState('BR')
   const [result, setResult] = useState('')
   const buy = useMutation({
     mutationFn: async () => {
       const d = await reveal()
       const auth = await api<{ id: string; status: string; response_code: string; reason: string }>('POST', '/v1/sandbox/card-network/authorizations', {
-        body: { pan: d.pan, expiry_month: d.expiry_month, expiry_year: d.expiry_year, cvv: d.cvv, amount, merchant_name: merchant, mcc: '5462', country, channel: 'ONLINE', function: fn } })
+        body: { pan: d.pan, expiry_month: d.expiry_month, expiry_year: d.expiry_year, cvv: d.cvv, amount, merchant_name: merchant, mcc: '5462', country, channel: 'ONLINE', function: fn, installments: fn === 'CREDIT' ? Number(installments) : 1 } })
       if (auth.status === 'APPROVED') await api('POST', `/v1/sandbox/card-network/authorizations/${auth.id}/clear`, { body: {} })
       return auth
     },
@@ -104,6 +105,11 @@ function SimulatePurchase({ card, reveal }: { card: Card; reveal: () => Promise<
         <Field label="Loja" value={merchant} onChange={(e) => setMerchant(e.target.value.toUpperCase())} />
         <Select label="Função" value={fn} onChange={(e) => setFn(e.target.value)}><option value="DEBIT">Débito</option><option value="CREDIT">Crédito</option></Select>
         <Select label="País" value={country} onChange={(e) => setCountry(e.target.value)}><option value="BR">Brasil</option><option value="US">Estados Unidos</option></Select>
+        {fn === 'CREDIT' && (
+          <Select label="Parcelas" value={installments} onChange={(e) => setInstallments(e.target.value)}>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? 'À vista' : `${n}x sem juros`}</option>)}
+          </Select>
+        )}
         <div className="sm:col-span-2"><Button type="submit" icon={ShoppingCart} loading={buy.isPending} disabled={!amount}>Passar o cartão</Button></div>
       </form>
       {result && <p className="mt-3 text-sm font-medium text-warning">{result}</p>}
@@ -160,7 +166,7 @@ function Purchases({ accountId, card }: { accountId: string; card: Card }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-fg">{p.merchant_name}</p>
                   <p className="text-xs text-muted">
-                    {p.function === 'CREDIT' ? 'Crédito' : 'Débito'} · {dateTimeBR(p.created_at)}
+                    {p.function === 'CREDIT' ? 'Crédito' : 'Débito'}{(p.installments ?? 1) > 1 && ` em ${p.installments}x`} · {dateTimeBR(p.created_at)}
                     {refunded && ` · estornado ${formatBRL(p.refunded_amount)}`}
                   </p>
                 </div>

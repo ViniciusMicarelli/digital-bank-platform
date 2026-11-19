@@ -21,6 +21,10 @@ type Store interface {
 	Invoice(ctx context.Context, id uuid.UUID) (domain.Invoice, error)
 	Items(ctx context.Context, invoice uuid.UUID) ([]domain.Item, error)
 	Hold(ctx context.Context, id uuid.UUID) (domain.Hold, error)
+	// UpcomingInstallments is the sum of installments not on an invoice yet.
+	UpcomingInstallments(ctx context.Context, line uuid.UUID) (int64, error)
+	// InstallmentPlans lists purchases with installments still to come, newest first.
+	InstallmentPlans(ctx context.Context, line uuid.UUID) ([]domain.InstallmentPlan, error)
 	RefundByKey(ctx context.Context, key string) (*domain.Refund, error)
 
 	// LinesDue lists lines with an invoice to close or to make overdue.
@@ -59,6 +63,11 @@ type Tx interface {
 	LockPayment(id uuid.UUID) (domain.Payment, error)
 	InsertPayment(p domain.Payment) error
 	SavePayment(p domain.Payment) error
+
+	InsertInstallments(list []domain.Installment) error
+	// NextInstallments locks the lowest pending installment of each plan of a line.
+	NextInstallments(line uuid.UUID) ([]domain.Installment, error)
+	BillInstallment(id, invoice uuid.UUID) error
 
 	// InsertRefund returns false when the key exists already.
 	InsertRefund(r domain.Refund) (bool, error)

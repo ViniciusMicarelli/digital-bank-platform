@@ -56,7 +56,7 @@ func invoicePB(i domain.Invoice) *creditv1.Invoice {
 
 func holdPB(h domain.Hold) *creditv1.Hold {
 	return &creditv1.Hold{Id: h.ID.String(), Status: string(h.Status), FailureReason: h.FailureReason,
-		Amount: brl(h.Amount), Captured: brl(h.Captured)}
+		Amount: brl(h.Amount), Captured: brl(h.Captured), Installments: int32(max(h.Installments, 1))} //nolint:gosec // 1..12
 }
 
 func paymentPB(p domain.Payment) *creditv1.Payment {
@@ -85,7 +85,31 @@ func (s *Server) GetCreditLine(ctx context.Context, req *creditv1.GetCreditLineR
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	return &creditv1.GetCreditLineResponse{Line: linePB(l)}, nil
+	out := linePB(l)
+	upcoming, err := s.app.UpcomingInstallments(ctx, l)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	out.UpcomingInstallments = brl(upcoming)
+	return &creditv1.GetCreditLineResponse{Line: out}, nil
+}
+
+func (s *Server) ListInstallmentPlans(ctx context.Context, req *creditv1.ListInstallmentPlansRequest) (*creditv1.ListInstallmentPlansResponse, error) {
+	account, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	plans, err := s.app.InstallmentPlans(ctx, account)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	out := &creditv1.ListInstallmentPlansResponse{}
+	for _, p := range plans {
+		out.Plans = append(out.Plans, &creditv1.InstallmentPlan{HoldId: p.HoldID.String(), Description: p.Description, Total: brl(p.Total),
+			Installments: int32(p.Count), Billed: int32(p.Billed), InstallmentAmount: brl(p.Installment), //nolint:gosec // 1..12
+			Remaining: brl(p.Remaining), PurchasedAt: timestamppb.New(p.PurchasedAt)})
+	}
+	return out, nil
 }
 
 func (s *Server) ListInvoices(ctx context.Context, req *creditv1.ListInvoicesRequest) (*creditv1.ListInvoicesResponse, error) {
@@ -146,7 +170,7 @@ func (s *Server) ReserveCredit(ctx context.Context, req *creditv1.ReserveCreditR
 	if err != nil {
 		return nil, err
 	}
-	h, err := s.app.Reserve(ctx, req.GetIdempotencyKey(), account, amt, req.GetDescription(), req.GetMetadata())
+	h, err := s.app.Reserve(ctx, req.GetIdempotencyKey(), account, amt, int(req.GetInstallments()), req.GetDescription(), req.GetMetadata())
 	if err != nil {
 		return nil, toStatus(err)
 	}

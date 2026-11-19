@@ -19,6 +19,7 @@ export default function Cards() {
   const [error, setError] = useState('')
   const [amount, setAmount] = useState<string | null>(null)
   const [fn, setFn] = useState<'DEBIT' | 'CREDIT'>('DEBIT')
+  const [installments, setInstallments] = useState<'1' | '3' | '6' | '10'>('1')
   const [result, setResult] = useState('')
   const key = ['cards', account?.id]
   const cards = useQuery({ queryKey: key, enabled: !!account, queryFn: async () => (await api<{ cards: CardT[] }>('GET', `/v1/accounts/${account!.id}/cards`)).cards })
@@ -43,7 +44,7 @@ export default function Cards() {
     mutationFn: async () => {
       const d = await reveal()
       const a = await api<{ id: string; status: string; response_code: string; reason: string }>('POST', '/v1/sandbox/card-network/authorizations', {
-        body: { pan: d.pan, expiry_month: d.expiry_month, expiry_year: d.expiry_year, cvv: d.cvv, amount, merchant_name: 'MERCADO DO BAIRRO', mcc: '5411', country: 'BR', channel: 'ONLINE', function: fn } })
+        body: { pan: d.pan, expiry_month: d.expiry_month, expiry_year: d.expiry_year, cvv: d.cvv, amount, merchant_name: 'MERCADO DO BAIRRO', mcc: '5411', country: 'BR', channel: 'ONLINE', function: fn, installments: fn === 'CREDIT' ? Number(installments) : 1 } })
       if (a.status === 'APPROVED') await api('POST', `/v1/sandbox/card-network/authorizations/${a.id}/clear`, { body: {} })
       return a
     },
@@ -101,6 +102,7 @@ export default function Cards() {
         <Sandbox>
           <MoneyField label="Simular compra de" onValue={setAmount} />
           <Segmented value={fn} onChange={setFn} options={[['DEBIT', 'Débito'], ['CREDIT', 'Crédito']]} />
+          {fn === 'CREDIT' && <Segmented value={installments} onChange={setInstallments} options={[['1', 'À vista'], ['3', '3x'], ['6', '6x'], ['10', '10x']]} />}
           <Button title="Passar o cartão" icon={ShoppingCart} disabled={!amount} loading={buy.isPending} onPress={() => buy.mutate()} />
           {result ? <Txt variant="label" tone="warning">{result}</Txt> : null}
         </Sandbox>

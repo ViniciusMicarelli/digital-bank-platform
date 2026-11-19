@@ -195,6 +195,8 @@ message Authorization {
   bank.common.v1.Money refunded_amount = 16;
   // The latest dispute of this purchase, if any.
   Dispute dispute = 17;
+  // 1 unless paid in installments on credit.
+  int32 installments = 18;
 }
 
 message AuthorizeRequest {
@@ -213,6 +215,8 @@ message AuthorizeRequest {
   Channel channel = 10;
   // Debit by default.
   Function function = 11;
+  // Credit only: 2 to 12 interest-free installments (each at least R$ 5,00).
+  int32 installments = 12;
 }
 
 message AuthorizeResponse {

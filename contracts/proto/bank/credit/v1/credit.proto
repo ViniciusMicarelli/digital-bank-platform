@@ -28,6 +28,9 @@ service CreditService {
   // on the key.
   rpc RefundCredit(RefundCreditRequest) returns (RefundCreditResponse);
 
+  // Installment purchases with installments still to come, newest first.
+  rpc ListInstallmentPlans(ListInstallmentPlansRequest) returns (ListInstallmentPlansResponse);
+
   // Sandbox: close the open invoice now, or make the closed one overdue.
   rpc AdvanceCycle(AdvanceCycleRequest) returns (AdvanceCycleResponse);
 }
@@ -44,6 +47,8 @@ message CreditLine {
   // Monthly interest on unpaid balances, in basis points (800 = 8% a month).
   int32 interest_rate_bp = 8;
   google.protobuf.Timestamp created_at = 9;
+  // Installments of past purchases not on an invoice yet (part of used).
+  bank.common.v1.Money upcoming_installments = 10;
 }
 
 message Invoice {
@@ -79,6 +84,7 @@ message Hold {
   string failure_reason = 3;
   bank.common.v1.Money amount = 4;
   bank.common.v1.Money captured = 5;
+  int32 installments = 6;
 }
 
 message Payment {
@@ -144,6 +150,10 @@ message ReserveCreditRequest {
   bank.common.v1.Money amount = 3;
   string description = 4;
   map<string, string> metadata = 5;
+  // 1 (default) to 12: interest-free installments ("parcelado sem juros").
+  // The whole amount is held on the limit; one installment goes on each
+  // invoice from the one the purchase is captured on.
+  int32 installments = 6;
 }
 
 message ReserveCreditResponse {
@@ -196,4 +206,24 @@ message CreditRefund {
 
 message RefundCreditResponse {
   CreditRefund refund = 1;
+}
+
+message InstallmentPlan {
+  string hold_id = 1;
+  string description = 2;
+  bank.common.v1.Money total = 3;
+  int32 installments = 4;
+  // Installments already on an invoice.
+  int32 billed = 5;
+  bank.common.v1.Money installment_amount = 6;
+  bank.common.v1.Money remaining = 7;
+  google.protobuf.Timestamp purchased_at = 8;
+}
+
+message ListInstallmentPlansRequest {
+  string account_id = 1;
+}
+
+message ListInstallmentPlansResponse {
+  repeated InstallmentPlan plans = 1;
 }

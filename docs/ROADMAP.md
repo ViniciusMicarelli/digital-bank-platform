@@ -194,6 +194,11 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Daily compounded yield on the balance at the end of each Brasília day, paid exactly once from the ledger's `savings-yield` account, the fraction of a centavo carried; sandbox to simulate days.
 - Web and mobile: *Caixinhas* screen (boxes, goal progress, save / withdraw, history, simulate a month), on the home and in the shortcuts; savings in the statement.
 
+## Phase 27 — Installment purchases ✅
+
+- Credit purchases in 2 to 12 interest-free installments (at least R$ 5,00 each): the whole amount on the limit, paid to the merchant at clearing; one installment per invoice from the capture invoice on, the first with the remainder centavo; upcoming installments on the line and a list of plans.
+- Web and mobile: choose the installments when simulating a credit purchase, "em 6x" on the card's purchases, *Compras parceladas* on the credit screen with what is still to come.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

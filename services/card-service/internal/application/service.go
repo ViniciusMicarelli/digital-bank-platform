@@ -242,7 +242,7 @@ func (s *Service) Authorize(ctx context.Context, pan string, p domain.Purchase) 
 		return s.decide(ctx, a, domain.Declined, d.Code, d.Reason)
 	}
 
-	res, err := s.funds(a).Reserve(ctx, a.TransactionKey(), card.AccountID, p.Amount, p.MerchantName, s.metadata(a, card))
+	res, err := s.funds(a).Reserve(ctx, a.TransactionKey(), card.AccountID, p.Amount, max(p.Installments, 1), p.MerchantName, s.metadata(a, card))
 	if err != nil {
 		s.log.WarnContext(ctx, "reservation failed, declining with 91", "authorization_id", a.ID, "error", err)
 		authResults.WithLabelValues(domain.CodeIssuerUnavailable).Inc()
@@ -429,7 +429,7 @@ func (s *Service) reverseOrphan(ctx context.Context, id uuid.UUID) error {
 			return err
 		}
 		funds := s.funds(a)
-		res, err := funds.Reserve(ctx, a.TransactionKey(), card.AccountID, a.Purchase.Amount, a.Purchase.MerchantName, s.metadata(a, card))
+		res, err := funds.Reserve(ctx, a.TransactionKey(), card.AccountID, a.Purchase.Amount, max(a.Purchase.Installments, 1), a.Purchase.MerchantName, s.metadata(a, card))
 		if err != nil {
 			return err
 		}

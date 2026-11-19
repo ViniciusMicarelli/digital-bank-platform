@@ -57,7 +57,7 @@ func result(t *txv1.Transaction, err error) (ports.TxResult, error) {
 	return ports.TxResult{ID: id, Status: t.GetStatus().String()[len("TRANSACTION_STATUS_"):], FailureReason: t.GetFailureReason()}, nil
 }
 
-func (c *Transactions) Reserve(ctx context.Context, key string, account uuid.UUID, amount money.Money, description string, md map[string]string) (ports.TxResult, error) {
+func (c *Transactions) Reserve(ctx context.Context, key string, account uuid.UUID, amount money.Money, _ int, description string, md map[string]string) (ports.TxResult, error) {
 	resp, err := c.c.ReserveOutgoing(ctx, &txv1.ReserveOutgoingRequest{
 		IdempotencyKey: key, Type: txv1.TransactionType_TRANSACTION_TYPE_DEBIT_CARD_PURCHASE,
 		FromAccountId: account.String(), ToAccountId: CardClearingAccountID.String(),
@@ -93,9 +93,9 @@ func hold(h *creditv1.Hold, err error) (ports.TxResult, error) {
 	return ports.TxResult{ID: id, Status: st, FailureReason: h.GetFailureReason()}, nil
 }
 
-func (c *Credit) Reserve(ctx context.Context, key string, account uuid.UUID, amount money.Money, description string, md map[string]string) (ports.TxResult, error) {
+func (c *Credit) Reserve(ctx context.Context, key string, account uuid.UUID, amount money.Money, installments int, description string, md map[string]string) (ports.TxResult, error) {
 	resp, err := c.c.ReserveCredit(ctx, &creditv1.ReserveCreditRequest{IdempotencyKey: key, AccountId: account.String(),
-		Amount: moneyPB(amount), Description: description, Metadata: md})
+		Amount: moneyPB(amount), Description: description, Metadata: md, Installments: int32(max(installments, 1))}) //nolint:gosec // 1..12
 	return hold(resp.GetHold(), err)
 }
 

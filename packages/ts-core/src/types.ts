@@ -95,6 +95,18 @@ export interface CreditLine {
   available: Money
   closing_day: number
   monthly_interest_rate: number
+  /** Installments of past purchases still to come (part of used). */
+  upcoming_installments?: Money
+}
+
+export interface InstallmentPlan {
+  description: string
+  total: Money
+  installments: number
+  billed: number
+  installment_amount: Money
+  remaining: Money
+  purchased_at: string
 }
 
 export interface Invoice {
@@ -168,6 +180,7 @@ export interface CardPurchase {
   refunded_amount: Money
   merchant_name: string
   function: 'DEBIT' | 'CREDIT'
+  installments?: number
   created_at: string
   dispute?: Dispute
 }

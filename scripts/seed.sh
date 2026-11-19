@@ -69,10 +69,10 @@ if [[ $(call GET "/v1/accounts/$ANA_ACC/cards" "$ANA" | jq '.cards | length') ==
   CARD_ID=$(call POST "/v1/accounts/$ANA_ACC/cards" "$ANA" '{"kind":"VIRTUAL"}' "$(uuid)" | jq -r .id)
   STEP_UP=$(curl -sS -X POST "$API/v1/auth/step-up" -H "Authorization: Bearer $ANA" -d "{\"password\":\"$PASSWORD\"}" | jq -r .step_up_token)
   DETAILS=$(curl -sS -X POST "$API/v1/accounts/$ANA_ACC/cards/$CARD_ID/reveal" -H "Authorization: Bearer $ANA" -H "X-Step-Up-Token: $STEP_UP")
-  buy() { # buy AMOUNT MERCHANT MCC FUNCTION -> authorization id (cleared)
+  buy() { # buy AMOUNT MERCHANT MCC FUNCTION [INSTALLMENTS] -> authorization id (cleared)
     local id
-    id=$(call POST /v1/sandbox/card-network/authorizations "$ANA" "$(echo "$DETAILS" | jq -c --arg a "$1" --arg m "$2" --arg mcc "$3" --arg f "$4" \
-      '{pan, expiry_month, expiry_year, cvv, amount: $a, merchant_name: $m, mcc: $mcc, country: "BR", channel: "ONLINE", function: $f}')" | jq -r .id)
+    id=$(call POST /v1/sandbox/card-network/authorizations "$ANA" "$(echo "$DETAILS" | jq -c --arg a "$1" --arg m "$2" --arg mcc "$3" --arg f "$4" --argjson n "${5:-1}" \
+      '{pan, expiry_month, expiry_year, cvv, amount: $a, merchant_name: $m, mcc: $mcc, country: "BR", channel: "ONLINE", function: $f, installments: $n}')" | jq -r .id)
     call POST "/v1/sandbox/card-network/authorizations/$id/clear" "$ANA" '{}' >/dev/null
     echo "$id"
   }
@@ -82,7 +82,7 @@ if [[ $(call GET "/v1/accounts/$ANA_ACC/cards" "$ANA" | jq '.cards | length') ==
   ONLINE=$(buy 189.90 "LOJA ONLINE BRASIL" 5999 DEBIT)
   call POST "/v1/accounts/$ANA_ACC/cards/$CARD_ID/purchases/$ONLINE/disputes" "$ANA" \
     '{"reason":"NOT_RECEIVED","description":"Paguei há 20 dias e o pedido nunca chegou."}' >/dev/null
-  buy 899.00 "LOJA DE TV" 5732 CREDIT >/dev/null
+  buy 899.00 "LOJA DE TV" 5732 CREDIT 10 >/dev/null
   buy 54.90 "STREAMING PLUS" 4899 CREDIT >/dev/null
   BOLETO=$(call POST /v1/sandbox/boletos "$ANA" '{"amount":"189.90","due_date":"2030-01-10","payee_name":"CIA PAULISTA DE ENERGIA"}' | jq -r .formatted_line)
   echo "  boleto para testar o pagamento: $BOLETO"

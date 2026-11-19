@@ -59,7 +59,7 @@ export function Purchases({ accountId, card }: { accountId: string; card: CardT 
         return (
           <View key={p.id}>
             <Row title={p.merchant_name}
-              subtitle={`${p.function === 'CREDIT' ? 'Crédito' : 'Débito'} · ${dateTime(p.created_at)}${p.dispute ? ` · ${statusLabel[p.dispute.status]}` : ''}`}
+              subtitle={`${p.function === 'CREDIT' ? 'Crédito' : 'Débito'}${(p.installments ?? 1) > 1 ? ` em ${p.installments}x` : ''} · ${dateTime(p.created_at)}${p.dispute ? ` · ${statusLabel[p.dispute.status]}` : ''}`}
               onPress={disputable ? () => setDisputing(disputing === p.id ? null : p.id) : undefined}
               right={<View style={{ alignItems: 'flex-end' }}>
                 <Txt variant="label" style={{ fontVariant: ['tabular-nums'] }}>{formatBRL(p.status === 'CLEARED' ? p.cleared_amount : p.amount)}</Txt>

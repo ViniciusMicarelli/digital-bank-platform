@@ -1,8 +1,8 @@
-import { ApiError, compareBRL, errorMessage, formatBRL, type CreditLine, type Invoice } from '@bank/core'
+import { ApiError, compareBRL, errorMessage, formatBRL, type CreditLine, type InstallmentPlan, type Invoice } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { View } from 'react-native'
-import { CalendarClock, Receipt, Wallet } from 'lucide-react-native'
+import { CalendarClock, Layers, Receipt, Wallet } from 'lucide-react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Button, Card, Loading, MoneyField, Muted, Notice, Row, Sandbox, Screen, Txt } from '../components/ui'
 import { useCountUp } from '../lib/motion'
@@ -40,7 +40,8 @@ export default function Credit() {
     queryFn: async () => { try { return await api<CreditLine>('GET', base) } catch (e) { if (e instanceof ApiError && e.status === 404) return null; throw e } },
   })
   const invoices = useQuery({ queryKey: ['invoices', account?.id], enabled: !!line.data, queryFn: async () => (await api<{ invoices: Invoice[] }>('GET', `${base}/invoices`)).invoices })
-  const refresh = () => { for (const k of ['credit', 'invoices', 'balance']) qc.invalidateQueries({ queryKey: [k] }) }
+  const plans = useQuery({ queryKey: ['installments', account?.id], enabled: !!line.data, queryFn: async () => (await api<{ plans: InstallmentPlan[] }>('GET', `${base}/installments`)).plans })
+  const refresh = () => { for (const k of ['credit', 'invoices', 'balance', 'installments']) qc.invalidateQueries({ queryKey: [k] }) }
   const activate = useMutation({ mutationFn: () => api('POST', base, { body: { closing_day: 10 }, idempotent: true }), onSuccess: refresh, onError: (e) => setError(errorMessage(e)) })
   const toPay = invoices.data?.find((i) => i.status === 'CLOSED')
   const pay = useMutation({ mutationFn: () => api('POST', `${base}/invoices/${toPay!.id}/payments`, { body: { amount }, idempotent: true }), onSuccess: () => { setError(''); refresh() }, onError: (e) => setError(errorMessage(e)) })
@@ -65,6 +66,15 @@ export default function Credit() {
           <MoneyField label="Pagar" onValue={setAmount} />
           <Notice>{error}</Notice>
           <Button title="Pagar com saldo" variant="credit" disabled={!amount} loading={pay.isPending} onPress={() => pay.mutate()} />
+        </Card>
+      )}
+      {!!plans.data?.length && (
+        <Card title="Compras parceladas" icon={Layers} index={2}>
+          {plans.data.map((p) => (
+            <Row key={p.description + p.purchased_at} icon={Layers} tone="credit" title={p.description}
+              subtitle={`${p.installments}x de ${formatBRL(p.installment_amount)} · ${p.billed} de ${p.installments} na fatura`}
+              right={<Txt variant="label" style={{ fontFamily: font.semibold }}>{formatBRL(p.remaining)}</Txt>} />
+          ))}
         </Card>
       )}
       <Card title="Faturas" icon={Receipt} index={2}>

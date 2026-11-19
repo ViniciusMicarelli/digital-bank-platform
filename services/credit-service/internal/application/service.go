@@ -163,9 +163,15 @@ func (s *Service) Invoice(ctx context.Context, id uuid.UUID) (InvoiceDetail, err
 
 // Reserve holds amount of the account's limit for a card authorization.
 // Idempotent on key; refusals are FAILED holds with a reason.
-func (s *Service) Reserve(ctx context.Context, key string, account uuid.UUID, amount int64, description string, md map[string]string) (domain.Hold, error) {
+func (s *Service) Reserve(ctx context.Context, key string, account uuid.UUID, amount int64, installments int, description string, md map[string]string) (domain.Hold, error) {
 	if key == "" || amount <= 0 {
 		return domain.Hold{}, fmt.Errorf("%w: key and a positive amount are required", domain.ErrInvalidArgument)
+	}
+	if installments == 0 {
+		installments = 1
+	}
+	if err := domain.ValidInstallments(amount, installments); err != nil {
+		return domain.Hold{}, err
 	}
 	var h domain.Hold
 	err := s.store.InTx(ctx, func(tx ports.Tx) error {
@@ -174,14 +180,14 @@ func (s *Service) Reserve(ctx context.Context, key string, account uuid.UUID, am
 			return err
 		}
 		if existing != nil {
-			if existing.AccountID != account || existing.Amount != amount {
+			if existing.AccountID != account || existing.Amount != amount || existing.Installments != installments {
 				return fmt.Errorf("%w: %q", domain.ErrConflict, key)
 			}
 			h = *existing
 			return nil
 		}
 		h = domain.Hold{ID: uuid.Must(uuid.NewV7()), IdempotencyKey: key, AccountID: account, Status: domain.HoldReserved,
-			Amount: amount, Description: description, Metadata: md, CreatedAt: s.now()}
+			Amount: amount, Description: description, Metadata: md, CreatedAt: s.now(), Installments: installments}
 		l, err := tx.LockLineByAccount(account)
 		switch {
 		case errors.Is(err, domain.ErrNotFound):
@@ -245,8 +251,24 @@ func (s *Service) Capture(ctx context.Context, id uuid.UUID, amount *int64) (dom
 		}
 		h.Status, h.Captured = domain.HoldCaptured, captured
 		l.Free(h.Amount - captured) // the debt stays; only the difference is freed
-		inv.Total += captured
-		if err := tx.AddItem(domain.NewItem(inv.ID, domain.ItemPurchase, captured, h.Description, h.ID.String(), s.now())); err != nil {
+		// Installments: the first goes on this invoice, the others wait for
+		// the next ones (the whole debt is on the limit already).
+		parts := domain.Split(captured, max(h.Installments, 1))
+		inv.Total += parts[0]
+		desc := h.Description
+		if len(parts) > 1 {
+			plan := make([]domain.Installment, len(parts))
+			for k, amt := range parts {
+				plan[k] = domain.Installment{ID: uuid.Must(uuid.NewV7()), LineID: l.ID, HoldID: h.ID, Number: k + 1, Total: len(parts),
+					Amount: amt, Description: h.Description, CreatedAt: s.now()}
+			}
+			plan[0].InvoiceID = &inv.ID
+			if err := tx.InsertInstallments(plan); err != nil {
+				return err
+			}
+			desc = plan[0].Label()
+		}
+		if err := tx.AddItem(domain.NewItem(inv.ID, domain.ItemPurchase, parts[0], desc, h.ID.String(), s.now())); err != nil {
 			return err
 		}
 		if err := errors.Join(tx.SaveHold(h), tx.SaveLine(l), tx.SaveInvoice(inv)); err != nil {
@@ -357,6 +379,20 @@ func derefRefund(r *domain.Refund) domain.Refund {
 	return *r
 }
 
+// UpcomingInstallments is what installment purchases will still bill.
+func (s *Service) UpcomingInstallments(ctx context.Context, line domain.Line) (int64, error) {
+	return s.store.UpcomingInstallments(ctx, line.ID)
+}
+
+// InstallmentPlans lists the account's purchases with installments to come.
+func (s *Service) InstallmentPlans(ctx context.Context, account uuid.UUID) ([]domain.InstallmentPlan, error) {
+	l, err := s.store.LineByAccount(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+	return s.store.InstallmentPlans(ctx, l.ID)
+}
+
 // ---- invoice cycle ----
 
 // openInvoice returns the locked OPEN invoice of l, closing any whose
@@ -385,6 +421,25 @@ func (s *Service) openInvoice(ctx context.Context, tx ports.Tx, l domain.Line) (
 		next.Total -= credit
 		if err := tx.InsertInvoice(next); err != nil {
 			return domain.Invoice{}, err
+		}
+		// The next installment of every installment purchase goes on the new invoice.
+		due, err := tx.NextInstallments(l.ID)
+		if err != nil {
+			return domain.Invoice{}, err
+		}
+		for _, it := range due {
+			if err := errors.Join(
+				tx.AddItem(domain.NewItem(next.ID, domain.ItemPurchase, it.Amount, it.Label(), "installment:"+it.ID.String(), s.now())),
+				tx.BillInstallment(it.ID, next.ID),
+			); err != nil {
+				return domain.Invoice{}, err
+			}
+			next.Total += it.Amount
+		}
+		if len(due) > 0 {
+			if err := tx.SaveInvoice(next); err != nil {
+				return domain.Invoice{}, err
+			}
 		}
 		if credit > 0 {
 			if err := errors.Join(

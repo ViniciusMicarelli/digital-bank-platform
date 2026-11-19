@@ -219,6 +219,8 @@ type Purchase struct {
 	Country          string
 	Channel          Channel
 	Function         Function
+	// Installments: 1 (or 0) paid at once; 2 to 12 on credit, interest free.
+	Installments int
 }
 
 // Function is what the purchase is charged to.
@@ -242,6 +244,12 @@ func (p Purchase) Validate() error {
 		return fmt.Errorf("%w: unknown channel", ErrInvalidArgument)
 	case p.Function != Debit && p.Function != Credit:
 		return fmt.Errorf("%w: function must be DEBIT or CREDIT", ErrInvalidArgument)
+	case p.Installments < 0 || p.Installments > 12:
+		return fmt.Errorf("%w: installments must be between 1 and 12", ErrInvalidArgument)
+	case p.Installments > 1 && p.Function != Credit:
+		return fmt.Errorf("%w: only credit purchases can be paid in installments", ErrInvalidArgument)
+	case p.Installments > 1 && p.Amount.Minor()/int64(p.Installments) < 5_00:
+		return fmt.Errorf("%w: each installment must be at least R$ 5,00", ErrInvalidArgument)
 	}
 	return nil
 }

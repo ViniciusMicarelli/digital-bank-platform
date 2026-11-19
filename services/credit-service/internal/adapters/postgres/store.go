@@ -63,7 +63,7 @@ func collectInvoices(rows pgx.Rows, err error) ([]domain.Invoice, error) {
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (domain.Invoice, error) { return scanInvoice(r) })
 }
 
-const holdCols = `id, idempotency_key, line_id, account_id, status, failure_reason, amount, captured, description, metadata, created_at`
+const holdCols = `id, idempotency_key, line_id, account_id, status, failure_reason, amount, captured, description, metadata, created_at, installments`
 
 func scanHold(row pgx.Row) (domain.Hold, error) {
 	var (
@@ -72,7 +72,7 @@ func scanHold(row pgx.Row) (domain.Hold, error) {
 		status string
 	)
 	err := row.Scan(&h.ID, &h.IdempotencyKey, &line, &h.AccountID, &status, &h.FailureReason, &h.Amount, &h.Captured,
-		&h.Description, &h.Metadata, &h.CreatedAt)
+		&h.Description, &h.Metadata, &h.CreatedAt, &h.Installments)
 	if line != nil {
 		h.LineID = *line
 	}
@@ -290,10 +290,13 @@ func (u *unit) InsertHold(h domain.Hold) error {
 	if h.Metadata == nil {
 		h.Metadata = map[string]string{}
 	}
+	if h.Installments == 0 {
+		h.Installments = 1
+	}
 	return u.exec(`INSERT INTO holds (id, idempotency_key, line_id, account_id, status, failure_reason, amount, captured,
-		description, metadata, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		description, metadata, created_at, installments) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 		h.ID, h.IdempotencyKey, nullable(h.LineID), h.AccountID, h.Status, h.FailureReason, h.Amount, h.Captured, h.Description,
-		h.Metadata, h.CreatedAt)
+		h.Metadata, h.CreatedAt, h.Installments)
 }
 
 func (u *unit) SaveHold(h domain.Hold) error {
@@ -322,3 +325,66 @@ func (u *unit) SavePayment(p domain.Payment) error {
 }
 
 func (u *unit) Publish(m outbox.Message) error { return outbox.Insert(u.ctx, u.tx, m) }
+
+// ---- installments ----
+
+func (u *unit) InsertInstallments(list []domain.Installment) error {
+	for _, i := range list {
+		if err := u.exec(`INSERT INTO installments (id, line_id, hold_id, number, total, amount, description, invoice_id, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (hold_id, number) DO NOTHING`,
+			i.ID, i.LineID, i.HoldID, i.Number, i.Total, i.Amount, i.Description, i.InvoiceID, i.CreatedAt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (u *unit) NextInstallments(line uuid.UUID) ([]domain.Installment, error) {
+	rows, err := u.tx.Query(u.ctx, `SELECT DISTINCT ON (hold_id) id, line_id, hold_id, number, total, amount, description, created_at
+		FROM installments WHERE line_id = $1 AND invoice_id IS NULL ORDER BY hold_id, number`, line)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Installment
+	for rows.Next() {
+		var i domain.Installment
+		if err := rows.Scan(&i.ID, &i.LineID, &i.HoldID, &i.Number, &i.Total, &i.Amount, &i.Description, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, i)
+	}
+	return out, rows.Err()
+}
+
+func (u *unit) BillInstallment(id, invoice uuid.UUID) error {
+	return u.exec(`UPDATE installments SET invoice_id = $2 WHERE id = $1 AND invoice_id IS NULL`, id, invoice)
+}
+
+func (s *Store) UpcomingInstallments(ctx context.Context, line uuid.UUID) (int64, error) {
+	var sum int64
+	err := s.pool.QueryRow(ctx, `SELECT COALESCE(sum(amount), 0) FROM installments WHERE line_id = $1 AND invoice_id IS NULL`, line).Scan(&sum)
+	return sum, err
+}
+
+func (s *Store) InstallmentPlans(ctx context.Context, line uuid.UUID) ([]domain.InstallmentPlan, error) {
+	rows, err := s.pool.Query(ctx, `SELECT i.hold_id, min(i.description), h.captured, max(i.total),
+			count(*) FILTER (WHERE i.invoice_id IS NOT NULL), min(i.amount),
+			COALESCE(sum(i.amount) FILTER (WHERE i.invoice_id IS NULL), 0), h.created_at
+		FROM installments i JOIN holds h ON h.id = i.hold_id
+		WHERE i.line_id = $1 GROUP BY i.hold_id, h.captured, h.created_at
+		HAVING count(*) FILTER (WHERE i.invoice_id IS NULL) > 0 ORDER BY h.created_at DESC`, line)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.InstallmentPlan
+	for rows.Next() {
+		var p domain.InstallmentPlan
+		if err := rows.Scan(&p.HoldID, &p.Description, &p.Total, &p.Count, &p.Billed, &p.Installment, &p.Remaining, &p.PurchasedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, Receipt, Wallet } from 'lucide-react'
+import { CalendarClock, Layers, Receipt, Wallet } from 'lucide-react'
 import { useState } from 'react'
 import { BankCard } from '../components/BankCard'
 import { useCountUp } from '../lib/motion'
@@ -8,7 +8,7 @@ import { MoneyField } from '../components/MoneyField'
 import { Alert, Amount, Badge, Button, Empty, Loading, Modal, PageTitle, Panel, Sandbox, Select } from '../components/ui'
 import { dateBR, dateTimeBR } from '../lib/format'
 import { api, ApiError } from '../lib/api'
-import { errorMessage, compareBRL, formatBRL, type CreditLine, type Invoice } from '@bank/core'
+import { errorMessage, compareBRL, formatBRL, type CreditLine, type InstallmentPlan, type Invoice } from '@bank/core'
 
 const invoiceStatus: Record<Invoice['status'], [string, 'credit' | 'amber' | 'green' | 'red']> = {
   OPEN: ['Aberta', 'credit'], CLOSED: ['Fechada', 'amber'], PAID: ['Paga', 'green'], OVERDUE: ['Vencida', 'red'],
@@ -106,6 +106,11 @@ export function CreditPage() {
     enabled: !!line.data,
     queryFn: async () => (await api<{ invoices: Invoice[] }>('GET', `${base}/invoices`)).invoices,
   })
+  const plans = useQuery({
+    queryKey: ['installments', account?.id],
+    enabled: !!line.data,
+    queryFn: async () => (await api<{ plans: InstallmentPlan[] }>('GET', `${base}/installments`)).plans,
+  })
   const activate = useMutation({
     mutationFn: () => api('POST', base, { body: { closing_day: Number(closingDay) }, idempotent: true }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['credit'] }),
@@ -113,7 +118,7 @@ export function CreditPage() {
   })
   const cycle = useMutation({
     mutationFn: (action: 'CLOSE' | 'EXPIRE') => api('POST', `/v1/sandbox/accounts/${account!.id}/credit/cycle`, { body: { action } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['invoices'] }); qc.invalidateQueries({ queryKey: ['credit'] }) },
+    onSuccess: () => { for (const k of ['invoices', 'credit', 'installments']) qc.invalidateQueries({ queryKey: [k] }) },
   })
 
   if (!account || line.isLoading) return <Loading />
@@ -166,6 +171,28 @@ export function CreditPage() {
           </Panel>
         )}
       </div>
+      {!!plans.data?.length && (
+        <Panel title="Compras parceladas" icon={Layers}
+          action={l.upcoming_installments && <span className="text-sm text-muted">a vencer {formatBRL(l.upcoming_installments)}</span>}>
+          <ul className="-my-2 divide-y divide-line">
+            {plans.data.map((p) => (
+              <li key={p.description + p.purchased_at} className="flex items-center gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-fg">{p.description}</p>
+                  <p className="text-xs text-muted">{p.installments}x de {formatBRL(p.installment_amount)} · {p.billed} de {p.installments} na fatura · {dateTimeBR(p.purchased_at)}</p>
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-2">
+                    <div className="h-full rounded-full bg-credit" style={{ width: `${(p.billed / p.installments) * 100}%` }} />
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="tabular text-sm font-semibold text-fg">{formatBRL(p.remaining)}</p>
+                  <p className="text-xs text-muted">a vencer</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
       <Panel title="Faturas" icon={Receipt}>
         {invoices.isLoading ? <Loading /> : (
           <ul className="divide-y divide-line">

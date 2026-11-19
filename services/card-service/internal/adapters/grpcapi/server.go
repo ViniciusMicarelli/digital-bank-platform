@@ -89,6 +89,7 @@ func authPB(a domain.Authorization) *cardv1.Authorization {
 		}
 	}
 	out.RefundedAmount = brl(a.Refunded)
+	out.Installments = int32(max(a.Purchase.Installments, 1)) //nolint:gosec // 1..12
 	return out
 }
 
@@ -393,7 +394,8 @@ func (s *Server) Authorize(ctx context.Context, req *cardv1.AuthorizeRequest) (*
 		NetworkReference: req.GetNetworkReference(), ExpiryMonth: int(req.GetExpiryMonth()), ExpiryYear: int(req.GetExpiryYear()),
 		CVV: req.GetCvv(), Amount: amount, MerchantName: req.GetMerchantName(), MCC: req.GetMcc(),
 		Country: req.GetCountry(), Channel: channels[req.GetChannel()],
-		Function: map[cardv1.Function]domain.Function{cardv1.Function_FUNCTION_CREDIT: domain.Credit}[req.GetFunction()],
+		Function:     map[cardv1.Function]domain.Function{cardv1.Function_FUNCTION_CREDIT: domain.Credit}[req.GetFunction()],
+		Installments: int(req.GetInstallments()),
 	})
 	if err != nil {
 		return nil, toStatus(err)

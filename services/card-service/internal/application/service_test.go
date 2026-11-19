@@ -45,13 +45,16 @@ type fakeTxs struct {
 	lostReply bool // reserve succeeds but the caller sees an error
 	refunds   int
 	refuse    string // refunds fail with this reason
+	// lastInstallments is what the last reservation asked for.
+	lastInstallments int
 }
 
 func newTxs() *fakeTxs {
 	return &fakeTxs{balance: map[uuid.UUID]int64{}, byKey: map[string]ports.TxResult{}, held: map[uuid.UUID]int64{}}
 }
 
-func (f *fakeTxs) Reserve(_ context.Context, key string, account uuid.UUID, amount money.Money, _ string, _ map[string]string) (ports.TxResult, error) {
+func (f *fakeTxs) Reserve(_ context.Context, key string, account uuid.UUID, amount money.Money, installments int, _ string, _ map[string]string) (ports.TxResult, error) {
+	f.lastInstallments = installments
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.down {
@@ -328,7 +331,7 @@ func TestTokenPurchases(t *testing.T) {
 
 func TestCreditFunction(t *testing.T) {
 	e := setup(t)
-	_, d := e.issue(t)
+	c, d := e.issue(t)
 	e.txs.balance[account] = 0 // no money in checking: credit must not touch it
 	p := purchase(d, "300")
 	p.Function = domain.Credit
@@ -349,6 +352,23 @@ func TestCreditFunction(t *testing.T) {
 	p.NetworkReference = uuid.NewString()
 	if a, _ := e.svc.Authorize(e.ctx, d.PAN, p); a.Code != domain.CodeInsufficientFunds {
 		t.Fatalf("over the credit limit = %+v", a)
+	}
+
+	// Installments: credit only, at least R$ 5 each, passed to the credit line.
+	p.NetworkReference, p.Amount, p.Installments = uuid.NewString(), money.MustParse("120", money.BRL), 10
+	if a, err := e.svc.Authorize(e.ctx, d.PAN, p); err != nil || a.Status != domain.Approved || e.credit.lastInstallments != 10 {
+		t.Fatalf("10x = %+v %v (%d)", a, err, e.credit.lastInstallments)
+	}
+	if got, _ := e.store.AuthorizationsByCard(e.ctx, c.ID, 10); got[0].Purchase.Installments != 10 {
+		t.Fatalf("stored installments = %d", got[0].Purchase.Installments)
+	}
+	p.NetworkReference, p.Installments = uuid.NewString(), 30
+	if _, err := e.svc.Authorize(e.ctx, d.PAN, p); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatal("30 installments")
+	}
+	p.NetworkReference, p.Function, p.Installments = uuid.NewString(), domain.Debit, 3
+	if _, err := e.svc.Authorize(e.ctx, d.PAN, p); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatal("debit in installments")
 	}
 }
 

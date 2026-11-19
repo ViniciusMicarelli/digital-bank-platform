@@ -15,7 +15,7 @@ Debit cards: issuing, controls and real-time **purchase authorization**, then cl
 | Wallet tokens (BIN `999998`): a different number per device (Apple Pay, Google Pay, Samsung Pay, merchant), encrypted in the vault with its own blind index, suspendable/deletable without touching the card; token purchases need no CVV and resolve to the card | ✅ |
 | Real-time authorization with ISO 8583-style response codes | ✅ |
 | Clearing (full or partial) and merchant reversal | ✅ |
-| Credit function: purchases held on the credit line (credit-service) | ✅ |
+| Credit function: purchases held on the credit line (credit-service), at once or in 2 to 12 interest-free installments (credit only, at least R$ 5,00 each) | ✅ |
 | Merchant refunds of cleared purchases (network `Refund`, idempotent on the network's reference): debit back to the checking account (`CARD_REFUND`), credit as a credit on the invoice | ✅ |
 | Disputes (chargebacks): the customer disputes a cleared purchase within 90 days (not recognized, not received, duplicate, wrong amount, cancelled), all or part of it; one open dispute per purchase; an analyst decides in the back office, a won dispute refunds the amount | ✅ |
 | "Not recognized" is fraud: the card is blocked in the same transaction (`FRAUD_SUSPECTED`) and the customer cannot unblock it (`CARD_COMPROMISED`, a new card is needed) | ✅ |

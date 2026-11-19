@@ -12,7 +12,24 @@ import (
 func creditLineJSON(l *creditv1.CreditLine) map[string]any {
 	return map[string]any{"id": l.GetId(), "account_id": l.GetAccountId(), "status": l.GetStatus(),
 		"limit": moneyJSON(l.GetLimit()), "used": moneyJSON(l.GetUsed()), "available": moneyJSON(l.GetAvailable()),
-		"closing_day": l.GetClosingDay(), "monthly_interest_rate": float64(l.GetInterestRateBp()) / 100}
+		"closing_day": l.GetClosingDay(), "monthly_interest_rate": float64(l.GetInterestRateBp()) / 100,
+		"upcoming_installments": moneyJSON(l.GetUpcomingInstallments())}
+}
+
+// installmentPlans lists purchases with installments still to come.
+func (a *API) installmentPlans(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	resp, err := a.c.Credit.ListInstallmentPlans(r.Context(), &creditv1.ListInstallmentPlansRequest{AccountId: acc.GetId()})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	out := []map[string]any{}
+	for _, p := range resp.GetPlans() {
+		out = append(out, map[string]any{"description": p.GetDescription(), "total": moneyJSON(p.GetTotal()),
+			"installments": p.GetInstallments(), "billed": p.GetBilled(), "installment_amount": moneyJSON(p.GetInstallmentAmount()),
+			"remaining": moneyJSON(p.GetRemaining()), "purchased_at": ts(p.GetPurchasedAt())})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"plans": out})
 }
 
 func invoiceJSON(i *creditv1.Invoice) map[string]any {

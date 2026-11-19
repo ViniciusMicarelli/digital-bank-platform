@@ -17,7 +17,8 @@ Credit card credit: the **credit line** (limit), holds for card authorizations, 
 | Past the due date the unpaid balance moves to the next invoice with a 2% fine and a month of interest (8% a month by default); the overdue invoice is no longer payable | ✅ |
 | Sandbox: close the open invoice now / make the closed one overdue (`AdvanceCycle`) | ✅ |
 | Card refunds (`RefundCredit`, idempotent on the key): card clearing → credit-receivables in the ledger (`CREDIT_CARD_REFUND`), a `REFUND` credit on the open invoice and the limit freed; a credit larger than the invoice moves to the next one when it closes (`CREDIT_CARRIED_OUT` / `CREDIT_CARRIED_IN`) | ✅ |
-| Installments (`parcelado`), minimum payment, limit changes, blocking the line with the account | planned |
+| Interest-free installment purchases (`parcelado sem juros`, 2 to 12, at least R$ 5,00 each): the whole amount is held on the limit and posted to the ledger at capture; the first installment (with the remainder centavo) goes on the invoice the purchase is captured on, and each new invoice takes the next installment of every plan (robust to early closings); `upcoming_installments` on the line, `ListInstallmentPlans` | ✅ |
+| Installments with interest, minimum payment, limit changes, blocking the line with the account | planned |
 
 ## Money in the Ledger
 

@@ -130,6 +130,68 @@ type Hold struct {
 	Description    string
 	Metadata       map[string]string
 	CreatedAt      time.Time
+	// Installments is 1, or 2 to 12 for an interest-free installment purchase.
+	Installments int
+}
+
+// Installment purchases.
+const (
+	MaxInstallments = 12
+	// MinInstallment is the smallest installment a purchase can be split into.
+	MinInstallment = 5_00
+)
+
+// ValidInstallments checks how a purchase of amount may be split.
+func ValidInstallments(amount int64, n int) error {
+	switch {
+	case n < 1 || n > MaxInstallments:
+		return fmt.Errorf("%w: installments must be between 1 and %d", ErrInvalidArgument, MaxInstallments)
+	case n > 1 && amount/int64(n) < MinInstallment:
+		return fmt.Errorf("%w: each installment must be at least R$ 5,00", ErrInvalidArgument)
+	}
+	return nil
+}
+
+// Split divides amount into n installments; the first takes the remainder
+// so they add up exactly.
+func Split(amount int64, n int) []int64 {
+	out := make([]int64, n)
+	each := amount / int64(n)
+	for i := range out {
+		out[i] = each
+	}
+	out[0] += amount - each*int64(n)
+	return out
+}
+
+// Installment is one part of an installment purchase, billed on one invoice.
+type Installment struct {
+	ID          uuid.UUID
+	LineID      uuid.UUID
+	HoldID      uuid.UUID
+	Number      int
+	Total       int
+	Amount      int64
+	Description string
+	InvoiceID   *uuid.UUID
+	CreatedAt   time.Time
+}
+
+// Label is how the installment shows on the invoice, e.g. "LOJA DE TV (2/10)".
+func (i Installment) Label() string {
+	return fmt.Sprintf("%s (%d/%d)", i.Description, i.Number, i.Total)
+}
+
+// InstallmentPlan summarizes an installment purchase.
+type InstallmentPlan struct {
+	HoldID      uuid.UUID
+	Description string
+	Total       int64
+	Count       int
+	Billed      int
+	Installment int64
+	Remaining   int64
+	PurchasedAt time.Time
 }
 
 // CaptureKey is the idempotency key of the ledger posting of a capture.

@@ -36,8 +36,10 @@ type CreditLine struct {
 	// Monthly interest on unpaid balances, in basis points (800 = 8% a month).
 	InterestRateBp int32                  `protobuf:"varint,8,opt,name=interest_rate_bp,json=interestRateBp,proto3" json:"interest_rate_bp,omitempty"`
 	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Installments of past purchases not on an invoice yet (part of used).
+	UpcomingInstallments *v1.Money `protobuf:"bytes,10,opt,name=upcoming_installments,json=upcomingInstallments,proto3" json:"upcoming_installments,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *CreditLine) Reset() {
@@ -129,6 +131,13 @@ func (x *CreditLine) GetInterestRateBp() int32 {
 func (x *CreditLine) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *CreditLine) GetUpcomingInstallments() *v1.Money {
+	if x != nil {
+		return x.UpcomingInstallments
 	}
 	return nil
 }
@@ -324,6 +333,7 @@ type Hold struct {
 	FailureReason string    `protobuf:"bytes,3,opt,name=failure_reason,json=failureReason,proto3" json:"failure_reason,omitempty"`
 	Amount        *v1.Money `protobuf:"bytes,4,opt,name=amount,proto3" json:"amount,omitempty"`
 	Captured      *v1.Money `protobuf:"bytes,5,opt,name=captured,proto3" json:"captured,omitempty"`
+	Installments  int32     `protobuf:"varint,6,opt,name=installments,proto3" json:"installments,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -391,6 +401,13 @@ func (x *Hold) GetCaptured() *v1.Money {
 		return x.Captured
 	}
 	return nil
+}
+
+func (x *Hold) GetInstallments() int32 {
+	if x != nil {
+		return x.Installments
+	}
+	return 0
 }
 
 type Payment struct {
@@ -974,8 +991,12 @@ type ReserveCreditRequest struct {
 	Amount         *v1.Money              `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`
 	Description    string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
 	Metadata       map[string]string      `protobuf:"bytes,5,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 1 (default) to 12: interest-free installments ("parcelado sem juros").
+	// The whole amount is held on the limit; one installment goes on each
+	// invoice from the one the purchase is captured on.
+	Installments  int32 `protobuf:"varint,6,opt,name=installments,proto3" json:"installments,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ReserveCreditRequest) Reset() {
@@ -1041,6 +1062,13 @@ func (x *ReserveCreditRequest) GetMetadata() map[string]string {
 		return x.Metadata
 	}
 	return nil
+}
+
+func (x *ReserveCreditRequest) GetInstallments() int32 {
+	if x != nil {
+		return x.Installments
+	}
+	return 0
 }
 
 type ReserveCreditResponse struct {
@@ -1566,11 +1594,200 @@ func (x *RefundCreditResponse) GetRefund() *CreditRefund {
 	return nil
 }
 
+type InstallmentPlan struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	HoldId       string                 `protobuf:"bytes,1,opt,name=hold_id,json=holdId,proto3" json:"hold_id,omitempty"`
+	Description  string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Total        *v1.Money              `protobuf:"bytes,3,opt,name=total,proto3" json:"total,omitempty"`
+	Installments int32                  `protobuf:"varint,4,opt,name=installments,proto3" json:"installments,omitempty"`
+	// Installments already on an invoice.
+	Billed            int32                  `protobuf:"varint,5,opt,name=billed,proto3" json:"billed,omitempty"`
+	InstallmentAmount *v1.Money              `protobuf:"bytes,6,opt,name=installment_amount,json=installmentAmount,proto3" json:"installment_amount,omitempty"`
+	Remaining         *v1.Money              `protobuf:"bytes,7,opt,name=remaining,proto3" json:"remaining,omitempty"`
+	PurchasedAt       *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=purchased_at,json=purchasedAt,proto3" json:"purchased_at,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *InstallmentPlan) Reset() {
+	*x = InstallmentPlan{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InstallmentPlan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InstallmentPlan) ProtoMessage() {}
+
+func (x *InstallmentPlan) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InstallmentPlan.ProtoReflect.Descriptor instead.
+func (*InstallmentPlan) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *InstallmentPlan) GetHoldId() string {
+	if x != nil {
+		return x.HoldId
+	}
+	return ""
+}
+
+func (x *InstallmentPlan) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *InstallmentPlan) GetTotal() *v1.Money {
+	if x != nil {
+		return x.Total
+	}
+	return nil
+}
+
+func (x *InstallmentPlan) GetInstallments() int32 {
+	if x != nil {
+		return x.Installments
+	}
+	return 0
+}
+
+func (x *InstallmentPlan) GetBilled() int32 {
+	if x != nil {
+		return x.Billed
+	}
+	return 0
+}
+
+func (x *InstallmentPlan) GetInstallmentAmount() *v1.Money {
+	if x != nil {
+		return x.InstallmentAmount
+	}
+	return nil
+}
+
+func (x *InstallmentPlan) GetRemaining() *v1.Money {
+	if x != nil {
+		return x.Remaining
+	}
+	return nil
+}
+
+func (x *InstallmentPlan) GetPurchasedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.PurchasedAt
+	}
+	return nil
+}
+
+type ListInstallmentPlansRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListInstallmentPlansRequest) Reset() {
+	*x = ListInstallmentPlansRequest{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListInstallmentPlansRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListInstallmentPlansRequest) ProtoMessage() {}
+
+func (x *ListInstallmentPlansRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListInstallmentPlansRequest.ProtoReflect.Descriptor instead.
+func (*ListInstallmentPlansRequest) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ListInstallmentPlansRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type ListInstallmentPlansResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Plans         []*InstallmentPlan     `protobuf:"bytes,1,rep,name=plans,proto3" json:"plans,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListInstallmentPlansResponse) Reset() {
+	*x = ListInstallmentPlansResponse{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListInstallmentPlansResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListInstallmentPlansResponse) ProtoMessage() {}
+
+func (x *ListInstallmentPlansResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListInstallmentPlansResponse.ProtoReflect.Descriptor instead.
+func (*ListInstallmentPlansResponse) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ListInstallmentPlansResponse) GetPlans() []*InstallmentPlan {
+	if x != nil {
+		return x.Plans
+	}
+	return nil
+}
+
 var File_bank_credit_v1_credit_proto protoreflect.FileDescriptor
 
 const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"\n" +
-	"\x1bbank/credit/v1/credit.proto\x12\x0ebank.credit.v1\x1a\x1abank/common/v1/money.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe6\x02\n" +
+	"\x1bbank/credit/v1/credit.proto\x12\x0ebank.credit.v1\x1a\x1abank/common/v1/money.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb2\x03\n" +
 	"\n" +
 	"CreditLine\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
@@ -1584,7 +1801,9 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"closingDay\x12(\n" +
 	"\x10interest_rate_bp\x18\b \x01(\x05R\x0einterestRateBp\x129\n" +
 	"\n" +
-	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x95\x02\n" +
+	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12J\n" +
+	"\x15upcoming_installments\x18\n" +
+	" \x01(\v2\x15.bank.common.v1.MoneyR\x14upcomingInstallments\"\x95\x02\n" +
 	"\aInvoice\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\aline_id\x18\x02 \x01(\tR\x06lineId\x12\x16\n" +
@@ -1600,13 +1819,14 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"\x06amount\x18\x03 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12;\n" +
 	"\voccurred_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"occurredAt\"\xb7\x01\n" +
+	"occurredAt\"\xdb\x01\n" +
 	"\x04Hold\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12%\n" +
 	"\x0efailure_reason\x18\x03 \x01(\tR\rfailureReason\x12-\n" +
 	"\x06amount\x18\x04 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x121\n" +
-	"\bcaptured\x18\x05 \x01(\v2\x15.bank.common.v1.MoneyR\bcaptured\"\xe1\x01\n" +
+	"\bcaptured\x18\x05 \x01(\v2\x15.bank.common.v1.MoneyR\bcaptured\x12\"\n" +
+	"\finstallments\x18\x06 \x01(\x05R\finstallments\"\xe1\x01\n" +
 	"\aPayment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1647,14 +1867,15 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"invoice_id\x18\x02 \x01(\tR\tinvoiceId\x12-\n" +
 	"\x06amount\x18\x03 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\"G\n" +
 	"\x12PayInvoiceResponse\x121\n" +
-	"\apayment\x18\x01 \x01(\v2\x17.bank.credit.v1.PaymentR\apayment\"\xbc\x02\n" +
+	"\apayment\x18\x01 \x01(\v2\x17.bank.credit.v1.PaymentR\apayment\"\xe0\x02\n" +
 	"\x14ReserveCreditRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\x12-\n" +
 	"\x06amount\x18\x03 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12 \n" +
 	"\vdescription\x18\x04 \x01(\tR\vdescription\x12N\n" +
-	"\bmetadata\x18\x05 \x03(\v22.bank.credit.v1.ReserveCreditRequest.MetadataEntryR\bmetadata\x1a;\n" +
+	"\bmetadata\x18\x05 \x03(\v22.bank.credit.v1.ReserveCreditRequest.MetadataEntryR\bmetadata\x12\"\n" +
+	"\finstallments\x18\x06 \x01(\x05R\finstallments\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"A\n" +
@@ -1694,7 +1915,21 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"\x06amount\x18\x04 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12\x16\n" +
 	"\x06status\x18\x05 \x01(\tR\x06status\"L\n" +
 	"\x14RefundCreditResponse\x124\n" +
-	"\x06refund\x18\x01 \x01(\v2\x1c.bank.credit.v1.CreditRefundR\x06refund2\xa3\a\n" +
+	"\x06refund\x18\x01 \x01(\v2\x1c.bank.credit.v1.CreditRefundR\x06refund\"\xef\x02\n" +
+	"\x0fInstallmentPlan\x12\x17\n" +
+	"\ahold_id\x18\x01 \x01(\tR\x06holdId\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12+\n" +
+	"\x05total\x18\x03 \x01(\v2\x15.bank.common.v1.MoneyR\x05total\x12\"\n" +
+	"\finstallments\x18\x04 \x01(\x05R\finstallments\x12\x16\n" +
+	"\x06billed\x18\x05 \x01(\x05R\x06billed\x12D\n" +
+	"\x12installment_amount\x18\x06 \x01(\v2\x15.bank.common.v1.MoneyR\x11installmentAmount\x123\n" +
+	"\tremaining\x18\a \x01(\v2\x15.bank.common.v1.MoneyR\tremaining\x12=\n" +
+	"\fpurchased_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\vpurchasedAt\"<\n" +
+	"\x1bListInstallmentPlansRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"U\n" +
+	"\x1cListInstallmentPlansResponse\x125\n" +
+	"\x05plans\x18\x01 \x03(\v2\x1f.bank.credit.v1.InstallmentPlanR\x05plans2\x96\b\n" +
 	"\rCreditService\x12_\n" +
 	"\x0eOpenCreditLine\x12%.bank.credit.v1.OpenCreditLineRequest\x1a&.bank.credit.v1.OpenCreditLineResponse\x12\\\n" +
 	"\rGetCreditLine\x12$.bank.credit.v1.GetCreditLineRequest\x1a%.bank.credit.v1.GetCreditLineResponse\x12Y\n" +
@@ -1706,7 +1941,8 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"\rReserveCredit\x12$.bank.credit.v1.ReserveCreditRequest\x1a%.bank.credit.v1.ReserveCreditResponse\x12\\\n" +
 	"\rCaptureCredit\x12$.bank.credit.v1.CaptureCreditRequest\x1a%.bank.credit.v1.CaptureCreditResponse\x12\\\n" +
 	"\rReleaseCredit\x12$.bank.credit.v1.ReleaseCreditRequest\x1a%.bank.credit.v1.ReleaseCreditResponse\x12Y\n" +
-	"\fRefundCredit\x12#.bank.credit.v1.RefundCreditRequest\x1a$.bank.credit.v1.RefundCreditResponse\x12Y\n" +
+	"\fRefundCredit\x12#.bank.credit.v1.RefundCreditRequest\x1a$.bank.credit.v1.RefundCreditResponse\x12q\n" +
+	"\x14ListInstallmentPlans\x12+.bank.credit.v1.ListInstallmentPlansRequest\x1a,.bank.credit.v1.ListInstallmentPlansResponse\x12Y\n" +
 	"\fAdvanceCycle\x12#.bank.credit.v1.AdvanceCycleRequest\x1a$.bank.credit.v1.AdvanceCycleResponseB\xd8\x01\n" +
 	"\x12com.bank.credit.v1B\vCreditProtoP\x01Z[github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1;creditv1\xa2\x02\x03BCX\xaa\x02\x0eBank.Credit.V1\xca\x02\x0eBank\\Credit\\V1\xe2\x02\x1aBank\\Credit\\V1\\GPBMetadata\xea\x02\x10Bank::Credit::V1b\x06proto3"
 
@@ -1722,95 +1958,106 @@ func file_bank_credit_v1_credit_proto_rawDescGZIP() []byte {
 	return file_bank_credit_v1_credit_proto_rawDescData
 }
 
-var file_bank_credit_v1_credit_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_bank_credit_v1_credit_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_bank_credit_v1_credit_proto_goTypes = []any{
-	(*CreditLine)(nil),             // 0: bank.credit.v1.CreditLine
-	(*Invoice)(nil),                // 1: bank.credit.v1.Invoice
-	(*InvoiceItem)(nil),            // 2: bank.credit.v1.InvoiceItem
-	(*Hold)(nil),                   // 3: bank.credit.v1.Hold
-	(*Payment)(nil),                // 4: bank.credit.v1.Payment
-	(*OpenCreditLineRequest)(nil),  // 5: bank.credit.v1.OpenCreditLineRequest
-	(*OpenCreditLineResponse)(nil), // 6: bank.credit.v1.OpenCreditLineResponse
-	(*GetCreditLineRequest)(nil),   // 7: bank.credit.v1.GetCreditLineRequest
-	(*GetCreditLineResponse)(nil),  // 8: bank.credit.v1.GetCreditLineResponse
-	(*ListInvoicesRequest)(nil),    // 9: bank.credit.v1.ListInvoicesRequest
-	(*ListInvoicesResponse)(nil),   // 10: bank.credit.v1.ListInvoicesResponse
-	(*GetInvoiceRequest)(nil),      // 11: bank.credit.v1.GetInvoiceRequest
-	(*GetInvoiceResponse)(nil),     // 12: bank.credit.v1.GetInvoiceResponse
-	(*PayInvoiceRequest)(nil),      // 13: bank.credit.v1.PayInvoiceRequest
-	(*PayInvoiceResponse)(nil),     // 14: bank.credit.v1.PayInvoiceResponse
-	(*ReserveCreditRequest)(nil),   // 15: bank.credit.v1.ReserveCreditRequest
-	(*ReserveCreditResponse)(nil),  // 16: bank.credit.v1.ReserveCreditResponse
-	(*CaptureCreditRequest)(nil),   // 17: bank.credit.v1.CaptureCreditRequest
-	(*CaptureCreditResponse)(nil),  // 18: bank.credit.v1.CaptureCreditResponse
-	(*ReleaseCreditRequest)(nil),   // 19: bank.credit.v1.ReleaseCreditRequest
-	(*ReleaseCreditResponse)(nil),  // 20: bank.credit.v1.ReleaseCreditResponse
-	(*AdvanceCycleRequest)(nil),    // 21: bank.credit.v1.AdvanceCycleRequest
-	(*AdvanceCycleResponse)(nil),   // 22: bank.credit.v1.AdvanceCycleResponse
-	(*RefundCreditRequest)(nil),    // 23: bank.credit.v1.RefundCreditRequest
-	(*CreditRefund)(nil),           // 24: bank.credit.v1.CreditRefund
-	(*RefundCreditResponse)(nil),   // 25: bank.credit.v1.RefundCreditResponse
-	nil,                            // 26: bank.credit.v1.ReserveCreditRequest.MetadataEntry
-	nil,                            // 27: bank.credit.v1.RefundCreditRequest.MetadataEntry
-	(*v1.Money)(nil),               // 28: bank.common.v1.Money
-	(*timestamppb.Timestamp)(nil),  // 29: google.protobuf.Timestamp
+	(*CreditLine)(nil),                   // 0: bank.credit.v1.CreditLine
+	(*Invoice)(nil),                      // 1: bank.credit.v1.Invoice
+	(*InvoiceItem)(nil),                  // 2: bank.credit.v1.InvoiceItem
+	(*Hold)(nil),                         // 3: bank.credit.v1.Hold
+	(*Payment)(nil),                      // 4: bank.credit.v1.Payment
+	(*OpenCreditLineRequest)(nil),        // 5: bank.credit.v1.OpenCreditLineRequest
+	(*OpenCreditLineResponse)(nil),       // 6: bank.credit.v1.OpenCreditLineResponse
+	(*GetCreditLineRequest)(nil),         // 7: bank.credit.v1.GetCreditLineRequest
+	(*GetCreditLineResponse)(nil),        // 8: bank.credit.v1.GetCreditLineResponse
+	(*ListInvoicesRequest)(nil),          // 9: bank.credit.v1.ListInvoicesRequest
+	(*ListInvoicesResponse)(nil),         // 10: bank.credit.v1.ListInvoicesResponse
+	(*GetInvoiceRequest)(nil),            // 11: bank.credit.v1.GetInvoiceRequest
+	(*GetInvoiceResponse)(nil),           // 12: bank.credit.v1.GetInvoiceResponse
+	(*PayInvoiceRequest)(nil),            // 13: bank.credit.v1.PayInvoiceRequest
+	(*PayInvoiceResponse)(nil),           // 14: bank.credit.v1.PayInvoiceResponse
+	(*ReserveCreditRequest)(nil),         // 15: bank.credit.v1.ReserveCreditRequest
+	(*ReserveCreditResponse)(nil),        // 16: bank.credit.v1.ReserveCreditResponse
+	(*CaptureCreditRequest)(nil),         // 17: bank.credit.v1.CaptureCreditRequest
+	(*CaptureCreditResponse)(nil),        // 18: bank.credit.v1.CaptureCreditResponse
+	(*ReleaseCreditRequest)(nil),         // 19: bank.credit.v1.ReleaseCreditRequest
+	(*ReleaseCreditResponse)(nil),        // 20: bank.credit.v1.ReleaseCreditResponse
+	(*AdvanceCycleRequest)(nil),          // 21: bank.credit.v1.AdvanceCycleRequest
+	(*AdvanceCycleResponse)(nil),         // 22: bank.credit.v1.AdvanceCycleResponse
+	(*RefundCreditRequest)(nil),          // 23: bank.credit.v1.RefundCreditRequest
+	(*CreditRefund)(nil),                 // 24: bank.credit.v1.CreditRefund
+	(*RefundCreditResponse)(nil),         // 25: bank.credit.v1.RefundCreditResponse
+	(*InstallmentPlan)(nil),              // 26: bank.credit.v1.InstallmentPlan
+	(*ListInstallmentPlansRequest)(nil),  // 27: bank.credit.v1.ListInstallmentPlansRequest
+	(*ListInstallmentPlansResponse)(nil), // 28: bank.credit.v1.ListInstallmentPlansResponse
+	nil,                                  // 29: bank.credit.v1.ReserveCreditRequest.MetadataEntry
+	nil,                                  // 30: bank.credit.v1.RefundCreditRequest.MetadataEntry
+	(*v1.Money)(nil),                     // 31: bank.common.v1.Money
+	(*timestamppb.Timestamp)(nil),        // 32: google.protobuf.Timestamp
 }
 var file_bank_credit_v1_credit_proto_depIdxs = []int32{
-	28, // 0: bank.credit.v1.CreditLine.limit:type_name -> bank.common.v1.Money
-	28, // 1: bank.credit.v1.CreditLine.used:type_name -> bank.common.v1.Money
-	28, // 2: bank.credit.v1.CreditLine.available:type_name -> bank.common.v1.Money
-	29, // 3: bank.credit.v1.CreditLine.created_at:type_name -> google.protobuf.Timestamp
-	28, // 4: bank.credit.v1.Invoice.total:type_name -> bank.common.v1.Money
-	28, // 5: bank.credit.v1.Invoice.paid:type_name -> bank.common.v1.Money
-	28, // 6: bank.credit.v1.Invoice.remaining:type_name -> bank.common.v1.Money
-	28, // 7: bank.credit.v1.InvoiceItem.amount:type_name -> bank.common.v1.Money
-	29, // 8: bank.credit.v1.InvoiceItem.occurred_at:type_name -> google.protobuf.Timestamp
-	28, // 9: bank.credit.v1.Hold.amount:type_name -> bank.common.v1.Money
-	28, // 10: bank.credit.v1.Hold.captured:type_name -> bank.common.v1.Money
-	28, // 11: bank.credit.v1.Payment.amount:type_name -> bank.common.v1.Money
-	29, // 12: bank.credit.v1.Payment.created_at:type_name -> google.protobuf.Timestamp
-	0,  // 13: bank.credit.v1.OpenCreditLineResponse.line:type_name -> bank.credit.v1.CreditLine
-	0,  // 14: bank.credit.v1.GetCreditLineResponse.line:type_name -> bank.credit.v1.CreditLine
-	1,  // 15: bank.credit.v1.ListInvoicesResponse.invoices:type_name -> bank.credit.v1.Invoice
-	1,  // 16: bank.credit.v1.GetInvoiceResponse.invoice:type_name -> bank.credit.v1.Invoice
-	2,  // 17: bank.credit.v1.GetInvoiceResponse.items:type_name -> bank.credit.v1.InvoiceItem
-	28, // 18: bank.credit.v1.PayInvoiceRequest.amount:type_name -> bank.common.v1.Money
-	4,  // 19: bank.credit.v1.PayInvoiceResponse.payment:type_name -> bank.credit.v1.Payment
-	28, // 20: bank.credit.v1.ReserveCreditRequest.amount:type_name -> bank.common.v1.Money
-	26, // 21: bank.credit.v1.ReserveCreditRequest.metadata:type_name -> bank.credit.v1.ReserveCreditRequest.MetadataEntry
-	3,  // 22: bank.credit.v1.ReserveCreditResponse.hold:type_name -> bank.credit.v1.Hold
-	28, // 23: bank.credit.v1.CaptureCreditRequest.amount:type_name -> bank.common.v1.Money
-	3,  // 24: bank.credit.v1.CaptureCreditResponse.hold:type_name -> bank.credit.v1.Hold
-	3,  // 25: bank.credit.v1.ReleaseCreditResponse.hold:type_name -> bank.credit.v1.Hold
-	28, // 26: bank.credit.v1.RefundCreditRequest.amount:type_name -> bank.common.v1.Money
-	27, // 27: bank.credit.v1.RefundCreditRequest.metadata:type_name -> bank.credit.v1.RefundCreditRequest.MetadataEntry
-	28, // 28: bank.credit.v1.CreditRefund.amount:type_name -> bank.common.v1.Money
-	24, // 29: bank.credit.v1.RefundCreditResponse.refund:type_name -> bank.credit.v1.CreditRefund
-	5,  // 30: bank.credit.v1.CreditService.OpenCreditLine:input_type -> bank.credit.v1.OpenCreditLineRequest
-	7,  // 31: bank.credit.v1.CreditService.GetCreditLine:input_type -> bank.credit.v1.GetCreditLineRequest
-	9,  // 32: bank.credit.v1.CreditService.ListInvoices:input_type -> bank.credit.v1.ListInvoicesRequest
-	11, // 33: bank.credit.v1.CreditService.GetInvoice:input_type -> bank.credit.v1.GetInvoiceRequest
-	13, // 34: bank.credit.v1.CreditService.PayInvoice:input_type -> bank.credit.v1.PayInvoiceRequest
-	15, // 35: bank.credit.v1.CreditService.ReserveCredit:input_type -> bank.credit.v1.ReserveCreditRequest
-	17, // 36: bank.credit.v1.CreditService.CaptureCredit:input_type -> bank.credit.v1.CaptureCreditRequest
-	19, // 37: bank.credit.v1.CreditService.ReleaseCredit:input_type -> bank.credit.v1.ReleaseCreditRequest
-	23, // 38: bank.credit.v1.CreditService.RefundCredit:input_type -> bank.credit.v1.RefundCreditRequest
-	21, // 39: bank.credit.v1.CreditService.AdvanceCycle:input_type -> bank.credit.v1.AdvanceCycleRequest
-	6,  // 40: bank.credit.v1.CreditService.OpenCreditLine:output_type -> bank.credit.v1.OpenCreditLineResponse
-	8,  // 41: bank.credit.v1.CreditService.GetCreditLine:output_type -> bank.credit.v1.GetCreditLineResponse
-	10, // 42: bank.credit.v1.CreditService.ListInvoices:output_type -> bank.credit.v1.ListInvoicesResponse
-	12, // 43: bank.credit.v1.CreditService.GetInvoice:output_type -> bank.credit.v1.GetInvoiceResponse
-	14, // 44: bank.credit.v1.CreditService.PayInvoice:output_type -> bank.credit.v1.PayInvoiceResponse
-	16, // 45: bank.credit.v1.CreditService.ReserveCredit:output_type -> bank.credit.v1.ReserveCreditResponse
-	18, // 46: bank.credit.v1.CreditService.CaptureCredit:output_type -> bank.credit.v1.CaptureCreditResponse
-	20, // 47: bank.credit.v1.CreditService.ReleaseCredit:output_type -> bank.credit.v1.ReleaseCreditResponse
-	25, // 48: bank.credit.v1.CreditService.RefundCredit:output_type -> bank.credit.v1.RefundCreditResponse
-	22, // 49: bank.credit.v1.CreditService.AdvanceCycle:output_type -> bank.credit.v1.AdvanceCycleResponse
-	40, // [40:50] is the sub-list for method output_type
-	30, // [30:40] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	31, // 0: bank.credit.v1.CreditLine.limit:type_name -> bank.common.v1.Money
+	31, // 1: bank.credit.v1.CreditLine.used:type_name -> bank.common.v1.Money
+	31, // 2: bank.credit.v1.CreditLine.available:type_name -> bank.common.v1.Money
+	32, // 3: bank.credit.v1.CreditLine.created_at:type_name -> google.protobuf.Timestamp
+	31, // 4: bank.credit.v1.CreditLine.upcoming_installments:type_name -> bank.common.v1.Money
+	31, // 5: bank.credit.v1.Invoice.total:type_name -> bank.common.v1.Money
+	31, // 6: bank.credit.v1.Invoice.paid:type_name -> bank.common.v1.Money
+	31, // 7: bank.credit.v1.Invoice.remaining:type_name -> bank.common.v1.Money
+	31, // 8: bank.credit.v1.InvoiceItem.amount:type_name -> bank.common.v1.Money
+	32, // 9: bank.credit.v1.InvoiceItem.occurred_at:type_name -> google.protobuf.Timestamp
+	31, // 10: bank.credit.v1.Hold.amount:type_name -> bank.common.v1.Money
+	31, // 11: bank.credit.v1.Hold.captured:type_name -> bank.common.v1.Money
+	31, // 12: bank.credit.v1.Payment.amount:type_name -> bank.common.v1.Money
+	32, // 13: bank.credit.v1.Payment.created_at:type_name -> google.protobuf.Timestamp
+	0,  // 14: bank.credit.v1.OpenCreditLineResponse.line:type_name -> bank.credit.v1.CreditLine
+	0,  // 15: bank.credit.v1.GetCreditLineResponse.line:type_name -> bank.credit.v1.CreditLine
+	1,  // 16: bank.credit.v1.ListInvoicesResponse.invoices:type_name -> bank.credit.v1.Invoice
+	1,  // 17: bank.credit.v1.GetInvoiceResponse.invoice:type_name -> bank.credit.v1.Invoice
+	2,  // 18: bank.credit.v1.GetInvoiceResponse.items:type_name -> bank.credit.v1.InvoiceItem
+	31, // 19: bank.credit.v1.PayInvoiceRequest.amount:type_name -> bank.common.v1.Money
+	4,  // 20: bank.credit.v1.PayInvoiceResponse.payment:type_name -> bank.credit.v1.Payment
+	31, // 21: bank.credit.v1.ReserveCreditRequest.amount:type_name -> bank.common.v1.Money
+	29, // 22: bank.credit.v1.ReserveCreditRequest.metadata:type_name -> bank.credit.v1.ReserveCreditRequest.MetadataEntry
+	3,  // 23: bank.credit.v1.ReserveCreditResponse.hold:type_name -> bank.credit.v1.Hold
+	31, // 24: bank.credit.v1.CaptureCreditRequest.amount:type_name -> bank.common.v1.Money
+	3,  // 25: bank.credit.v1.CaptureCreditResponse.hold:type_name -> bank.credit.v1.Hold
+	3,  // 26: bank.credit.v1.ReleaseCreditResponse.hold:type_name -> bank.credit.v1.Hold
+	31, // 27: bank.credit.v1.RefundCreditRequest.amount:type_name -> bank.common.v1.Money
+	30, // 28: bank.credit.v1.RefundCreditRequest.metadata:type_name -> bank.credit.v1.RefundCreditRequest.MetadataEntry
+	31, // 29: bank.credit.v1.CreditRefund.amount:type_name -> bank.common.v1.Money
+	24, // 30: bank.credit.v1.RefundCreditResponse.refund:type_name -> bank.credit.v1.CreditRefund
+	31, // 31: bank.credit.v1.InstallmentPlan.total:type_name -> bank.common.v1.Money
+	31, // 32: bank.credit.v1.InstallmentPlan.installment_amount:type_name -> bank.common.v1.Money
+	31, // 33: bank.credit.v1.InstallmentPlan.remaining:type_name -> bank.common.v1.Money
+	32, // 34: bank.credit.v1.InstallmentPlan.purchased_at:type_name -> google.protobuf.Timestamp
+	26, // 35: bank.credit.v1.ListInstallmentPlansResponse.plans:type_name -> bank.credit.v1.InstallmentPlan
+	5,  // 36: bank.credit.v1.CreditService.OpenCreditLine:input_type -> bank.credit.v1.OpenCreditLineRequest
+	7,  // 37: bank.credit.v1.CreditService.GetCreditLine:input_type -> bank.credit.v1.GetCreditLineRequest
+	9,  // 38: bank.credit.v1.CreditService.ListInvoices:input_type -> bank.credit.v1.ListInvoicesRequest
+	11, // 39: bank.credit.v1.CreditService.GetInvoice:input_type -> bank.credit.v1.GetInvoiceRequest
+	13, // 40: bank.credit.v1.CreditService.PayInvoice:input_type -> bank.credit.v1.PayInvoiceRequest
+	15, // 41: bank.credit.v1.CreditService.ReserveCredit:input_type -> bank.credit.v1.ReserveCreditRequest
+	17, // 42: bank.credit.v1.CreditService.CaptureCredit:input_type -> bank.credit.v1.CaptureCreditRequest
+	19, // 43: bank.credit.v1.CreditService.ReleaseCredit:input_type -> bank.credit.v1.ReleaseCreditRequest
+	23, // 44: bank.credit.v1.CreditService.RefundCredit:input_type -> bank.credit.v1.RefundCreditRequest
+	27, // 45: bank.credit.v1.CreditService.ListInstallmentPlans:input_type -> bank.credit.v1.ListInstallmentPlansRequest
+	21, // 46: bank.credit.v1.CreditService.AdvanceCycle:input_type -> bank.credit.v1.AdvanceCycleRequest
+	6,  // 47: bank.credit.v1.CreditService.OpenCreditLine:output_type -> bank.credit.v1.OpenCreditLineResponse
+	8,  // 48: bank.credit.v1.CreditService.GetCreditLine:output_type -> bank.credit.v1.GetCreditLineResponse
+	10, // 49: bank.credit.v1.CreditService.ListInvoices:output_type -> bank.credit.v1.ListInvoicesResponse
+	12, // 50: bank.credit.v1.CreditService.GetInvoice:output_type -> bank.credit.v1.GetInvoiceResponse
+	14, // 51: bank.credit.v1.CreditService.PayInvoice:output_type -> bank.credit.v1.PayInvoiceResponse
+	16, // 52: bank.credit.v1.CreditService.ReserveCredit:output_type -> bank.credit.v1.ReserveCreditResponse
+	18, // 53: bank.credit.v1.CreditService.CaptureCredit:output_type -> bank.credit.v1.CaptureCreditResponse
+	20, // 54: bank.credit.v1.CreditService.ReleaseCredit:output_type -> bank.credit.v1.ReleaseCreditResponse
+	25, // 55: bank.credit.v1.CreditService.RefundCredit:output_type -> bank.credit.v1.RefundCreditResponse
+	28, // 56: bank.credit.v1.CreditService.ListInstallmentPlans:output_type -> bank.credit.v1.ListInstallmentPlansResponse
+	22, // 57: bank.credit.v1.CreditService.AdvanceCycle:output_type -> bank.credit.v1.AdvanceCycleResponse
+	47, // [47:58] is the sub-list for method output_type
+	36, // [36:47] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_bank_credit_v1_credit_proto_init() }
@@ -1824,7 +2071,7 @@ func file_bank_credit_v1_credit_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_credit_v1_credit_proto_rawDesc), len(file_bank_credit_v1_credit_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   28,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -120,3 +120,28 @@ test('savings box: create, save, withdraw, yield, close', async ({ page }) => {
   await page.getByRole('button', { name: 'Encerrar e resgatar tudo' }).click()
   await expect(page.getByRole('button', { name: 'Criar minha primeira caixinha' })).toBeVisible()
 })
+
+test('credit purchase in installments', async ({ page }) => {
+  await onboard(page)
+  await page.goto('/credito')
+  await page.getByRole('button', { name: 'Ativar crédito' }).click()
+  await expect(page.getByText('R$ 1.000,00').first()).toBeVisible()
+
+  await page.goto('/cartoes')
+  await page.getByRole('button', { name: 'Criar cartão virtual' }).click()
+  await page.getByLabel('Simular compra de').fill('600')
+  await page.getByLabel('Loja', { exact: true }).fill('LOJA DE TV')
+  await page.getByLabel('Função').selectOption('CREDIT')
+  await page.getByLabel('Parcelas').selectOption('6')
+  await page.getByRole('button', { name: 'Passar o cartão' }).click()
+  await page.getByLabel('Senha').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Confirmar' }).click()
+  await expect(page.getByText(/Aprovada: R\$ 600,00/)).toBeVisible()
+  await expect(page.getByText(/Crédito em 6x/)).toBeVisible()
+
+  await page.goto('/credito')
+  await expect(page.getByText('Compras parceladas')).toBeVisible()
+  await expect(page.getByText(/6x de R\$ 100,00 · 1 de 6 na fatura/)).toBeVisible()
+  await expect(page.getByText('a vencer R$ 500,00')).toBeVisible()
+  await shot(page, '14-installments')
+})

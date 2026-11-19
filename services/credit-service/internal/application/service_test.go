@@ -3,6 +3,7 @@ package application_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"sync"
@@ -134,24 +135,24 @@ func TestOpenLine(t *testing.T) {
 
 func TestHolds(t *testing.T) {
 	e := setup(t)
-	if h, _ := e.svc.Reserve(e.ctx, "h0", e.account, 10_00, "LOJA", nil); h.FailureReason != domain.ReasonNoCreditLine {
+	if h, _ := e.svc.Reserve(e.ctx, "h0", e.account, 10_00, 1, "LOJA", nil); h.FailureReason != domain.ReasonNoCreditLine {
 		t.Fatalf("no line: %+v", h)
 	}
 	_, _ = e.svc.OpenLine(e.ctx, "k", e.account, 10)
-	a, err := e.svc.Reserve(e.ctx, "h1", e.account, 600_00, "TV", nil)
+	a, err := e.svc.Reserve(e.ctx, "h1", e.account, 600_00, 1, "TV", nil)
 	if err != nil || a.Status != domain.HoldReserved {
 		t.Fatalf("reserve = %+v %v", a, err)
 	}
-	if again, _ := e.svc.Reserve(e.ctx, "h1", e.account, 600_00, "TV", nil); again.ID != a.ID || e.line(t).Used != 600_00 {
+	if again, _ := e.svc.Reserve(e.ctx, "h1", e.account, 600_00, 1, "TV", nil); again.ID != a.ID || e.line(t).Used != 600_00 {
 		t.Fatal("a retried reservation must not hold twice")
 	}
-	if _, err := e.svc.Reserve(e.ctx, "h1", e.account, 1_00, "TV", nil); !errors.Is(err, domain.ErrConflict) {
+	if _, err := e.svc.Reserve(e.ctx, "h1", e.account, 1_00, 1, "TV", nil); !errors.Is(err, domain.ErrConflict) {
 		t.Fatalf("same key, other amount: %v", err)
 	}
-	if b, _ := e.svc.Reserve(e.ctx, "h2", e.account, 400_01, "SOFA", nil); b.FailureReason != domain.ReasonInsufficientLimit {
+	if b, _ := e.svc.Reserve(e.ctx, "h2", e.account, 400_01, 1, "SOFA", nil); b.FailureReason != domain.ReasonInsufficientLimit {
 		t.Fatalf("over the limit: %+v", b)
 	}
-	b, _ := e.svc.Reserve(e.ctx, "h3", e.account, 100_00, "SOFA", nil)
+	b, _ := e.svc.Reserve(e.ctx, "h3", e.account, 100_00, 1, "SOFA", nil)
 	if _, err := e.svc.Release(e.ctx, b.ID); err != nil || e.line(t).Used != 600_00 {
 		t.Fatalf("release: %v, used %d", err, e.line(t).Used)
 	}
@@ -173,10 +174,10 @@ func TestHolds(t *testing.T) {
 	e.checkLedger(t, 0)
 
 	// Holds the network never clears expire after 7 days.
-	d, _ := e.svc.Reserve(e.ctx, "h4", e.account, 50_00, "HOTEL", nil)
+	d, _ := e.svc.Reserve(e.ctx, "h4", e.account, 50_00, 1, "HOTEL", nil)
 	e.now = e.now.Add(domain.HoldLifetime + time.Hour)
 	e.svc.RunOnce(e.ctx)
-	if h, _ := e.svc.Reserve(e.ctx, "h4", e.account, 50_00, "HOTEL", nil); h.ID != d.ID || h.Status != domain.HoldReleased {
+	if h, _ := e.svc.Reserve(e.ctx, "h4", e.account, 50_00, 1, "HOTEL", nil); h.ID != d.ID || h.Status != domain.HoldReleased {
 		t.Fatalf("expired hold = %+v", h)
 	}
 }
@@ -185,7 +186,7 @@ func TestInvoiceCycle(t *testing.T) {
 	e := setup(t)
 	_, _ = e.svc.OpenLine(e.ctx, "k", e.account, 10)
 	e.ledger.balance[e.account] = 300_00
-	h, _ := e.svc.Reserve(e.ctx, "h1", e.account, 500_00, "TV", nil)
+	h, _ := e.svc.Reserve(e.ctx, "h1", e.account, 500_00, 1, "TV", nil)
 	if _, err := e.svc.Capture(e.ctx, h.ID, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -259,7 +260,7 @@ func TestInvoiceCycle(t *testing.T) {
 func TestSandboxExpire(t *testing.T) {
 	e := setup(t)
 	_, _ = e.svc.OpenLine(e.ctx, "k", e.account, 10)
-	h, _ := e.svc.Reserve(e.ctx, "h", e.account, 100_00, "CAFE", nil)
+	h, _ := e.svc.Reserve(e.ctx, "h", e.account, 100_00, 1, "CAFE", nil)
 	_, _ = e.svc.Capture(e.ctx, h.ID, nil)
 	if err := e.svc.AdvanceCycle(e.ctx, e.account, "CLOSE"); err != nil {
 		t.Fatal(err)
@@ -279,7 +280,7 @@ func TestRefunds(t *testing.T) {
 		t.Fatalf("no line: %v", err)
 	}
 	_, _ = e.svc.OpenLine(e.ctx, "k", e.account, 10)
-	h, _ := e.svc.Reserve(e.ctx, "h1", e.account, 100_00, "LOJA", nil)
+	h, _ := e.svc.Reserve(e.ctx, "h1", e.account, 100_00, 1, "LOJA", nil)
 	if _, err := e.svc.Capture(e.ctx, h.ID, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -326,5 +327,65 @@ func TestRefunds(t *testing.T) {
 	d, _ := e.svc.Invoice(e.ctx, list[0].ID)
 	if len(d.Items) != 1 || d.Items[0].Kind != domain.ItemCreditCarriedIn || d.Items[0].Amount != 20_00 {
 		t.Fatalf("next invoice items = %+v", d.Items)
+	}
+}
+
+func TestInstallments(t *testing.T) {
+	e := setup(t)
+	_, _ = e.svc.OpenLine(e.ctx, "k", e.account, 10)
+	if _, err := e.svc.Reserve(e.ctx, "small", e.account, 9_00, 2, "X", nil); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatalf("installments under R$ 5: %v", err)
+	}
+	if _, err := e.svc.Reserve(e.ctx, "many", e.account, 900_00, 13, "X", nil); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatalf("13 installments: %v", err)
+	}
+	h, err := e.svc.Reserve(e.ctx, "tv", e.account, 900_01, 3, "LOJA DE TV", nil)
+	if err != nil || h.Installments != 3 || e.line(t).Used != 900_01 {
+		t.Fatalf("reserve = %+v %v", h, err)
+	}
+	if _, err := e.svc.Reserve(e.ctx, "tv", e.account, 900_01, 1, "LOJA DE TV", nil); !errors.Is(err, domain.ErrConflict) {
+		t.Fatal("same key, other installments")
+	}
+	if _, err := e.svc.Capture(e.ctx, h.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+	// The whole debt is on the limit; only the first installment (with the
+	// remainder centavo) is on this invoice.
+	inv := e.invoices(t)[0]
+	if inv.Total != 300_01 || e.line(t).Used != 900_01 {
+		t.Fatalf("invoice %+v, used %d", inv, e.line(t).Used)
+	}
+	if up, _ := e.svc.UpcomingInstallments(e.ctx, e.line(t)); up != 600_00 {
+		t.Fatalf("upcoming = %d", up)
+	}
+	e.checkLedger(t, 0)
+	d, _ := e.svc.Invoice(e.ctx, inv.ID)
+	if len(d.Items) != 1 || d.Items[0].Description != "LOJA DE TV (1/3)" {
+		t.Fatalf("items = %+v", d.Items)
+	}
+
+	// Each new invoice gets the next installment.
+	for n := 2; n <= 3; n++ {
+		if err := e.svc.AdvanceCycle(e.ctx, e.account, "CLOSE"); err != nil {
+			t.Fatal(err)
+		}
+		open := e.invoices(t)[0]
+		d, _ := e.svc.Invoice(e.ctx, open.ID)
+		if open.Total != 300_00 || len(d.Items) != 1 || d.Items[0].Description != fmt.Sprintf("LOJA DE TV (%d/3)", n) {
+			t.Fatalf("invoice %d = %+v %+v", n, open, d.Items)
+		}
+		plans, _ := e.svc.InstallmentPlans(e.ctx, e.account)
+		if n < 3 && (len(plans) != 1 || plans[0].Billed != n || plans[0].Remaining != 300_00) {
+			t.Fatalf("plans after %d = %+v", n, plans)
+		}
+		if n == 3 && len(plans) != 0 {
+			t.Fatalf("a fully billed purchase has no plan: %+v", plans)
+		}
+	}
+	if err := e.svc.AdvanceCycle(e.ctx, e.account, "CLOSE"); err != nil {
+		t.Fatal(err)
+	}
+	if open := e.invoices(t)[0]; open.Total != 0 {
+		t.Fatalf("nothing more to bill: %+v", open)
 	}
 }
