@@ -113,8 +113,11 @@ Requirements: Docker, Go 1.26+, `jq` for the demo.
 
 ```bash
 make up      # build and start everything
+make seed    # demo customers, analysts and data in every feature
 make demo    # walk through the public API
 ```
+
+Accounts, passwords and what to try: [docs/testing.md](docs/testing.md).
 
 ```text
 ▶ Ana's statement (built asynchronously from Kafka events)
@@ -125,6 +128,7 @@ make demo    # walk through the public API
 
 | URL | |
 |---|---|
+| http://127.0.0.1:8081 | Web app (customers and back office) |
 | http://127.0.0.1:8000 | REST API ([reference](docs/api/README.md)) |
 | http://127.0.0.1:16686 | Jaeger traces |
 | http://127.0.0.1:9090 | Prometheus (metrics, alerts) |

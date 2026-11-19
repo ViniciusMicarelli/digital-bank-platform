@@ -7,7 +7,7 @@ BUF_VERSION          := v1.75.0
 PROTOC_GEN_GO        := v1.36.12
 PROTOC_GEN_GO_GRPC   := v1.6.2
 
-.PHONY: help certs rotate-certs k8s-validate tf-validate infra-tools up up-obs demo web web-test web-e2e mobile mobile-test mobile-e2e down test test-unit e2e cover lint fmt tidy generate tools run-%
+.PHONY: help seed totp certs rotate-certs k8s-validate tf-validate infra-tools up up-obs demo web web-test web-e2e mobile mobile-test mobile-e2e down test test-unit e2e cover lint fmt tidy generate tools run-%
 
 help: ## List available targets
 	@grep -E '^[a-z%-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -44,6 +44,12 @@ mobile-test: ## Lint, typecheck and check the mobile app
 
 mobile-e2e: ## Browser tests of the mobile app's web build on a phone viewport (needs `make up`)
 	cd apps/mobile && EXPO_PUBLIC_API_URL=http://localhost:8000 npx expo export --platform web && npx playwright test
+
+seed: ## Create demo customers with data in every feature (needs `make up` and jq; safe to rerun)
+	./scripts/seed.sh
+
+totp: ## Current TOTP codes of the development analysts (back office login)
+	@python3 scripts/totp.py
 
 demo: ## Walk through the public API with curl (needs `make up` and jq)
 	./scripts/demo.sh
