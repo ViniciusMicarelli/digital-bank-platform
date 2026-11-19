@@ -135,6 +135,8 @@ type payload struct {
 	ToAccountID     string            `json:"to_account_id"`
 	FromAccountID   string            `json:"from_account_id"`
 	Metadata        map[string]string `json:"metadata"`
+	DecisionReason  string            `json:"decision_reason"`
+	Source          string            `json:"source"`
 }
 
 func brDate(s string) string {
@@ -195,6 +197,29 @@ func FromEvent(ev Event, now time.Time) ([]Draft, error) {
 		}
 		d.Category, d.Title, d.Important = CategoryCard, "Compra recusada", true
 		d.Body = fmt.Sprintf("Uma compra de %s em %s foi recusada: %s.", BRL(p.AmountMinor), p.MerchantName, p.Reason)
+	case "card.dispute.opened":
+		d.Category, d.Title = CategoryCard, "Contestação aberta"
+		d.Body = fmt.Sprintf("Recebemos sua contestação de %s em %s. Avisamos quando ela for analisada.", BRL(p.AmountMinor), p.MerchantName)
+		if p.Reason == "NOT_RECOGNIZED" {
+			d.Important = true
+			d.Body += " Por segurança, bloqueamos o cartão."
+		}
+	case "card.dispute.decided":
+		d.Category, d.Important = CategoryCard, true
+		if p.Status == "WON" {
+			d.Title = "Contestação aceita"
+			d.Body = fmt.Sprintf("Sua contestação de %s em %s foi aceita e o valor será devolvido.", BRL(p.AmountMinor), p.MerchantName)
+		} else {
+			d.Title = "Contestação recusada"
+			d.Body = fmt.Sprintf("Sua contestação de %s em %s foi recusada: %s.", BRL(p.AmountMinor), p.MerchantName, p.DecisionReason)
+		}
+	case "card.purchase.refunded":
+		d.Category, d.Title = CategoryCard, "Estorno recebido"
+		where := "na sua conta"
+		if p.Function == "CREDIT" {
+			where = "na sua fatura"
+		}
+		d.Body = fmt.Sprintf("%s de %s voltaram %s.", BRL(p.AmountMinor), p.MerchantName, where)
 	case "credit.invoice.closed":
 		if p.Remaining <= 0 {
 			return nil, nil

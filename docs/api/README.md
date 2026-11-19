@@ -77,8 +77,12 @@
 | `POST` | `/v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}/suspend` | Suspend one device |
 | `POST` | `/v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}/resume` | 🔐 Resume it |
 | `DELETE` | `/v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}` | Delete it for good |
+| `GET` | `/v1/accounts/{id}/cards/{cardID}/purchases` | The card's purchases, newest first, with `refunded_amount` and the latest `dispute` |
+| `POST` | `/v1/accounts/{id}/cards/{cardID}/purchases/{authID}/disputes` | Dispute a cleared purchase `{reason, amount?, description?}` (`NOT_RECOGNIZED` blocks the card) → 201 (`NOT_CLEARED`, `DISPUTE_WINDOW_CLOSED`, `DISPUTE_ALREADY_OPEN`, `NOTHING_TO_DISPUTE`) |
+| `GET` | `/v1/accounts/{id}/disputes` | The account's disputes, newest first |
 | `POST` | `/v1/sandbox/card-network/authorizations` | *(sandbox)* Network authorization `{pan, expiry_month, expiry_year, cvv, amount, merchant_name, mcc, country, channel, function?}` (`function`: `DEBIT` default, or `CREDIT`) |
 | `POST` | `/v1/sandbox/card-network/authorizations/{id}/clear` · `/reverse` | *(sandbox)* Clearing `{amount?}` / merchant reversal |
+| `POST` | `/v1/sandbox/card-network/authorizations/{id}/refund` | *(sandbox)* Merchant refund `{amount, refund_reference?}` of a cleared purchase (`REFUND_TOO_LARGE`) |
 | `GET` | `/v1/notifications` | Inbox `?unread=true&before=<id>&limit=`, with `unread_count` |
 | `POST` | `/v1/notifications/read` | `{ids?}` mark read (all unread when empty) |
 | `GET` · `PUT` | `/v1/notifications/preferences` | `{push, email}` |
@@ -102,6 +106,8 @@
 | `POST` | `/v1/backoffice/accounts/{id}/unblock` | 👤 Ask to unblock `{reason}` → 202 with a four-eyes approval (`ACCOUNT_NOT_BLOCKED`, `APPROVAL_ALREADY_PENDING`) |
 | `GET` | `/v1/backoffice/approvals` | 👤 Four-eyes requests (`?status=PENDING` by default, or `APPROVED`, `EXECUTED`, `REJECTED`, `FAILED`, `EXPIRED`, `ALL`), with the account and its customer |
 | `POST` | `/v1/backoffice/approvals/{id}/approve` · `/reject` | 👤 The second analyst's decision `{reason}` (required to reject); approving runs the action → `EXECUTED` or `FAILED` (`SAME_ANALYST`, `APPROVAL_NOT_PENDING`, `APPROVAL_EXPIRED`) |
+| `GET` | `/v1/backoffice/disputes` | 👤 Card disputes (`?status=OPEN` by default, or `WON`, `LOST`, `ALL`), with the account holder and customer |
+| `POST` | `/v1/backoffice/disputes/{id}/decide` | 👤 `{won, reason}` (reason required to reject); won refunds the amount; audited on the account |
 | `GET` | `/v1/backoffice/audit` | 👤 Audit trail, newest first (`?target_id=`, `?actor_id=`, `?limit=`) |
 | `GET` | `/v1/backoffice/audit/verify` | 👤 Recompute the hash chain → `{intact, events, broken_at}` |
 | `GET` | `/healthz`, `/metrics` | Health and Prometheus metrics |

@@ -163,7 +163,7 @@ func (s *Store) SaveToken(ctx context.Context, t domain.Token, ev outbox.Message
 }
 
 const authCols = `id, network_reference, card_id, token_id, status, response_code, reason, amount, currency, cleared_amount,
-	merchant_name, mcc, country, channel, transaction_id, created_at, function`
+	merchant_name, mcc, country, channel, transaction_id, created_at, function, refunded_amount`
 
 func scanAuth(row pgx.Row) (domain.Authorization, error) {
 	var (
@@ -174,7 +174,7 @@ func scanAuth(row pgx.Row) (domain.Authorization, error) {
 		amount                    int64
 	)
 	err := row.Scan(&a.ID, &a.NetworkReference, &card, &token, &status, &a.Code, &a.Reason, &amount, &currency, &a.Cleared,
-		&a.Purchase.MerchantName, &a.Purchase.MCC, &a.Purchase.Country, &channel, &txID, &a.CreatedAt, &function)
+		&a.Purchase.MerchantName, &a.Purchase.MCC, &a.Purchase.Country, &channel, &txID, &a.CreatedAt, &function, &a.Refunded)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return a, fmt.Errorf("%w: authorization", domain.ErrNotFound)
 	}
@@ -279,4 +279,212 @@ func (s *Store) HandleAccountEvent(ctx context.Context, ev outbox.Event) error {
 		_, err := tx.Exec(ctx, sql, p.AccountID)
 		return err
 	})
+}
+
+func (s *Store) AuthorizationsByCard(ctx context.Context, card uuid.UUID, limit int) ([]domain.Authorization, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, err := s.pool.Query(ctx, `SELECT `+authCols+` FROM authorizations WHERE card_id = $1 AND status <> 'PENDING_REVERSAL'
+		ORDER BY created_at DESC LIMIT $2`, card, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Authorization
+	for rows.Next() {
+		a, err := scanAuth(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
+}
+
+// ---- refunds and disputes ----
+
+type unit struct {
+	ctx context.Context
+	tx  pgx.Tx
+}
+
+func (s *Store) InTx(ctx context.Context, fn func(ports.Tx) error) error {
+	return pg.InTx(ctx, s.pool, func(tx pgx.Tx) error { return fn(&unit{ctx: ctx, tx: tx}) })
+}
+
+func (u *unit) exec(sql string, args ...any) error {
+	_, err := u.tx.Exec(u.ctx, sql, args...)
+	return err
+}
+
+func (u *unit) LockAuthorization(id uuid.UUID) (domain.Authorization, error) {
+	a, err := scanAuth(u.tx.QueryRow(u.ctx, `SELECT `+authCols+` FROM authorizations WHERE id = $1 FOR UPDATE`, id))
+	if err != nil || a.CardID == uuid.Nil {
+		return a, err
+	}
+	err = u.tx.QueryRow(u.ctx, `SELECT account_id FROM cards WHERE id = $1`, a.CardID).Scan(&a.AccountID)
+	return a, err
+}
+
+func (u *unit) SetRefunded(id uuid.UUID, refunded int64) error {
+	return u.exec(`UPDATE authorizations SET refunded_amount = $2, updated_at = now() WHERE id = $1`, id, refunded)
+}
+
+const disputeCols = `d.id, d.authorization_id, d.card_id, d.account_id, d.reason, d.amount, d.description, d.status, d.decided_by,
+	d.decision_reason, d.created_at, d.decided_at, a.merchant_name, a.created_at`
+
+const disputeFrom = ` FROM disputes d JOIN authorizations a ON a.id = d.authorization_id`
+
+func scanDispute(row pgx.Row) (domain.Dispute, error) {
+	var (
+		d              domain.Dispute
+		reason, status string
+	)
+	err := row.Scan(&d.ID, &d.AuthorizationID, &d.CardID, &d.AccountID, &reason, &d.Amount, &d.Description, &status, &d.DecidedBy,
+		&d.DecisionReason, &d.CreatedAt, &d.DecidedAt, &d.MerchantName, &d.PurchasedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return d, fmt.Errorf("%w: dispute", domain.ErrNotFound)
+	}
+	d.Reason, d.Status = domain.DisputeReason(reason), domain.DisputeStatus(status)
+	return d, err
+}
+
+func collectDisputes(rows pgx.Rows, err error) ([]domain.Dispute, error) {
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Dispute
+	for rows.Next() {
+		d, err := scanDispute(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, d)
+	}
+	return out, rows.Err()
+}
+
+func (u *unit) OpenDispute(authorization uuid.UUID) (*domain.Dispute, error) {
+	d, err := scanDispute(u.tx.QueryRow(u.ctx, `SELECT `+disputeCols+disputeFrom+` WHERE d.authorization_id = $1 AND d.status = 'OPEN'`, authorization))
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil, nil
+	}
+	return &d, err
+}
+
+func (u *unit) InsertDispute(d domain.Dispute) error {
+	err := u.exec(`INSERT INTO disputes (id, authorization_id, card_id, account_id, reason, amount, description, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		d.ID, d.AuthorizationID, d.CardID, d.AccountID, d.Reason, d.Amount, d.Description, d.Status, d.CreatedAt)
+	if pg.IsUniqueViolation(err, "disputes_one_open") {
+		return domain.Refuse("DISPUTE_ALREADY_OPEN", "this purchase is already being disputed")
+	}
+	return err
+}
+
+func (u *unit) LockDispute(id uuid.UUID) (domain.Dispute, error) {
+	return scanDispute(u.tx.QueryRow(u.ctx, `SELECT `+disputeCols+disputeFrom+` WHERE d.id = $1 FOR UPDATE OF d`, id))
+}
+
+func (u *unit) SaveDispute(d domain.Dispute) error {
+	return u.exec(`UPDATE disputes SET status = $2, decided_by = $3, decision_reason = $4, decided_at = $5 WHERE id = $1`,
+		d.ID, d.Status, d.DecidedBy, d.DecisionReason, d.DecidedAt)
+}
+
+const refundCols = `r.id, r.authorization_id, r.account_id, r.amount, r.source, r.reference, r.status, r.failure_reason, r.created_at,
+	a.function, a.merchant_name`
+
+const refundFrom = ` FROM refunds r JOIN authorizations a ON a.id = r.authorization_id`
+
+func scanRefund(row pgx.Row) (domain.Refund, error) {
+	var (
+		r                        domain.Refund
+		source, status, function string
+	)
+	err := row.Scan(&r.ID, &r.AuthorizationID, &r.AccountID, &r.Amount, &source, &r.Reference, &status, &r.FailureReason, &r.CreatedAt,
+		&function, &r.MerchantName)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return r, fmt.Errorf("%w: refund", domain.ErrNotFound)
+	}
+	r.Source, r.Status, r.Function = domain.RefundSource(source), domain.RefundStatus(status), domain.Function(function)
+	return r, err
+}
+
+func (u *unit) RefundByReference(authorization uuid.UUID, reference string) (*domain.Refund, error) {
+	r, err := scanRefund(u.tx.QueryRow(u.ctx, `SELECT `+refundCols+refundFrom+` WHERE r.authorization_id = $1 AND r.reference = $2`,
+		authorization, reference))
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil, nil
+	}
+	return &r, err
+}
+
+func (u *unit) InsertRefund(r domain.Refund) error {
+	return u.exec(`INSERT INTO refunds (id, authorization_id, account_id, amount, source, reference, status, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, r.ID, r.AuthorizationID, r.AccountID, r.Amount, r.Source, r.Reference, r.Status, r.CreatedAt)
+}
+
+func (u *unit) LockRefund(id uuid.UUID) (domain.Refund, error) {
+	return scanRefund(u.tx.QueryRow(u.ctx, `SELECT `+refundCols+refundFrom+` WHERE r.id = $1 FOR UPDATE OF r`, id))
+}
+
+func (u *unit) SaveRefund(r domain.Refund) error {
+	return u.exec(`UPDATE refunds SET status = $2, failure_reason = $3, updated_at = now() WHERE id = $1`, r.ID, r.Status, r.FailureReason)
+}
+
+func (u *unit) LockCard(id uuid.UUID) (domain.Card, error) {
+	return scanCard(u.tx.QueryRow(u.ctx, `SELECT `+cardCols+` FROM cards WHERE id = $1 FOR UPDATE`, id))
+}
+
+func (u *unit) SaveCard(c domain.Card) error {
+	return u.exec(`UPDATE cards SET status = $2, status_reason = $3, updated_at = now() WHERE id = $1`, c.ID, c.Status, c.StatusReason)
+}
+
+func (u *unit) Publish(m outbox.Message) error { return outbox.Insert(u.ctx, u.tx, m) }
+
+func (s *Store) Dispute(ctx context.Context, id uuid.UUID) (domain.Dispute, error) {
+	return scanDispute(s.pool.QueryRow(ctx, `SELECT `+disputeCols+disputeFrom+` WHERE d.id = $1`, id))
+}
+
+func (s *Store) Disputes(ctx context.Context, account uuid.UUID, status domain.DisputeStatus, limit int) ([]domain.Dispute, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 100
+	}
+	var acc *uuid.UUID
+	if account != uuid.Nil {
+		acc = &account
+	}
+	return collectDisputes(s.pool.Query(ctx, `SELECT `+disputeCols+disputeFrom+`
+		WHERE ($1::uuid IS NULL OR d.account_id = $1) AND ($2 = '' OR d.status = $2) ORDER BY d.created_at DESC LIMIT $3`,
+		acc, string(status), limit))
+}
+
+func (s *Store) LatestDisputes(ctx context.Context, authorizations []uuid.UUID) (map[uuid.UUID]domain.Dispute, error) {
+	list, err := collectDisputes(s.pool.Query(ctx, `SELECT DISTINCT ON (d.authorization_id) `+disputeCols+disputeFrom+`
+		WHERE d.authorization_id = ANY($1) ORDER BY d.authorization_id, d.created_at DESC`, authorizations))
+	out := map[uuid.UUID]domain.Dispute{}
+	for _, d := range list {
+		out[d.AuthorizationID] = d
+	}
+	return out, err
+}
+
+func (s *Store) PendingRefunds(ctx context.Context, before time.Time, limit int) ([]domain.Refund, error) {
+	rows, err := s.pool.Query(ctx, `SELECT `+refundCols+refundFrom+` WHERE r.status = 'PENDING' AND r.updated_at < $1
+		ORDER BY r.updated_at LIMIT $2`, before, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Refund
+	for rows.Next() {
+		r, err := scanRefund(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }

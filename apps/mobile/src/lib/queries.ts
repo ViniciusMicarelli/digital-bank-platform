@@ -46,6 +46,7 @@ export function useStatement(id?: string, limit = 30) {
 export const typeLabels: Record<string, string> = {
   INTERNAL_TRANSFER: 'Transferência', PIX: 'Pix', PIX_OUT: 'Pix enviado', PIX_IN: 'Pix recebido', PIX_REFUND: 'Devolução Pix',
   DEBIT_CARD_PURCHASE: 'Compra no débito', CREDIT_INVOICE_PAYMENT: 'Pagamento de fatura', BOLETO_PAYMENT: 'Boleto',
+  CARD_REFUND: 'Estorno no cartão',
 }
 
 export const dateTime = (iso: string) =>

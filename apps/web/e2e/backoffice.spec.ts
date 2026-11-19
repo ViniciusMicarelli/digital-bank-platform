@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { ANALYST, PASSWORD, randomCPF, REVIEWER, shot, staffLogin } from './helpers'
+import { ANALYST, fund, onboard, PASSWORD, randomCPF, REVIEWER, shot, staffLogin } from './helpers'
 
 const api = (path: string) => `http://127.0.0.1:8000${path}`
 
@@ -76,6 +76,41 @@ test('unblocking an account needs a second analyst', async ({ page, browser, req
   await expect(reviewer.getByText(/Cadeia íntegra/)).toBeVisible()
   await shot(reviewer, '11-backoffice-four-eyes')
   await other.close()
+})
+
+test('a customer disputes a card purchase and an analyst refunds it', async ({ page, browser }) => {
+  await onboard(page)
+  await fund(page, '200,00')
+  await page.goto('/cartoes')
+  await page.getByRole('button', { name: 'Criar cartão virtual' }).click()
+  const merchant = `LOJA ${crypto.randomUUID().slice(0, 6).toUpperCase()}`
+  await page.getByLabel('Simular compra de').fill('75')
+  await page.getByLabel('Loja', { exact: true }).fill(merchant)
+  await page.getByRole('button', { name: 'Passar o cartão' }).click()
+  await expect(page.getByText('Confirme que é você')).toBeVisible()
+  await page.getByLabel('Senha').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Confirmar' }).click()
+  await expect(page.getByText(/Aprovada: R\$ 75,00/)).toBeVisible()
+
+  const row = page.getByRole('listitem').filter({ hasText: merchant })
+  await row.getByRole('button', { name: 'Contestar' }).click()
+  await page.getByLabel('O que aconteceu?').selectOption('NOT_RECEIVED')
+  await page.getByLabel('Conte o que houve (opcional)').fill('O pedido nunca chegou')
+  await page.getByRole('button', { name: 'Enviar contestação' }).click()
+  await expect(row.getByText('Contestação em análise')).toBeVisible()
+  await shot(page, '12-dispute')
+
+  const other = await browser.newContext()
+  const staff = await other.newPage()
+  await staffLogin(staff, REVIEWER)
+  const item = staff.getByRole('listitem').filter({ hasText: merchant })
+  await expect(item.getByText('O pedido nunca chegou')).toBeVisible()
+  await item.getByRole('button', { name: 'Aceitar e estornar' }).click()
+  await expect(item).toHaveCount(0)
+  await other.close()
+
+  await page.reload()
+  await expect(page.getByRole('listitem').filter({ hasText: merchant }).getByText('Contestação estornada')).toBeVisible()
 })
 
 test('customers cannot open the back office', async ({ page, request }) => {

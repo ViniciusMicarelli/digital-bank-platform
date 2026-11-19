@@ -43,6 +43,8 @@ type fakeTxs struct {
 	reserves  int
 	down      bool
 	lostReply bool // reserve succeeds but the caller sees an error
+	refunds   int
+	refuse    string // refunds fail with this reason
 }
 
 func newTxs() *fakeTxs {
@@ -100,6 +102,27 @@ func (f *fakeTxs) Compensate(_ context.Context, id uuid.UUID, _ string) (ports.T
 	f.balance[account] += f.held[id]
 	f.held[id] = 0
 	return f.setStatus(id, "FAILED"), nil
+}
+
+// Refund gives money back to account, once per key; refuse makes it FAILED.
+func (f *fakeTxs) Refund(_ context.Context, key string, acc uuid.UUID, amount money.Money, _ string, _ map[string]string) (ports.TxResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.down {
+		return ports.TxResult{}, errors.New("transaction-service unavailable")
+	}
+	if r, ok := f.byKey[key]; ok {
+		return r, nil
+	}
+	r := ports.TxResult{ID: uuid.New(), Status: "COMPLETED"}
+	if f.refuse != "" {
+		r.Status, r.FailureReason = "FAILED", f.refuse
+	} else {
+		f.balance[acc] += amount.Minor()
+		f.refunds++
+	}
+	f.byKey[key] = r
+	return r, nil
 }
 
 type env struct {
@@ -326,5 +349,134 @@ func TestCreditFunction(t *testing.T) {
 	p.NetworkReference = uuid.NewString()
 	if a, _ := e.svc.Authorize(e.ctx, d.PAN, p); a.Code != domain.CodeInsufficientFunds {
 		t.Fatalf("over the credit limit = %+v", a)
+	}
+}
+
+func reasonOf(err error) string {
+	if r, ok := domain.AsRefused(err); ok {
+		return r.Reason
+	}
+	return ""
+}
+
+func TestMerchantRefunds(t *testing.T) {
+	e := setup(t)
+	_, d := e.issue(t)
+	a, _ := e.svc.Authorize(e.ctx, d.PAN, purchase(d, "60"))
+	if _, err := e.svc.Refund(e.ctx, a.ID, "rf-1", 10_00); reasonOf(err) != "NOT_CLEARED" {
+		t.Fatalf("refund before clearing: %v", err)
+	}
+	_, _ = e.svc.Clear(e.ctx, a.ID, nil) // balance 40
+	r, err := e.svc.Refund(e.ctx, a.ID, "rf-1", 25_00)
+	if err != nil || r.Status != domain.RefundCompleted || e.txs.balance[account] != 65_00 {
+		t.Fatalf("refund = %+v %v (balance %d)", r, err, e.txs.balance[account])
+	}
+	if again, _ := e.svc.Refund(e.ctx, a.ID, "rf-1", 25_00); again.ID != r.ID || e.txs.refunds != 1 {
+		t.Fatal("a network retry refunds once")
+	}
+	if _, err := e.svc.Refund(e.ctx, a.ID, "rf-2", 35_01); reasonOf(err) != "REFUND_TOO_LARGE" {
+		t.Fatalf("more than cleared: %v", err)
+	}
+
+	// An outage: recorded as PENDING, the worker finishes it.
+	e.txs.down = true
+	r2, err := e.svc.Refund(e.ctx, a.ID, "rf-2", 5_00)
+	if err != nil || r2.Status != domain.RefundPending {
+		t.Fatalf("during the outage = %+v %v", r2, err)
+	}
+	e.txs.down = false
+	e.svc.SetClock(func() time.Time { return time.Now().Add(time.Minute) })
+	e.svc.RecoverOnce(e.ctx, 30*time.Second)
+	if got, _ := e.store.Authorization(e.ctx, a.ID); got.Refunded != 30_00 || e.txs.balance[account] != 70_00 {
+		t.Fatalf("after recovery: refunded %d, balance %d", got.Refunded, e.txs.balance[account])
+	}
+
+	// A refund the ledger refuses gives the amount back to what can be refunded.
+	e.txs.refuse = "DESTINATION_NOT_ACTIVE"
+	if r3, _ := e.svc.Refund(e.ctx, a.ID, "rf-3", 10_00); r3.Status != domain.RefundFailed || r3.FailureReason != "DESTINATION_NOT_ACTIVE" {
+		t.Fatalf("refused refund = %+v", r3)
+	}
+	if got, _ := e.store.Authorization(e.ctx, a.ID); got.Refunded != 30_00 {
+		t.Fatalf("refunded after a failure = %d", got.Refunded)
+	}
+}
+
+func TestDisputes(t *testing.T) {
+	e := setup(t)
+	c, d := e.issue(t)
+	a, _ := e.svc.Authorize(e.ctx, d.PAN, purchase(d, "80"))
+	if _, err := e.svc.OpenDispute(e.ctx, uuid.Nil, a.ID, domain.DisputeNotReceived, 0, ""); reasonOf(err) != "NOT_CLEARED" {
+		t.Fatalf("dispute before clearing: %v", err)
+	}
+	_, _ = e.svc.Clear(e.ctx, a.ID, nil) // balance 20
+
+	// Not recognized: fraud, the card is blocked at once.
+	if _, err := e.svc.OpenDispute(e.ctx, uuid.New(), a.ID, domain.DisputeNotRecognized, 0, ""); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("a purchase of another card: %v", err)
+	}
+	dp, err := e.svc.OpenDispute(e.ctx, c.ID, a.ID, domain.DisputeNotRecognized, 0, "não fui eu")
+	if err != nil || dp.Status != domain.DisputeOpen || dp.Amount != 80_00 || dp.MerchantName != "PADARIA SAO JOSE" {
+		t.Fatalf("open = %+v %v", dp, err)
+	}
+	if card, _ := e.store.Card(e.ctx, c.ID); card.Status != domain.Blocked || card.StatusReason != domain.ReasonFraudSuspected {
+		t.Fatalf("card after a fraud dispute = %+v", card)
+	}
+	if _, err := e.svc.Unblock(e.ctx, c.ID); reasonOf(err) != "CARD_COMPROMISED" {
+		t.Fatalf("unblocking a card blocked for fraud: %v", err)
+	}
+	if _, err := e.svc.OpenDispute(e.ctx, uuid.Nil, a.ID, domain.DisputeDuplicate, 0, ""); reasonOf(err) != "DISPUTE_ALREADY_OPEN" {
+		t.Fatalf("second dispute: %v", err)
+	}
+	// The merchant cannot refund what is under dispute.
+	if _, err := e.svc.Refund(e.ctx, a.ID, "rf-1", 1_00); reasonOf(err) != "REFUND_TOO_LARGE" {
+		t.Fatalf("refund under dispute: %v", err)
+	}
+	if list, _ := e.svc.Disputes(e.ctx, uuid.Nil, domain.DisputeOpen, 10); len(list) != 1 {
+		t.Fatalf("open disputes = %+v", list)
+	}
+	purchases, _ := e.svc.Purchases(e.ctx, c.ID, 10)
+	if len(purchases) != 1 || purchases[0].Dispute == nil || purchases[0].Dispute.ID != dp.ID {
+		t.Fatalf("purchases = %+v", purchases)
+	}
+
+	// Won: the customer gets the money back, once.
+	won, err := e.svc.DecideDispute(e.ctx, dp.ID, "analyst-1", true, "")
+	if err != nil || won.Status != domain.DisputeWon || won.DecidedBy != "analyst-1" || e.txs.balance[account] != 100_00 {
+		t.Fatalf("won = %+v %v (balance %d)", won, err, e.txs.balance[account])
+	}
+	if _, err := e.svc.DecideDispute(e.ctx, dp.ID, "analyst-2", false, "x"); reasonOf(err) != "DISPUTE_NOT_OPEN" {
+		t.Fatalf("decided twice: %v", err)
+	}
+	if _, err := e.svc.OpenDispute(e.ctx, uuid.Nil, a.ID, domain.DisputeDuplicate, 0, ""); reasonOf(err) != "NOTHING_TO_DISPUTE" {
+		t.Fatalf("dispute a refunded purchase: %v", err)
+	}
+
+	// Lost: needs a reason, nothing moves. (The first card is blocked: a new one.)
+	_, d2 := e.issue(t)
+	b, _ := e.svc.Authorize(e.ctx, d2.PAN, purchase(d2, "10"))
+	_, _ = e.svc.Clear(e.ctx, b.ID, nil)
+	lost, _ := e.svc.OpenDispute(e.ctx, uuid.Nil, b.ID, domain.DisputeNotReceived, 4_00, "")
+	if _, err := e.svc.DecideDispute(e.ctx, lost.ID, "analyst-1", false, ""); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatal("a lost dispute needs a reason")
+	}
+	if l, err := e.svc.DecideDispute(e.ctx, lost.ID, "analyst-1", false, "Comprovante de entrega"); err != nil || l.Status != domain.DisputeLost || e.txs.balance[account] != 90_00 {
+		t.Fatalf("lost = %+v %v (balance %d)", l, err, e.txs.balance[account])
+	}
+}
+
+func TestCreditDisputeRefundsTheInvoice(t *testing.T) {
+	e := setup(t)
+	_, d := e.issue(t)
+	p := purchase(d, "50")
+	p.Function = domain.Credit
+	e.credit.balance[account] = 500_00
+	a, _ := e.svc.Authorize(e.ctx, d.PAN, p)
+	_, _ = e.svc.Clear(e.ctx, a.ID, nil)
+	dp, _ := e.svc.OpenDispute(e.ctx, uuid.Nil, a.ID, domain.DisputeWrongAmount, 20_00, "")
+	if _, err := e.svc.DecideDispute(e.ctx, dp.ID, "analyst-1", true, ""); err != nil {
+		t.Fatal(err)
+	}
+	if e.credit.refunds != 1 || e.txs.refunds != 0 {
+		t.Fatalf("credit refunds %d, debit refunds %d", e.credit.refunds, e.txs.refunds)
 	}
 }

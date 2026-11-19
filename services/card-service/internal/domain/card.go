@@ -163,9 +163,14 @@ func (c *Card) Block(reason string) error {
 	return nil
 }
 
+// Unblock reactivates a blocked card, except one blocked because its holder
+// reported fraud: that number is compromised, a new card is the way out.
 func (c *Card) Unblock() error {
 	if c.Status != Blocked {
 		return fmt.Errorf("%w: card is %s", ErrInvalidTransition, c.Status)
+	}
+	if c.StatusReason == ReasonFraudSuspected {
+		return Refuse("CARD_COMPROMISED", "a card blocked for fraud cannot be unblocked; ask for a new one")
 	}
 	c.Status, c.StatusReason = Active, ""
 	return nil
@@ -339,6 +344,7 @@ type Authorization struct {
 	Reason           string
 	Purchase         Purchase
 	Cleared          int64
+	Refunded         int64 // merchant refunds and won disputes
 	TransactionID    uuid.UUID
 	CreatedAt        time.Time
 }

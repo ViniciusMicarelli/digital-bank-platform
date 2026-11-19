@@ -23,6 +23,10 @@ service CreditService {
   // Clearing: the purchase goes into the open invoice.
   rpc CaptureCredit(CaptureCreditRequest) returns (CaptureCreditResponse);
   rpc ReleaseCredit(ReleaseCreditRequest) returns (ReleaseCreditResponse);
+  // Card refund on a captured credit purchase (merchant refund or won
+  // dispute): a credit on the open invoice and the limit freed. Idempotent
+  // on the key.
+  rpc RefundCredit(RefundCreditRequest) returns (RefundCreditResponse);
 
   // Sandbox: close the open invoice now, or make the closed one overdue.
   rpc AdvanceCycle(AdvanceCycleRequest) returns (AdvanceCycleResponse);
@@ -58,7 +62,9 @@ message Invoice {
 
 message InvoiceItem {
   string id = 1;
-  // PURCHASE, PAYMENT, BALANCE_CARRIED, FINE, INTEREST.
+  // PURCHASE, PAYMENT, BALANCE_CARRIED, FINE, INTEREST (owed), REFUND and
+  // CREDIT_CARRIED_IN (credits), CREDIT_CARRIED_OUT (a credit moved to the
+  // next invoice).
   string kind = 2;
   bank.common.v1.Money amount = 3;
   string description = 4;
@@ -170,3 +176,24 @@ message AdvanceCycleRequest {
 }
 
 message AdvanceCycleResponse {}
+
+message RefundCreditRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  bank.common.v1.Money amount = 3;
+  string description = 4;
+  map<string, string> metadata = 5;
+}
+
+message CreditRefund {
+  string id = 1;
+  string account_id = 2;
+  string invoice_id = 3;
+  bank.common.v1.Money amount = 4;
+  // COMPLETED.
+  string status = 5;
+}
+
+message RefundCreditResponse {
+  CreditRefund refund = 1;
+}

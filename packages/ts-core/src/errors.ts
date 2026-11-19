@@ -40,6 +40,12 @@ const messages: Record<string, string> = {
   INVALID_PROFILE: 'Confira os dados do cadastro.',
   INVALID_AMOUNT: 'Valor inválido.',
   DESTINATION_NOT_FOUND: 'Conta de destino não encontrada.',
+  NOT_CLEARED: 'Esta compra ainda não foi confirmada pela loja.',
+  DISPUTE_WINDOW_CLOSED: 'Compras podem ser contestadas em até 90 dias.',
+  DISPUTE_ALREADY_OPEN: 'Esta compra já está em contestação.',
+  NOTHING_TO_DISPUTE: 'Esta compra já foi totalmente estornada.',
+  DISPUTE_NOT_OPEN: 'Esta contestação já foi decidida.',
+  CARD_COMPROMISED: 'Este cartão foi bloqueado por segurança. Peça um novo.',
 }
 
 export function errorMessage(err: unknown): string {

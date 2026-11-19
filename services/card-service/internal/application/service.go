@@ -414,6 +414,7 @@ func (s *Service) RecoverOnce(ctx context.Context, olderThan time.Duration) int 
 		}
 		done++
 	}
+	s.recoverRefunds(ctx, olderThan)
 	return done
 }
 

@@ -164,7 +164,8 @@ func TestPublicAPI(t *testing.T) {
 		}
 	}
 	if status, body := ana.call("POST", "/v1/accounts/"+anaID+"/transfers",
-		map[string]string{"to_account_id": brunoID, "amount": "1000.00"}, idem()); status != 422 || body["error"].(map[string]any)["code"] != "INSUFFICIENT_FUNDS" {
+		// More than the balance, within the nightly limit (R$ 1.000 from 20h to 6h).
+		map[string]string{"to_account_id": brunoID, "amount": "500.00"}, idem()); status != 422 || body["error"].(map[string]any)["code"] != "INSUFFICIENT_FUNDS" {
 		t.Fatalf("overdraw: %d %v", status, body)
 	}
 

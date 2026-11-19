@@ -11,8 +11,11 @@ Orchestrates money movements that involve more than one step or service, using *
 | `INTERNAL_TRANSFER` | app | check destination → consume limit → post entry |
 | `PIX_OUT` | pix-service | consume limit → hold → *(SPI)* → capture / release + restore limit |
 | `PIX_IN` | pix-service | check destination → post entry |
-
-Planned: `BOLETO_PAYMENT`, `DEBIT_CARD_PURCHASE`, `INVOICE_PAYMENT`.
+| `DEBIT_CARD_PURCHASE` | card-service | consume limit → hold → *(clearing)* → capture (partial allowed) / release |
+| `BOLETO_PAYMENT` | payment-service | consume limit → hold → *(clearing)* → capture / release |
+| `CREDIT_CARD_PURCHASE`, `CREDIT_INVOICE_PAYMENT`, `CREDIT_CHARGES` | credit-service | post entry (one step) |
+| `CARD_REFUND` | card-service | check destination → post entry (card clearing → customer) |
+| `CREDIT_CARD_REFUND` | credit-service | post entry (card clearing → credit-receivables) |
 
 ## State Machine
 

@@ -32,6 +32,25 @@ service CardService {
   rpc Clear(ClearRequest) returns (ClearResponse);
   // Cancels an approved authorization (merchant void); the money is released.
   rpc Reverse(ReverseRequest) returns (ReverseResponse);
+  // Network: the merchant refunds (part of) a cleared purchase; idempotent
+  // on refund_reference. Fails with FAILED_PRECONDITION and reason
+  // REFUND_TOO_LARGE or NOT_CLEARED.
+  rpc Refund(RefundRequest) returns (RefundResponse);
+
+  // A card's purchases, newest first, with what was refunded and any dispute.
+  rpc ListAuthorizations(ListAuthorizationsRequest) returns (ListAuthorizationsResponse);
+
+  // The customer disputes a cleared purchase (chargeback). A purchase the
+  // customer does not recognize blocks the card at once. Fails with
+  // FAILED_PRECONDITION and reason NOT_CLEARED, DISPUTE_WINDOW_CLOSED,
+  // DISPUTE_ALREADY_OPEN or NOTHING_TO_DISPUTE.
+  rpc OpenDispute(OpenDisputeRequest) returns (OpenDisputeResponse);
+  rpc GetDispute(GetDisputeRequest) returns (GetDisputeResponse);
+  // By account (the customer) or by status (the back office).
+  rpc ListDisputes(ListDisputesRequest) returns (ListDisputesResponse);
+  // An analyst's decision: won refunds the disputed amount; lost needs a
+  // reason. Fails with FAILED_PRECONDITION and reason DISPUTE_NOT_OPEN.
+  rpc DecideDispute(DecideDisputeRequest) returns (DecideDisputeResponse);
 }
 
 enum CardKind {
@@ -172,6 +191,10 @@ message Authorization {
   // Set when the purchase was made with a token.
   string token_id = 14;
   Function function = 15;
+  // Refunded so far (merchant refunds and won disputes).
+  bank.common.v1.Money refunded_amount = 16;
+  // The latest dispute of this purchase, if any.
+  Dispute dispute = 17;
 }
 
 message AuthorizeRequest {
@@ -254,4 +277,115 @@ message UpdateTokenRequest {
 
 message UpdateTokenResponse {
   CardToken token = 1;
+}
+
+message RefundRequest {
+  string authorization_id = 1;
+  // The network's id of this refund; retries reuse it.
+  string refund_reference = 2;
+  bank.common.v1.Money amount = 3;
+}
+
+message Refund {
+  string id = 1;
+  string authorization_id = 2;
+  bank.common.v1.Money amount = 3;
+  // MERCHANT or DISPUTE.
+  string source = 4;
+  // PENDING (money on its way, retried), COMPLETED, FAILED.
+  string status = 5;
+  string failure_reason = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message RefundResponse {
+  Refund refund = 1;
+}
+
+message ListAuthorizationsRequest {
+  string card_id = 1;
+  int32 limit = 2;
+}
+
+message ListAuthorizationsResponse {
+  repeated Authorization authorizations = 1;
+}
+
+enum DisputeReason {
+  DISPUTE_REASON_UNSPECIFIED = 0;
+  // Fraud: the customer did not make this purchase (blocks the card).
+  DISPUTE_REASON_NOT_RECOGNIZED = 1;
+  DISPUTE_REASON_NOT_RECEIVED = 2;
+  DISPUTE_REASON_DUPLICATE = 3;
+  DISPUTE_REASON_WRONG_AMOUNT = 4;
+  // Subscription or order cancelled and still charged.
+  DISPUTE_REASON_CANCELLED = 5;
+}
+
+enum DisputeStatus {
+  DISPUTE_STATUS_UNSPECIFIED = 0;
+  DISPUTE_STATUS_OPEN = 1;
+  // Decided for the customer: the amount was refunded.
+  DISPUTE_STATUS_WON = 2;
+  DISPUTE_STATUS_LOST = 3;
+}
+
+message Dispute {
+  string id = 1;
+  string authorization_id = 2;
+  string card_id = 3;
+  string account_id = 4;
+  DisputeReason reason = 5;
+  bank.common.v1.Money amount = 6;
+  string description = 7;
+  DisputeStatus status = 8;
+  string decided_by = 9;
+  string decision_reason = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp decided_at = 12;
+  string merchant_name = 13;
+  google.protobuf.Timestamp purchased_at = 14;
+}
+
+message OpenDisputeRequest {
+  string authorization_id = 1;
+  DisputeReason reason = 2;
+  // Optional: defaults to everything not refunded yet.
+  bank.common.v1.Money amount = 3;
+  string description = 4;
+  // The card the purchase must belong to (NOT_FOUND otherwise).
+  string card_id = 5;
+}
+
+message OpenDisputeResponse {
+  Dispute dispute = 1;
+}
+
+message GetDisputeRequest {
+  string id = 1;
+}
+
+message GetDisputeResponse {
+  Dispute dispute = 1;
+}
+
+message ListDisputesRequest {
+  string account_id = 1;
+  DisputeStatus status = 2;
+  int32 limit = 3;
+}
+
+message ListDisputesResponse {
+  repeated Dispute disputes = 1;
+}
+
+message DecideDisputeRequest {
+  string id = 1;
+  string analyst_id = 2;
+  bool won = 3;
+  string reason = 4;
+}
+
+message DecideDisputeResponse {
+  Dispute dispute = 1;
 }

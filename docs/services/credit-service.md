@@ -16,6 +16,7 @@ Credit card credit: the **credit line** (limit), holds for card authorizations, 
 | Payments of an open (in advance) or closed invoice, total or partial, from the checking account; payments in flight count against what is left, so concurrent payments can never overpay | ✅ |
 | Past the due date the unpaid balance moves to the next invoice with a 2% fine and a month of interest (8% a month by default); the overdue invoice is no longer payable | ✅ |
 | Sandbox: close the open invoice now / make the closed one overdue (`AdvanceCycle`) | ✅ |
+| Card refunds (`RefundCredit`, idempotent on the key): card clearing → credit-receivables in the ledger (`CREDIT_CARD_REFUND`), a `REFUND` credit on the open invoice and the limit freed; a credit larger than the invoice moves to the next one when it closes (`CREDIT_CARRIED_OUT` / `CREDIT_CARRIED_IN`) | ✅ |
 | Installments (`parcelado`), minimum payment, limit changes, blocking the line with the account | planned |
 
 ## Money in the Ledger
@@ -74,7 +75,7 @@ Defined in [`contracts/proto/bank/credit/v1/credit.proto`](../../contracts/proto
 | `OpenCreditLine` / `GetCreditLine` | Open (idempotent) and read the line |
 | `ListInvoices` / `GetInvoice` | Invoices and their items |
 | `PayInvoice` | Pay from the checking account |
-| `ReserveCredit` / `CaptureCredit` / `ReleaseCredit` | Used by card-service |
+| `ReserveCredit` / `CaptureCredit` / `ReleaseCredit` / `RefundCredit` | Used by card-service |
 | `AdvanceCycle` | Sandbox only |
 
 ## Events

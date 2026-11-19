@@ -13,7 +13,11 @@ import { errorMessage, compareBRL, formatBRL, type CreditLine, type Invoice } fr
 const invoiceStatus: Record<Invoice['status'], [string, 'credit' | 'amber' | 'green' | 'red']> = {
   OPEN: ['Aberta', 'credit'], CLOSED: ['Fechada', 'amber'], PAID: ['Paga', 'green'], OVERDUE: ['Vencida', 'red'],
 }
-const itemKinds: Record<string, string> = { PURCHASE: 'Compra', PAYMENT: 'Pagamento', BALANCE_CARRIED: 'Saldo anterior', FINE: 'Multa', INTEREST: 'Juros' }
+const itemKinds: Record<string, string> = {
+  PURCHASE: 'Compra', PAYMENT: 'Pagamento', BALANCE_CARRIED: 'Saldo anterior', FINE: 'Multa', INTEREST: 'Juros',
+  REFUND: 'Estorno', CREDIT_CARRIED_IN: 'Crédito anterior', CREDIT_CARRIED_OUT: 'Crédito para a próxima fatura',
+}
+const creditKinds = new Set(['PAYMENT', 'REFUND', 'CREDIT_CARRIED_IN'])
 
 function InvoiceModal({ base, invoice, onClose }: { base: string; invoice: Invoice | null; onClose: () => void }) {
   const qc = useQueryClient()
@@ -46,7 +50,7 @@ function InvoiceModal({ base, invoice, onClose }: { base: string; invoice: Invoi
                 <li key={i} className="flex justify-between gap-3 py-2 text-sm">
                   <span className="min-w-0"><span className="block truncate font-medium">{it.description || itemKinds[it.kind]}</span>
                     <span className="text-xs text-muted">{itemKinds[it.kind] ?? it.kind} · {dateTimeBR(it.occurred_at)}</span></span>
-                  <Amount value={it.amount} direction={it.kind === 'PAYMENT' ? 'CREDIT' : undefined} />
+                  <Amount value={it.amount} direction={creditKinds.has(it.kind) ? 'CREDIT' : undefined} />
                 </li>
               ))}
             </ul>

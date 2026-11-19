@@ -1,0 +1,5 @@
+ALTER TABLE transactions DROP CONSTRAINT transactions_type_check;
+ALTER TABLE transactions ADD CONSTRAINT transactions_type_check
+    CHECK (type IN ('INTERNAL_TRANSFER', 'PIX_OUT', 'PIX_IN', 'DEBIT_CARD_PURCHASE',
+                    'CREDIT_CARD_PURCHASE', 'CREDIT_INVOICE_PAYMENT', 'CREDIT_CHARGES', 'BOLETO_PAYMENT',
+                    'CARD_REFUND', 'CREDIT_CARD_REFUND'));

@@ -3,12 +3,12 @@ import { useState } from 'react'
 import { useAccount } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
 import { useStepUp } from '../components/StepUp'
-import { Eye, EyeOff, Globe, Lock, LockOpen, Nfc, Pause, Play, Plus, ShoppingCart, Smartphone, Trash2, Wifi } from 'lucide-react'
+import { Eye, EyeOff, Globe, Lock, LockOpen, Nfc, Pause, Play, Plus, Receipt, ShieldAlert, ShoppingCart, Smartphone, Trash2, Wifi } from 'lucide-react'
 import { BankCard } from '../components/BankCard'
 import { Alert, Badge, Button, Empty, Field, IconButton, IconTile, Loading, Modal, PageTitle, Panel, Sandbox, Select, Toggle } from '../components/ui'
-import { cx } from '../lib/format'
+import { cx, dateTimeBR } from '../lib/format'
 import { api } from '../lib/api'
-import { errorMessage, formatBRL, type Card, type CardDetails, type CardToken } from '@bank/core'
+import { disputeReasons, errorMessage, formatBRL, type Card, type CardDetails, type CardPurchase, type CardToken, type DisputeReason } from '@bank/core'
 
 const wallets: Record<string, string> = { APPLE_PAY: 'Apple Pay', GOOGLE_PAY: 'Google Pay', SAMSUNG_PAY: 'Samsung Pay', MERCHANT: 'Loja' }
 
@@ -92,6 +92,7 @@ function SimulatePurchase({ card, reveal }: { card: Card; reveal: () => Promise<
     onSuccess: (a) => {
       setResult(a.status === 'APPROVED' ? `Aprovada: ${formatBRL(amount!)} em ${merchant}.` : `Recusada (código ${a.response_code}): ${a.reason}.`)
       qc.invalidateQueries({ queryKey: ['balance'] })
+      qc.invalidateQueries({ queryKey: ['purchases', card.id] })
     },
     onError: (e) => setResult(e instanceof Error && e.message === 'cancelled' ? '' : errorMessage(e)),
   })
@@ -107,6 +108,82 @@ function SimulatePurchase({ card, reveal }: { card: Card; reveal: () => Promise<
       </form>
       {result && <p className="mt-3 text-sm font-medium text-warning">{result}</p>}
     </Sandbox>
+  )
+}
+
+const disputeStatus = { OPEN: ['amber', 'Em análise'], WON: ['green', 'Estornada'], LOST: ['red', 'Recusada'] } as const
+
+function DisputeForm({ base, purchase, onDone }: { base: string; purchase: CardPurchase; onDone: () => void }) {
+  const [reason, setReason] = useState<DisputeReason>('NOT_RECEIVED')
+  const [amount, setAmount] = useState<string | null>(null)
+  const [description, setDescription] = useState('')
+  const [error, setError] = useState('')
+  const open = useMutation({
+    mutationFn: () => api('POST', `${base}/purchases/${purchase.id}/disputes`, { body: { reason, amount: amount ?? '', description } }),
+    onSuccess: onDone,
+    onError: (e) => setError(errorMessage(e)),
+  })
+  return (
+    <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); open.mutate() }}>
+      <p className="text-sm text-fg-2">{purchase.merchant_name} · {formatBRL(purchase.cleared_amount)} · {dateTimeBR(purchase.created_at)}</p>
+      <Select label="O que aconteceu?" value={reason} onChange={(e) => setReason(e.target.value as DisputeReason)}>
+        {Object.entries(disputeReasons).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+      </Select>
+      {reason === 'NOT_RECOGNIZED'
+        ? <Alert tone="amber">Por segurança, o cartão será bloqueado assim que você enviar. Depois é só pedir um novo.</Alert>
+        : <MoneyField label="Valor contestado" optional hint={`Até ${formatBRL(purchase.cleared_amount)}; em branco, a compra toda.`} onValue={setAmount} />}
+      <Field label="Conte o que houve (opcional)" value={description} maxLength={500} onChange={(e) => setDescription(e.target.value)} />
+      <Alert>{error}</Alert>
+      <Button type="submit" icon={ShieldAlert} loading={open.isPending}>Enviar contestação</Button>
+    </form>
+  )
+}
+
+function Purchases({ accountId, card }: { accountId: string; card: Card }) {
+  const qc = useQueryClient()
+  const base = `/v1/accounts/${accountId}/cards/${card.id}`
+  const [disputing, setDisputing] = useState<CardPurchase | null>(null)
+  const purchases = useQuery({
+    queryKey: ['purchases', card.id],
+    queryFn: async () => (await api<{ purchases: CardPurchase[] }>('GET', `${base}/purchases`)).purchases,
+  })
+  const list = (purchases.data ?? []).filter((p) => p.status === 'CLEARED' || p.status === 'APPROVED')
+  return (
+    <Panel title="Compras" icon={Receipt}>
+      {purchases.isLoading ? <Loading /> : !list.length ? <Empty icon={Receipt}>As compras com este cartão aparecem aqui.</Empty> : (
+        <ul className="-my-2 divide-y divide-line">
+          {list.map((p) => {
+            const refunded = Number(p.refunded_amount.amount) > 0
+            const d = p.dispute
+            return (
+              <li key={p.id} className="flex items-center gap-3 py-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-fg">{p.merchant_name}</p>
+                  <p className="text-xs text-muted">
+                    {p.function === 'CREDIT' ? 'Crédito' : 'Débito'} · {dateTimeBR(p.created_at)}
+                    {refunded && ` · estornado ${formatBRL(p.refunded_amount)}`}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="text-sm font-semibold tabular-nums text-fg">{formatBRL(p.status === 'CLEARED' ? p.cleared_amount : p.amount)}</span>
+                  {d ? <Badge tone={disputeStatus[d.status][0]}>Contestação {disputeStatus[d.status][1].toLowerCase()}</Badge>
+                    : p.status === 'CLEARED' && Number(p.refunded_amount.amount) < Number(p.cleared_amount.amount)
+                      ? <Button variant="ghost" size="sm" onClick={() => setDisputing(p)}>Contestar</Button>
+                      : p.status === 'APPROVED' && <Badge tone="slate">Pendente</Badge>}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <Modal open={!!disputing} onClose={() => setDisputing(null)} title="Contestar compra">
+        {disputing && <DisputeForm base={base} purchase={disputing} onDone={() => {
+          setDisputing(null)
+          qc.invalidateQueries({ queryKey: ['purchases', card.id] })
+          qc.invalidateQueries({ queryKey: ['cards', accountId] })
+        }} />}
+      </Modal>
+    </Panel>
   )
 }
 
@@ -133,6 +210,7 @@ function CardView({ accountId, card }: { accountId: string; card: Card }) {
     onSuccess: refresh,
   })
   const setControl = (k: keyof Card['controls']) => (v: boolean) => controls.mutate({ ...card.controls, [k]: v })
+  const compromised = card.status_reason === 'FRAUD_SUSPECTED'
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="space-y-5">
@@ -145,11 +223,14 @@ function CardView({ accountId, card }: { accountId: string; card: Card }) {
         <div data-reveal className="grid grid-cols-2 gap-3">
           {details ? <Button variant="secondary" icon={EyeOff} onClick={() => setDetails(null)}>Ocultar dados</Button>
             : <Button variant="secondary" icon={Eye} loading={show.isPending} onClick={() => show.mutate()} disabled={card.status !== 'ACTIVE'}>Ver dados do cartão</Button>}
-          <Button variant={card.status === 'ACTIVE' ? 'danger' : 'primary'} icon={card.status === 'ACTIVE' ? Lock : LockOpen} loading={block.isPending} onClick={() => block.mutate()}>
+          <Button variant={card.status === 'ACTIVE' ? 'danger' : 'primary'} icon={card.status === 'ACTIVE' ? Lock : LockOpen} loading={block.isPending}
+            disabled={compromised} onClick={() => block.mutate()}>
             {card.status === 'ACTIVE' ? 'Bloquear' : 'Desbloquear'}
           </Button>
         </div>
-        {card.status === 'BLOCKED' && <Alert tone="amber">Cartão bloqueado: compras são recusadas até você desbloquear.</Alert>}
+        {compromised
+          ? <Alert tone="amber">Bloqueamos este cartão por segurança depois da sua contestação. Peça um novo cartão virtual.</Alert>
+          : card.status === 'BLOCKED' && <Alert tone="amber">Cartão bloqueado: compras são recusadas até você desbloquear.</Alert>}
         <Alert>{error}</Alert>
         <SimulatePurchase card={card} reveal={reveal} />
       </div>
@@ -161,6 +242,7 @@ function CardView({ accountId, card }: { accountId: string; card: Card }) {
             <Toggle label="Pagamento por aproximação" description="Encostar o cartão na maquininha" checked={card.controls.contactless} onChange={setControl('contactless')} />
           </div>
         </Panel>
+        <Purchases accountId={accountId} card={card} />
         <Wallets accountId={accountId} card={card} confirm={confirm} />
       </div>
       {modal}

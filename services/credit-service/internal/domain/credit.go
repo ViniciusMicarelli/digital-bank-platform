@@ -240,7 +240,24 @@ const (
 	ItemBalanceCarried ItemKind = "BALANCE_CARRIED"
 	ItemFine           ItemKind = "FINE"
 	ItemInterest       ItemKind = "INTEREST"
+	// Credits: a card refund, and a credit carried from the previous invoice.
+	ItemRefund          ItemKind = "REFUND"
+	ItemCreditCarriedIn ItemKind = "CREDIT_CARRIED_IN"
+	// A credit larger than the invoice, moved to the next one.
+	ItemCreditCarriedOut ItemKind = "CREDIT_CARRIED_OUT"
 )
+
+// Refund is a card refund credited to an invoice.
+type Refund struct {
+	ID             uuid.UUID
+	IdempotencyKey string
+	LineID         uuid.UUID
+	AccountID      uuid.UUID
+	InvoiceID      uuid.UUID
+	Amount         int64
+	Description    string
+	CreatedAt      time.Time
+}
 
 type Item struct {
 	ID          uuid.UUID

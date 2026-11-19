@@ -175,7 +175,14 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Four-eyes approvals: unblocking an account needs a second analyst; approved actions run right away and are retried after an outage; requests expire after 24 h.
 - Web back office: approvals panel, unblock requests, audit trail with the chain status on the customer file. Two development analysts with TOTP; the e2e and browser tests share the last TOTP step used, so no code is replayed.
 
+## Phase 24 — Card refunds and disputes ✅
+
+- Merchant refunds of cleared purchases from the card network, idempotent and never more than what is left; debit refunds go back to the checking account (`CARD_REFUND`), credit refunds become a credit on the invoice, carried to the next invoice when larger than it.
+- Disputes: the customer disputes a purchase within 90 days; "not recognized" blocks the card for good; an analyst accepts (the amount is refunded) or rejects with a reason in the back office, audited.
+- Refunds left pending by an outage are retried; notifications for disputes and refunds; refunds in the statement.
+- Web and mobile: the card's purchases with "Contestar"; back-office disputes panel.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.
-- Back office: card disputes and chargebacks, staff SSO (OIDC) with WebAuthn, more four-eyes actions.
+- Back office: staff SSO (OIDC) with WebAuthn, more four-eyes actions; card representment and arbitration.

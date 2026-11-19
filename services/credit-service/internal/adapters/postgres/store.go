@@ -131,6 +131,24 @@ func (s *Store) Items(ctx context.Context, invoice uuid.UUID) ([]domain.Item, er
 	})
 }
 
+func (s *Store) RefundByKey(ctx context.Context, key string) (*domain.Refund, error) {
+	var r domain.Refund
+	err := s.pool.QueryRow(ctx, `SELECT id, idempotency_key, line_id, account_id, invoice_id, amount, description, created_at
+		FROM refunds WHERE idempotency_key = $1`, key).
+		Scan(&r.ID, &r.IdempotencyKey, &r.LineID, &r.AccountID, &r.InvoiceID, &r.Amount, &r.Description, &r.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return &r, err
+}
+
+func (u *unit) InsertRefund(r domain.Refund) (bool, error) {
+	tag, err := u.tx.Exec(u.ctx, `INSERT INTO refunds (id, idempotency_key, line_id, account_id, invoice_id, amount, description, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (idempotency_key) DO NOTHING`,
+		r.ID, r.IdempotencyKey, r.LineID, r.AccountID, r.InvoiceID, r.Amount, r.Description, r.CreatedAt)
+	return tag.RowsAffected() == 1, err
+}
+
 func (s *Store) Hold(ctx context.Context, id uuid.UUID) (domain.Hold, error) {
 	return scanHold(s.pool.QueryRow(ctx, `SELECT `+holdCols+` FROM holds WHERE id = $1`, id))
 }

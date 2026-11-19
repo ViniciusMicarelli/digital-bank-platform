@@ -48,7 +48,7 @@ func (f *fakeLedger) Post(_ context.Context, key, _ string, from, to uuid.UUID, 
 		return r, nil
 	}
 	r := ports.TxResult{ID: uuid.New(), Status: "COMPLETED"}
-	internal := from == application.CreditReceivablesAccountID
+	internal := from == application.CreditReceivablesAccountID || from == application.CardClearingAccountID
 	if !internal && f.balance[from] < amount {
 		r.Status, r.FailureReason = "FAILED", "INSUFFICIENT_FUNDS"
 	} else {
@@ -271,4 +271,60 @@ func TestSandboxExpire(t *testing.T) {
 		t.Fatalf("expired = %+v", list)
 	}
 	e.checkLedger(t, 0)
+}
+
+func TestRefunds(t *testing.T) {
+	e := setup(t)
+	if _, err := e.svc.Refund(e.ctx, "r0", e.account, 10_00, "ESTORNO", nil); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("no line: %v", err)
+	}
+	_, _ = e.svc.OpenLine(e.ctx, "k", e.account, 10)
+	h, _ := e.svc.Reserve(e.ctx, "h1", e.account, 100_00, "LOJA", nil)
+	if _, err := e.svc.Capture(e.ctx, h.ID, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := e.svc.Refund(e.ctx, "r1", e.account, 30_00, "Estorno LOJA", nil)
+	if err != nil || r.Amount != 30_00 {
+		t.Fatalf("refund = %+v %v", r, err)
+	}
+	if again, err := e.svc.Refund(e.ctx, "r1", e.account, 30_00, "Estorno LOJA", nil); err != nil || again.ID != r.ID {
+		t.Fatalf("retry = %+v %v", again, err)
+	}
+	if _, err := e.svc.Refund(e.ctx, "r1", e.account, 31_00, "x", nil); !errors.Is(err, domain.ErrConflict) {
+		t.Fatalf("same key, other amount: %v", err)
+	}
+	if inv := e.invoices(t)[0]; inv.Total != 70_00 || e.line(t).Used != 70_00 {
+		t.Fatalf("after a refund: invoice %+v, used %d", inv, e.line(t).Used)
+	}
+	e.checkLedger(t, 0)
+
+	// A lost reply from the ledger: the retry does not credit twice.
+	e.ledger.lostReply = true
+	if _, err := e.svc.Refund(e.ctx, "r2", e.account, 10_00, "Estorno", nil); err == nil {
+		t.Fatal("expected the lost reply")
+	}
+	if _, err := e.svc.Refund(e.ctx, "r2", e.account, 10_00, "Estorno", nil); err != nil {
+		t.Fatal(err)
+	}
+	if inv := e.invoices(t)[0]; inv.Total != 60_00 {
+		t.Fatalf("after the retried refund: %+v", inv)
+	}
+	e.checkLedger(t, 0)
+
+	// More refunded than owed: the credit moves to the next invoice.
+	if _, err := e.svc.Refund(e.ctx, "r3", e.account, 80_00, "Estorno", nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.AdvanceCycle(e.ctx, e.account, "CLOSE"); err != nil {
+		t.Fatal(err)
+	}
+	list := e.invoices(t)
+	if len(list) != 2 || list[1].Status != domain.InvoicePaid || list[1].Total != 0 || list[0].Total != -20_00 {
+		t.Fatalf("after closing = %+v", list)
+	}
+	d, _ := e.svc.Invoice(e.ctx, list[0].ID)
+	if len(d.Items) != 1 || d.Items[0].Kind != domain.ItemCreditCarriedIn || d.Items[0].Amount != 20_00 {
+		t.Fatalf("next invoice items = %+v", d.Items)
+	}
 }

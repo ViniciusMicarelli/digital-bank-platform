@@ -56,10 +56,14 @@ const (
 	TypeCreditInvoicePayment Type = "CREDIT_INVOICE_PAYMENT"
 	TypeCreditCharges        Type = "CREDIT_CHARGES"
 	TypeBoletoPayment        Type = "BOLETO_PAYMENT"
+	// Card refunds: card clearing -> customer account (debit) or
+	// credit-receivables (credit, one step).
+	TypeCardRefund       Type = "CARD_REFUND"
+	TypeCreditCardRefund Type = "CREDIT_CARD_REFUND"
 )
 
 var validTypes = []Type{TypeInternalTransfer, TypePixOut, TypePixIn, TypeDebitCard,
-	TypeCreditPurchase, TypeCreditInvoicePayment, TypeCreditCharges, TypeBoletoPayment}
+	TypeCreditPurchase, TypeCreditInvoicePayment, TypeCreditCharges, TypeBoletoPayment, TypeCardRefund, TypeCreditCardRefund}
 
 type Status string
 
@@ -139,7 +143,7 @@ func (t Transaction) DebitsCustomerWithoutLimit() bool { return t.Type == TypeCr
 // (which must exist and be active), rather than a bank-internal account such
 // as Pix settlement or card clearing.
 func (t Transaction) CreditsCustomer() bool {
-	return t.Type == TypeInternalTransfer || t.Type == TypePixIn
+	return t.Type == TypeInternalTransfer || t.Type == TypePixIn || t.Type == TypeCardRefund
 }
 
 // TwoPhase reports whether the money is held before an external confirmation.

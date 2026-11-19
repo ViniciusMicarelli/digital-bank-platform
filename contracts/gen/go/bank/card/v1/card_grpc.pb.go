@@ -19,19 +19,25 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CardService_IssueCard_FullMethodName         = "/bank.card.v1.CardService/IssueCard"
-	CardService_GetCard_FullMethodName           = "/bank.card.v1.CardService/GetCard"
-	CardService_ListCards_FullMethodName         = "/bank.card.v1.CardService/ListCards"
-	CardService_BlockCard_FullMethodName         = "/bank.card.v1.CardService/BlockCard"
-	CardService_UnblockCard_FullMethodName       = "/bank.card.v1.CardService/UnblockCard"
-	CardService_UpdateControls_FullMethodName    = "/bank.card.v1.CardService/UpdateControls"
-	CardService_RevealCardDetails_FullMethodName = "/bank.card.v1.CardService/RevealCardDetails"
-	CardService_TokenizeCard_FullMethodName      = "/bank.card.v1.CardService/TokenizeCard"
-	CardService_ListTokens_FullMethodName        = "/bank.card.v1.CardService/ListTokens"
-	CardService_UpdateToken_FullMethodName       = "/bank.card.v1.CardService/UpdateToken"
-	CardService_Authorize_FullMethodName         = "/bank.card.v1.CardService/Authorize"
-	CardService_Clear_FullMethodName             = "/bank.card.v1.CardService/Clear"
-	CardService_Reverse_FullMethodName           = "/bank.card.v1.CardService/Reverse"
+	CardService_IssueCard_FullMethodName          = "/bank.card.v1.CardService/IssueCard"
+	CardService_GetCard_FullMethodName            = "/bank.card.v1.CardService/GetCard"
+	CardService_ListCards_FullMethodName          = "/bank.card.v1.CardService/ListCards"
+	CardService_BlockCard_FullMethodName          = "/bank.card.v1.CardService/BlockCard"
+	CardService_UnblockCard_FullMethodName        = "/bank.card.v1.CardService/UnblockCard"
+	CardService_UpdateControls_FullMethodName     = "/bank.card.v1.CardService/UpdateControls"
+	CardService_RevealCardDetails_FullMethodName  = "/bank.card.v1.CardService/RevealCardDetails"
+	CardService_TokenizeCard_FullMethodName       = "/bank.card.v1.CardService/TokenizeCard"
+	CardService_ListTokens_FullMethodName         = "/bank.card.v1.CardService/ListTokens"
+	CardService_UpdateToken_FullMethodName        = "/bank.card.v1.CardService/UpdateToken"
+	CardService_Authorize_FullMethodName          = "/bank.card.v1.CardService/Authorize"
+	CardService_Clear_FullMethodName              = "/bank.card.v1.CardService/Clear"
+	CardService_Reverse_FullMethodName            = "/bank.card.v1.CardService/Reverse"
+	CardService_Refund_FullMethodName             = "/bank.card.v1.CardService/Refund"
+	CardService_ListAuthorizations_FullMethodName = "/bank.card.v1.CardService/ListAuthorizations"
+	CardService_OpenDispute_FullMethodName        = "/bank.card.v1.CardService/OpenDispute"
+	CardService_GetDispute_FullMethodName         = "/bank.card.v1.CardService/GetDispute"
+	CardService_ListDisputes_FullMethodName       = "/bank.card.v1.CardService/ListDisputes"
+	CardService_DecideDispute_FullMethodName      = "/bank.card.v1.CardService/DecideDispute"
 )
 
 // CardServiceClient is the client API for CardService service.
@@ -63,6 +69,23 @@ type CardServiceClient interface {
 	Clear(ctx context.Context, in *ClearRequest, opts ...grpc.CallOption) (*ClearResponse, error)
 	// Cancels an approved authorization (merchant void); the money is released.
 	Reverse(ctx context.Context, in *ReverseRequest, opts ...grpc.CallOption) (*ReverseResponse, error)
+	// Network: the merchant refunds (part of) a cleared purchase; idempotent
+	// on refund_reference. Fails with FAILED_PRECONDITION and reason
+	// REFUND_TOO_LARGE or NOT_CLEARED.
+	Refund(ctx context.Context, in *RefundRequest, opts ...grpc.CallOption) (*RefundResponse, error)
+	// A card's purchases, newest first, with what was refunded and any dispute.
+	ListAuthorizations(ctx context.Context, in *ListAuthorizationsRequest, opts ...grpc.CallOption) (*ListAuthorizationsResponse, error)
+	// The customer disputes a cleared purchase (chargeback). A purchase the
+	// customer does not recognize blocks the card at once. Fails with
+	// FAILED_PRECONDITION and reason NOT_CLEARED, DISPUTE_WINDOW_CLOSED,
+	// DISPUTE_ALREADY_OPEN or NOTHING_TO_DISPUTE.
+	OpenDispute(ctx context.Context, in *OpenDisputeRequest, opts ...grpc.CallOption) (*OpenDisputeResponse, error)
+	GetDispute(ctx context.Context, in *GetDisputeRequest, opts ...grpc.CallOption) (*GetDisputeResponse, error)
+	// By account (the customer) or by status (the back office).
+	ListDisputes(ctx context.Context, in *ListDisputesRequest, opts ...grpc.CallOption) (*ListDisputesResponse, error)
+	// An analyst's decision: won refunds the disputed amount; lost needs a
+	// reason. Fails with FAILED_PRECONDITION and reason DISPUTE_NOT_OPEN.
+	DecideDispute(ctx context.Context, in *DecideDisputeRequest, opts ...grpc.CallOption) (*DecideDisputeResponse, error)
 }
 
 type cardServiceClient struct {
@@ -203,6 +226,66 @@ func (c *cardServiceClient) Reverse(ctx context.Context, in *ReverseRequest, opt
 	return out, nil
 }
 
+func (c *cardServiceClient) Refund(ctx context.Context, in *RefundRequest, opts ...grpc.CallOption) (*RefundResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RefundResponse)
+	err := c.cc.Invoke(ctx, CardService_Refund_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cardServiceClient) ListAuthorizations(ctx context.Context, in *ListAuthorizationsRequest, opts ...grpc.CallOption) (*ListAuthorizationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAuthorizationsResponse)
+	err := c.cc.Invoke(ctx, CardService_ListAuthorizations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cardServiceClient) OpenDispute(ctx context.Context, in *OpenDisputeRequest, opts ...grpc.CallOption) (*OpenDisputeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OpenDisputeResponse)
+	err := c.cc.Invoke(ctx, CardService_OpenDispute_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cardServiceClient) GetDispute(ctx context.Context, in *GetDisputeRequest, opts ...grpc.CallOption) (*GetDisputeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDisputeResponse)
+	err := c.cc.Invoke(ctx, CardService_GetDispute_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cardServiceClient) ListDisputes(ctx context.Context, in *ListDisputesRequest, opts ...grpc.CallOption) (*ListDisputesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListDisputesResponse)
+	err := c.cc.Invoke(ctx, CardService_ListDisputes_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cardServiceClient) DecideDispute(ctx context.Context, in *DecideDisputeRequest, opts ...grpc.CallOption) (*DecideDisputeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DecideDisputeResponse)
+	err := c.cc.Invoke(ctx, CardService_DecideDispute_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CardServiceServer is the server API for CardService service.
 // All implementations must embed UnimplementedCardServiceServer
 // for forward compatibility.
@@ -232,6 +315,23 @@ type CardServiceServer interface {
 	Clear(context.Context, *ClearRequest) (*ClearResponse, error)
 	// Cancels an approved authorization (merchant void); the money is released.
 	Reverse(context.Context, *ReverseRequest) (*ReverseResponse, error)
+	// Network: the merchant refunds (part of) a cleared purchase; idempotent
+	// on refund_reference. Fails with FAILED_PRECONDITION and reason
+	// REFUND_TOO_LARGE or NOT_CLEARED.
+	Refund(context.Context, *RefundRequest) (*RefundResponse, error)
+	// A card's purchases, newest first, with what was refunded and any dispute.
+	ListAuthorizations(context.Context, *ListAuthorizationsRequest) (*ListAuthorizationsResponse, error)
+	// The customer disputes a cleared purchase (chargeback). A purchase the
+	// customer does not recognize blocks the card at once. Fails with
+	// FAILED_PRECONDITION and reason NOT_CLEARED, DISPUTE_WINDOW_CLOSED,
+	// DISPUTE_ALREADY_OPEN or NOTHING_TO_DISPUTE.
+	OpenDispute(context.Context, *OpenDisputeRequest) (*OpenDisputeResponse, error)
+	GetDispute(context.Context, *GetDisputeRequest) (*GetDisputeResponse, error)
+	// By account (the customer) or by status (the back office).
+	ListDisputes(context.Context, *ListDisputesRequest) (*ListDisputesResponse, error)
+	// An analyst's decision: won refunds the disputed amount; lost needs a
+	// reason. Fails with FAILED_PRECONDITION and reason DISPUTE_NOT_OPEN.
+	DecideDispute(context.Context, *DecideDisputeRequest) (*DecideDisputeResponse, error)
 	mustEmbedUnimplementedCardServiceServer()
 }
 
@@ -280,6 +380,24 @@ func (UnimplementedCardServiceServer) Clear(context.Context, *ClearRequest) (*Cl
 }
 func (UnimplementedCardServiceServer) Reverse(context.Context, *ReverseRequest) (*ReverseResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Reverse not implemented")
+}
+func (UnimplementedCardServiceServer) Refund(context.Context, *RefundRequest) (*RefundResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Refund not implemented")
+}
+func (UnimplementedCardServiceServer) ListAuthorizations(context.Context, *ListAuthorizationsRequest) (*ListAuthorizationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAuthorizations not implemented")
+}
+func (UnimplementedCardServiceServer) OpenDispute(context.Context, *OpenDisputeRequest) (*OpenDisputeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method OpenDispute not implemented")
+}
+func (UnimplementedCardServiceServer) GetDispute(context.Context, *GetDisputeRequest) (*GetDisputeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetDispute not implemented")
+}
+func (UnimplementedCardServiceServer) ListDisputes(context.Context, *ListDisputesRequest) (*ListDisputesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDisputes not implemented")
+}
+func (UnimplementedCardServiceServer) DecideDispute(context.Context, *DecideDisputeRequest) (*DecideDisputeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DecideDispute not implemented")
 }
 func (UnimplementedCardServiceServer) mustEmbedUnimplementedCardServiceServer() {}
 func (UnimplementedCardServiceServer) testEmbeddedByValue()                     {}
@@ -536,6 +654,114 @@ func _CardService_Reverse_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CardService_Refund_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefundRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CardServiceServer).Refund(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CardService_Refund_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CardServiceServer).Refund(ctx, req.(*RefundRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CardService_ListAuthorizations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAuthorizationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CardServiceServer).ListAuthorizations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CardService_ListAuthorizations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CardServiceServer).ListAuthorizations(ctx, req.(*ListAuthorizationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CardService_OpenDispute_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OpenDisputeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CardServiceServer).OpenDispute(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CardService_OpenDispute_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CardServiceServer).OpenDispute(ctx, req.(*OpenDisputeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CardService_GetDispute_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDisputeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CardServiceServer).GetDispute(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CardService_GetDispute_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CardServiceServer).GetDispute(ctx, req.(*GetDisputeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CardService_ListDisputes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDisputesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CardServiceServer).ListDisputes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CardService_ListDisputes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CardServiceServer).ListDisputes(ctx, req.(*ListDisputesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CardService_DecideDispute_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DecideDisputeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CardServiceServer).DecideDispute(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CardService_DecideDispute_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CardServiceServer).DecideDispute(ctx, req.(*DecideDisputeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CardService_ServiceDesc is the grpc.ServiceDesc for CardService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -594,6 +820,30 @@ var CardService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Reverse",
 			Handler:    _CardService_Reverse_Handler,
+		},
+		{
+			MethodName: "Refund",
+			Handler:    _CardService_Refund_Handler,
+		},
+		{
+			MethodName: "ListAuthorizations",
+			Handler:    _CardService_ListAuthorizations_Handler,
+		},
+		{
+			MethodName: "OpenDispute",
+			Handler:    _CardService_OpenDispute_Handler,
+		},
+		{
+			MethodName: "GetDispute",
+			Handler:    _CardService_GetDispute_Handler,
+		},
+		{
+			MethodName: "ListDisputes",
+			Handler:    _CardService_ListDisputes_Handler,
+		},
+		{
+			MethodName: "DecideDispute",
+			Handler:    _CardService_DecideDispute_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -124,4 +125,57 @@ func TestTokens(t *testing.T) {
 	if _, _, err := NewToken(c, GooglePay, "Pixel"); err == nil {
 		t.Fatal("tokenizing a blocked card")
 	}
+}
+
+func TestDisputesAndRefunds(t *testing.T) {
+	now := time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)
+	a := Authorization{ID: uuid.New(), Status: Approved, Cleared: 0, CreatedAt: now.Add(-24 * time.Hour)}
+	if _, err := NewDispute(a, DisputeNotReceived, 0, "", false, now); !refused(err, "NOT_CLEARED") {
+		t.Fatalf("not cleared: %v", err)
+	}
+	a.Status, a.Cleared = Cleared, 100_00
+	if _, err := NewDispute(a, "BORED", 0, "", false, now); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatal("unknown reason")
+	}
+	if _, err := NewDispute(a, DisputeNotReceived, 0, "", false, a.CreatedAt.Add(DisputeWindow+time.Hour)); !refused(err, "DISPUTE_WINDOW_CLOSED") {
+		t.Fatal("window")
+	}
+	if _, err := NewDispute(a, DisputeNotReceived, 0, "", true, now); !refused(err, "DISPUTE_ALREADY_OPEN") {
+		t.Fatal("one open dispute")
+	}
+	d, err := NewDispute(a, DisputeWrongAmount, 0, "  cobraram a mais  ", false, now)
+	if err != nil || d.Amount != 100_00 || d.Description != "cobraram a mais" {
+		t.Fatalf("default amount = %+v %v", d, err)
+	}
+
+	// A refund cannot eat into an open dispute, nor go past what was cleared.
+	if _, err := NewRefund(a, 1, RefundMerchant, "r1", d.Amount, now); !refused(err, "REFUND_TOO_LARGE") {
+		t.Fatalf("refund under a full dispute: %v", err)
+	}
+	r, err := NewRefund(a, 40_00, RefundMerchant, "r1", 0, now)
+	if err != nil || r.Status != RefundPending {
+		t.Fatalf("refund = %+v %v", r, err)
+	}
+	a.Refunded = 40_00
+	if a.Refundable(0) != 60_00 {
+		t.Fatal(a.Refundable(0))
+	}
+	if _, err := NewDispute(a, DisputeWrongAmount, 70_00, "", false, now); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatal("dispute more than what is left")
+	}
+
+	if err := d.Decide("a1", false, "", now); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatal("a lost dispute needs a reason")
+	}
+	if err := d.Decide("a1", true, "", now); err != nil || d.Status != DisputeWon || d.DecidedBy != "a1" {
+		t.Fatalf("won = %+v %v", d, err)
+	}
+	if err := d.Decide("a2", false, "x", now); !refused(err, "DISPUTE_NOT_OPEN") {
+		t.Fatal("decided twice")
+	}
+}
+
+func refused(err error, reason string) bool {
+	r, ok := AsRefused(err)
+	return ok && r.Reason == reason
 }

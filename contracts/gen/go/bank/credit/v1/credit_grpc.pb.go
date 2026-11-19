@@ -27,6 +27,7 @@ const (
 	CreditService_ReserveCredit_FullMethodName  = "/bank.credit.v1.CreditService/ReserveCredit"
 	CreditService_CaptureCredit_FullMethodName  = "/bank.credit.v1.CreditService/CaptureCredit"
 	CreditService_ReleaseCredit_FullMethodName  = "/bank.credit.v1.CreditService/ReleaseCredit"
+	CreditService_RefundCredit_FullMethodName   = "/bank.credit.v1.CreditService/RefundCredit"
 	CreditService_AdvanceCycle_FullMethodName   = "/bank.credit.v1.CreditService/AdvanceCycle"
 )
 
@@ -51,6 +52,10 @@ type CreditServiceClient interface {
 	// Clearing: the purchase goes into the open invoice.
 	CaptureCredit(ctx context.Context, in *CaptureCreditRequest, opts ...grpc.CallOption) (*CaptureCreditResponse, error)
 	ReleaseCredit(ctx context.Context, in *ReleaseCreditRequest, opts ...grpc.CallOption) (*ReleaseCreditResponse, error)
+	// Card refund on a captured credit purchase (merchant refund or won
+	// dispute): a credit on the open invoice and the limit freed. Idempotent
+	// on the key.
+	RefundCredit(ctx context.Context, in *RefundCreditRequest, opts ...grpc.CallOption) (*RefundCreditResponse, error)
 	// Sandbox: close the open invoice now, or make the closed one overdue.
 	AdvanceCycle(ctx context.Context, in *AdvanceCycleRequest, opts ...grpc.CallOption) (*AdvanceCycleResponse, error)
 }
@@ -143,6 +148,16 @@ func (c *creditServiceClient) ReleaseCredit(ctx context.Context, in *ReleaseCred
 	return out, nil
 }
 
+func (c *creditServiceClient) RefundCredit(ctx context.Context, in *RefundCreditRequest, opts ...grpc.CallOption) (*RefundCreditResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RefundCreditResponse)
+	err := c.cc.Invoke(ctx, CreditService_RefundCredit_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *creditServiceClient) AdvanceCycle(ctx context.Context, in *AdvanceCycleRequest, opts ...grpc.CallOption) (*AdvanceCycleResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AdvanceCycleResponse)
@@ -174,6 +189,10 @@ type CreditServiceServer interface {
 	// Clearing: the purchase goes into the open invoice.
 	CaptureCredit(context.Context, *CaptureCreditRequest) (*CaptureCreditResponse, error)
 	ReleaseCredit(context.Context, *ReleaseCreditRequest) (*ReleaseCreditResponse, error)
+	// Card refund on a captured credit purchase (merchant refund or won
+	// dispute): a credit on the open invoice and the limit freed. Idempotent
+	// on the key.
+	RefundCredit(context.Context, *RefundCreditRequest) (*RefundCreditResponse, error)
 	// Sandbox: close the open invoice now, or make the closed one overdue.
 	AdvanceCycle(context.Context, *AdvanceCycleRequest) (*AdvanceCycleResponse, error)
 	mustEmbedUnimplementedCreditServiceServer()
@@ -209,6 +228,9 @@ func (UnimplementedCreditServiceServer) CaptureCredit(context.Context, *CaptureC
 }
 func (UnimplementedCreditServiceServer) ReleaseCredit(context.Context, *ReleaseCreditRequest) (*ReleaseCreditResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReleaseCredit not implemented")
+}
+func (UnimplementedCreditServiceServer) RefundCredit(context.Context, *RefundCreditRequest) (*RefundCreditResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RefundCredit not implemented")
 }
 func (UnimplementedCreditServiceServer) AdvanceCycle(context.Context, *AdvanceCycleRequest) (*AdvanceCycleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AdvanceCycle not implemented")
@@ -378,6 +400,24 @@ func _CreditService_ReleaseCredit_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CreditService_RefundCredit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RefundCreditRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CreditServiceServer).RefundCredit(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CreditService_RefundCredit_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CreditServiceServer).RefundCredit(ctx, req.(*RefundCreditRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CreditService_AdvanceCycle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AdvanceCycleRequest)
 	if err := dec(in); err != nil {
@@ -434,6 +474,10 @@ var CreditService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReleaseCredit",
 			Handler:    _CreditService_ReleaseCredit_Handler,
+		},
+		{
+			MethodName: "RefundCredit",
+			Handler:    _CreditService_RefundCredit_Handler,
 		},
 		{
 			MethodName: "AdvanceCycle",

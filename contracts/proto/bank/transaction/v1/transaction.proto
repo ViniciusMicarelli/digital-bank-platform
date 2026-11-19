@@ -39,6 +39,11 @@ enum TransactionType {
   TRANSACTION_TYPE_CREDIT_CHARGES = 7;
   // Two-phase: customer account -> boleto settlement.
   TRANSACTION_TYPE_BOLETO_PAYMENT = 8;
+  // Debit card refund (merchant refund or won dispute): card clearing ->
+  // customer account, through CreditIncoming.
+  TRANSACTION_TYPE_CARD_REFUND = 9;
+  // Credit card refund: card clearing -> credit-receivables (one step).
+  TRANSACTION_TYPE_CREDIT_CARD_REFUND = 10;
 }
 
 enum TransactionStatus {

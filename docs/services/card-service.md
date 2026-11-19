@@ -15,7 +15,21 @@ Debit cards: issuing, controls and real-time **purchase authorization**, then cl
 | Wallet tokens (BIN `999998`): a different number per device (Apple Pay, Google Pay, Samsung Pay, merchant), encrypted in the vault with its own blind index, suspendable/deletable without touching the card; token purchases need no CVV and resolve to the card | ✅ |
 | Real-time authorization with ISO 8583-style response codes | ✅ |
 | Clearing (full or partial) and merchant reversal | ✅ |
-| Credit function (needs credit-service), 3-D Secure | planned |
+| Credit function: purchases held on the credit line (credit-service) | ✅ |
+| Merchant refunds of cleared purchases (network `Refund`, idempotent on the network's reference): debit back to the checking account (`CARD_REFUND`), credit as a credit on the invoice | ✅ |
+| Disputes (chargebacks): the customer disputes a cleared purchase within 90 days (not recognized, not received, duplicate, wrong amount, cancelled), all or part of it; one open dispute per purchase; an analyst decides in the back office, a won dispute refunds the amount | ✅ |
+| "Not recognized" is fraud: the card is blocked in the same transaction (`FRAUD_SUSPECTED`) and the customer cannot unblock it (`CARD_COMPROMISED`, a new card is needed) | ✅ |
+| Refunds are recorded with the purchase locked (never more than was cleared, never into an amount under dispute), the money moves after the commit and a worker retries refunds left `PENDING` | ✅ |
+| Representment (the merchant contests the chargeback), network arbitration, 3-D Secure | planned |
+
+## Disputes
+
+```mermaid
+stateDiagram-v2
+    [*] --> OPEN: customer disputes a cleared purchase
+    OPEN --> WON: analyst accepts → refund (PENDING → COMPLETED)
+    OPEN --> LOST: analyst rejects (reason)
+```
 
 ## Card Vault
 
@@ -59,7 +73,9 @@ Defined in [`contracts/proto/bank/card/v1/card.proto`](../../contracts/proto/ban
 | `BlockCard` / `UnblockCard` / `UpdateControls` | Customer controls |
 | `RevealCardDetails` | PAN, expiry, CVV |
 | `TokenizeCard` / `ListTokens` / `UpdateToken` | Wallet tokens (the token number is returned once) |
-| `Authorize` / `Clear` / `Reverse` | Network-facing |
+| `Authorize` / `Clear` / `Reverse` / `Refund` | Network-facing |
+| `ListAuthorizations` | A card's purchases with refunded amount and latest dispute |
+| `OpenDispute` / `GetDispute` / `ListDisputes` / `DecideDispute` | Disputes (customer opens, analyst decides) |
 
 ## Events
 
@@ -67,6 +83,7 @@ Defined in [`contracts/proto/bank/card/v1/card.proto`](../../contracts/proto/ban
 |---|---|
 | `card.issued`, `card.blocked`, `card.unblocked`, `card.controls.changed`, `card.token.created`, `card.token.suspended`, `card.token.active`, `card.token.deleted` | `account.blocked`, `account.unblocked`, `account.closed` |
 | `card.authorization.approved`, `card.authorization.declined`, `card.authorization.reversed`, `card.purchase.cleared` | |
+| `card.purchase.refunded`, `card.refund.failed`, `card.dispute.opened`, `card.dispute.decided` | |
 
 ## Data
 

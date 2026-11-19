@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { BankCard } from '../../components/BankCard'
+import { Purchases } from '../../components/Purchases'
 import { useStepUp } from '../../components/StepUp'
 import { Button, Card, IconTile, Loading, MoneyField, Muted, Notice, Sandbox, Screen, Segmented, Toggle, Txt } from '../../components/ui'
 import { api } from '../../lib/client'
@@ -46,7 +47,10 @@ export default function Cards() {
       if (a.status === 'APPROVED') await api('POST', `/v1/sandbox/card-network/authorizations/${a.id}/clear`, { body: {} })
       return a
     },
-    onSuccess: (a) => setResult(a.status === 'APPROVED' ? `Aprovada: ${formatBRL(amount!)}` : `Recusada (${a.response_code}): ${a.reason}`),
+    onSuccess: (a) => {
+      setResult(a.status === 'APPROVED' ? `Aprovada: ${formatBRL(amount!)}` : `Recusada (${a.response_code}): ${a.reason}`)
+      qc.invalidateQueries({ queryKey: ['purchases', card?.id] })
+    },
     onError: (e) => { if (!cancelled(e)) setResult(errorMessage(e)) },
   })
 
@@ -65,6 +69,7 @@ export default function Cards() {
     )
   }
   const set = (k: keyof CardT['controls']) => (v: boolean) => controls.mutate({ ...card.controls, [k]: v })
+  const compromised = card.status_reason === 'FRAUD_SUSPECTED'
   return (
     <Screen title="Cartões" subtitle="Débito na conta e, com o crédito ativo, também no crédito.">
       <Animated.View entering={FadeInDown.delay(60).duration(500)}>
@@ -79,16 +84,19 @@ export default function Cards() {
         </View>
         <View style={{ flex: 1 }}>
           <Button title={card.status === 'ACTIVE' ? 'Bloquear' : 'Desbloquear'} icon={card.status === 'ACTIVE' ? Lock : LockOpen}
-            variant={card.status === 'ACTIVE' ? 'danger' : 'primary'} loading={block.isPending} onPress={() => block.mutate()} />
+            variant={card.status === 'ACTIVE' ? 'danger' : 'primary'} loading={block.isPending} disabled={compromised} onPress={() => block.mutate()} />
         </View>
       </View>
-      {card.status === 'BLOCKED' && <Notice tone="amber">Cartão bloqueado: compras são recusadas até você desbloquear.</Notice>}
+      {compromised
+        ? <Notice tone="amber">Bloqueamos este cartão por segurança depois da sua contestação. Peça um novo cartão virtual.</Notice>
+        : card.status === 'BLOCKED' && <Notice tone="amber">Cartão bloqueado: compras são recusadas até você desbloquear.</Notice>}
       <Notice>{error}</Notice>
       <Card title="Controles" icon={Lock} index={2}>
         <Toggle label="Compras online" description="Sites e aplicativos" value={card.controls.online} onChange={set('online')} />
         <Toggle label="Compras internacionais" description="Fora do Brasil" value={card.controls.international} onChange={set('international')} />
         <Toggle label="Aproximação" description="Encostar o cartão na maquininha" value={card.controls.contactless} onChange={set('contactless')} />
       </Card>
+      <Purchases accountId={account.id} card={card} />
       {card.status === 'ACTIVE' && (
         <Sandbox>
           <MoneyField label="Simular compra de" onValue={setAmount} />

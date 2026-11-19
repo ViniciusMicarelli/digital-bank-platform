@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,7 +28,26 @@ const (
 // step used per analyst is kept in a temp file (shared with the Playwright
 // tests) and a fresh step is always used: this one, the next (the server
 // allows one step of drift), or the one after once it is close enough.
+//
+// Sessions are reused within a test run (tokens last 15 minutes), so each
+// analyst signs in once.
 func analyst(t *testing.T, email, secret string) *client {
+	sessionsMu.Lock()
+	defer sessionsMu.Unlock()
+	if token, ok := sessions[email]; ok {
+		return &client{t: t, base: addr("GATEWAY_URL", "http://127.0.0.1:8000"), token: token}
+	}
+	c := signInAnalyst(t, email, secret)
+	sessions[email] = c.token
+	return c
+}
+
+var (
+	sessionsMu sync.Mutex
+	sessions   = map[string]string{}
+)
+
+func signInAnalyst(t *testing.T, email, secret string) *client {
 	file := filepath.Join(os.TempDir(), "digital-bank-totp-"+email)
 	var last int64
 	if b, err := os.ReadFile(file); err == nil {

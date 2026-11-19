@@ -239,7 +239,9 @@ func (x *Invoice) GetRemaining() *v1.Money {
 type InvoiceItem struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	// PURCHASE, PAYMENT, BALANCE_CARRIED, FINE, INTEREST.
+	// PURCHASE, PAYMENT, BALANCE_CARRIED, FINE, INTEREST (owed), REFUND and
+	// CREDIT_CARRIED_IN (credits), CREDIT_CARRIED_OUT (a credit moved to the
+	// next invoice).
 	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
 	Amount        *v1.Money              `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`
 	Description   string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
@@ -1367,6 +1369,203 @@ func (*AdvanceCycleResponse) Descriptor() ([]byte, []int) {
 	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{22}
 }
 
+type RefundCreditRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	IdempotencyKey string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	AccountId      string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Amount         *v1.Money              `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	Description    string                 `protobuf:"bytes,4,opt,name=description,proto3" json:"description,omitempty"`
+	Metadata       map[string]string      `protobuf:"bytes,5,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RefundCreditRequest) Reset() {
+	*x = RefundCreditRequest{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefundCreditRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefundCreditRequest) ProtoMessage() {}
+
+func (x *RefundCreditRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefundCreditRequest.ProtoReflect.Descriptor instead.
+func (*RefundCreditRequest) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RefundCreditRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *RefundCreditRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *RefundCreditRequest) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *RefundCreditRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *RefundCreditRequest) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
+}
+
+type CreditRefund struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AccountId string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	InvoiceId string                 `protobuf:"bytes,3,opt,name=invoice_id,json=invoiceId,proto3" json:"invoice_id,omitempty"`
+	Amount    *v1.Money              `protobuf:"bytes,4,opt,name=amount,proto3" json:"amount,omitempty"`
+	// COMPLETED.
+	Status        string `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreditRefund) Reset() {
+	*x = CreditRefund{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreditRefund) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreditRefund) ProtoMessage() {}
+
+func (x *CreditRefund) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreditRefund.ProtoReflect.Descriptor instead.
+func (*CreditRefund) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *CreditRefund) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CreditRefund) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *CreditRefund) GetInvoiceId() string {
+	if x != nil {
+		return x.InvoiceId
+	}
+	return ""
+}
+
+func (x *CreditRefund) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *CreditRefund) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type RefundCreditResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Refund        *CreditRefund          `protobuf:"bytes,1,opt,name=refund,proto3" json:"refund,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RefundCreditResponse) Reset() {
+	*x = RefundCreditResponse{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RefundCreditResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RefundCreditResponse) ProtoMessage() {}
+
+func (x *RefundCreditResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RefundCreditResponse.ProtoReflect.Descriptor instead.
+func (*RefundCreditResponse) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *RefundCreditResponse) GetRefund() *CreditRefund {
+	if x != nil {
+		return x.Refund
+	}
+	return nil
+}
+
 var File_bank_credit_v1_credit_proto protoreflect.FileDescriptor
 
 const file_bank_credit_v1_credit_proto_rawDesc = "" +
@@ -1475,7 +1674,27 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x16\n" +
 	"\x06action\x18\x02 \x01(\tR\x06action\"\x16\n" +
-	"\x14AdvanceCycleResponse2\xc8\x06\n" +
+	"\x14AdvanceCycleResponse\"\xba\x02\n" +
+	"\x13RefundCreditRequest\x12'\n" +
+	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12-\n" +
+	"\x06amount\x18\x03 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12 \n" +
+	"\vdescription\x18\x04 \x01(\tR\vdescription\x12M\n" +
+	"\bmetadata\x18\x05 \x03(\v21.bank.credit.v1.RefundCreditRequest.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa3\x01\n" +
+	"\fCreditRefund\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x1d\n" +
+	"\n" +
+	"invoice_id\x18\x03 \x01(\tR\tinvoiceId\x12-\n" +
+	"\x06amount\x18\x04 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\"L\n" +
+	"\x14RefundCreditResponse\x124\n" +
+	"\x06refund\x18\x01 \x01(\v2\x1c.bank.credit.v1.CreditRefundR\x06refund2\xa3\a\n" +
 	"\rCreditService\x12_\n" +
 	"\x0eOpenCreditLine\x12%.bank.credit.v1.OpenCreditLineRequest\x1a&.bank.credit.v1.OpenCreditLineResponse\x12\\\n" +
 	"\rGetCreditLine\x12$.bank.credit.v1.GetCreditLineRequest\x1a%.bank.credit.v1.GetCreditLineResponse\x12Y\n" +
@@ -1487,6 +1706,7 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"\rReserveCredit\x12$.bank.credit.v1.ReserveCreditRequest\x1a%.bank.credit.v1.ReserveCreditResponse\x12\\\n" +
 	"\rCaptureCredit\x12$.bank.credit.v1.CaptureCreditRequest\x1a%.bank.credit.v1.CaptureCreditResponse\x12\\\n" +
 	"\rReleaseCredit\x12$.bank.credit.v1.ReleaseCreditRequest\x1a%.bank.credit.v1.ReleaseCreditResponse\x12Y\n" +
+	"\fRefundCredit\x12#.bank.credit.v1.RefundCreditRequest\x1a$.bank.credit.v1.RefundCreditResponse\x12Y\n" +
 	"\fAdvanceCycle\x12#.bank.credit.v1.AdvanceCycleRequest\x1a$.bank.credit.v1.AdvanceCycleResponseB\xd8\x01\n" +
 	"\x12com.bank.credit.v1B\vCreditProtoP\x01Z[github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1;creditv1\xa2\x02\x03BCX\xaa\x02\x0eBank.Credit.V1\xca\x02\x0eBank\\Credit\\V1\xe2\x02\x1aBank\\Credit\\V1\\GPBMetadata\xea\x02\x10Bank::Credit::V1b\x06proto3"
 
@@ -1502,7 +1722,7 @@ func file_bank_credit_v1_credit_proto_rawDescGZIP() []byte {
 	return file_bank_credit_v1_credit_proto_rawDescData
 }
 
-var file_bank_credit_v1_credit_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_bank_credit_v1_credit_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_bank_credit_v1_credit_proto_goTypes = []any{
 	(*CreditLine)(nil),             // 0: bank.credit.v1.CreditLine
 	(*Invoice)(nil),                // 1: bank.credit.v1.Invoice
@@ -1527,60 +1747,70 @@ var file_bank_credit_v1_credit_proto_goTypes = []any{
 	(*ReleaseCreditResponse)(nil),  // 20: bank.credit.v1.ReleaseCreditResponse
 	(*AdvanceCycleRequest)(nil),    // 21: bank.credit.v1.AdvanceCycleRequest
 	(*AdvanceCycleResponse)(nil),   // 22: bank.credit.v1.AdvanceCycleResponse
-	nil,                            // 23: bank.credit.v1.ReserveCreditRequest.MetadataEntry
-	(*v1.Money)(nil),               // 24: bank.common.v1.Money
-	(*timestamppb.Timestamp)(nil),  // 25: google.protobuf.Timestamp
+	(*RefundCreditRequest)(nil),    // 23: bank.credit.v1.RefundCreditRequest
+	(*CreditRefund)(nil),           // 24: bank.credit.v1.CreditRefund
+	(*RefundCreditResponse)(nil),   // 25: bank.credit.v1.RefundCreditResponse
+	nil,                            // 26: bank.credit.v1.ReserveCreditRequest.MetadataEntry
+	nil,                            // 27: bank.credit.v1.RefundCreditRequest.MetadataEntry
+	(*v1.Money)(nil),               // 28: bank.common.v1.Money
+	(*timestamppb.Timestamp)(nil),  // 29: google.protobuf.Timestamp
 }
 var file_bank_credit_v1_credit_proto_depIdxs = []int32{
-	24, // 0: bank.credit.v1.CreditLine.limit:type_name -> bank.common.v1.Money
-	24, // 1: bank.credit.v1.CreditLine.used:type_name -> bank.common.v1.Money
-	24, // 2: bank.credit.v1.CreditLine.available:type_name -> bank.common.v1.Money
-	25, // 3: bank.credit.v1.CreditLine.created_at:type_name -> google.protobuf.Timestamp
-	24, // 4: bank.credit.v1.Invoice.total:type_name -> bank.common.v1.Money
-	24, // 5: bank.credit.v1.Invoice.paid:type_name -> bank.common.v1.Money
-	24, // 6: bank.credit.v1.Invoice.remaining:type_name -> bank.common.v1.Money
-	24, // 7: bank.credit.v1.InvoiceItem.amount:type_name -> bank.common.v1.Money
-	25, // 8: bank.credit.v1.InvoiceItem.occurred_at:type_name -> google.protobuf.Timestamp
-	24, // 9: bank.credit.v1.Hold.amount:type_name -> bank.common.v1.Money
-	24, // 10: bank.credit.v1.Hold.captured:type_name -> bank.common.v1.Money
-	24, // 11: bank.credit.v1.Payment.amount:type_name -> bank.common.v1.Money
-	25, // 12: bank.credit.v1.Payment.created_at:type_name -> google.protobuf.Timestamp
+	28, // 0: bank.credit.v1.CreditLine.limit:type_name -> bank.common.v1.Money
+	28, // 1: bank.credit.v1.CreditLine.used:type_name -> bank.common.v1.Money
+	28, // 2: bank.credit.v1.CreditLine.available:type_name -> bank.common.v1.Money
+	29, // 3: bank.credit.v1.CreditLine.created_at:type_name -> google.protobuf.Timestamp
+	28, // 4: bank.credit.v1.Invoice.total:type_name -> bank.common.v1.Money
+	28, // 5: bank.credit.v1.Invoice.paid:type_name -> bank.common.v1.Money
+	28, // 6: bank.credit.v1.Invoice.remaining:type_name -> bank.common.v1.Money
+	28, // 7: bank.credit.v1.InvoiceItem.amount:type_name -> bank.common.v1.Money
+	29, // 8: bank.credit.v1.InvoiceItem.occurred_at:type_name -> google.protobuf.Timestamp
+	28, // 9: bank.credit.v1.Hold.amount:type_name -> bank.common.v1.Money
+	28, // 10: bank.credit.v1.Hold.captured:type_name -> bank.common.v1.Money
+	28, // 11: bank.credit.v1.Payment.amount:type_name -> bank.common.v1.Money
+	29, // 12: bank.credit.v1.Payment.created_at:type_name -> google.protobuf.Timestamp
 	0,  // 13: bank.credit.v1.OpenCreditLineResponse.line:type_name -> bank.credit.v1.CreditLine
 	0,  // 14: bank.credit.v1.GetCreditLineResponse.line:type_name -> bank.credit.v1.CreditLine
 	1,  // 15: bank.credit.v1.ListInvoicesResponse.invoices:type_name -> bank.credit.v1.Invoice
 	1,  // 16: bank.credit.v1.GetInvoiceResponse.invoice:type_name -> bank.credit.v1.Invoice
 	2,  // 17: bank.credit.v1.GetInvoiceResponse.items:type_name -> bank.credit.v1.InvoiceItem
-	24, // 18: bank.credit.v1.PayInvoiceRequest.amount:type_name -> bank.common.v1.Money
+	28, // 18: bank.credit.v1.PayInvoiceRequest.amount:type_name -> bank.common.v1.Money
 	4,  // 19: bank.credit.v1.PayInvoiceResponse.payment:type_name -> bank.credit.v1.Payment
-	24, // 20: bank.credit.v1.ReserveCreditRequest.amount:type_name -> bank.common.v1.Money
-	23, // 21: bank.credit.v1.ReserveCreditRequest.metadata:type_name -> bank.credit.v1.ReserveCreditRequest.MetadataEntry
+	28, // 20: bank.credit.v1.ReserveCreditRequest.amount:type_name -> bank.common.v1.Money
+	26, // 21: bank.credit.v1.ReserveCreditRequest.metadata:type_name -> bank.credit.v1.ReserveCreditRequest.MetadataEntry
 	3,  // 22: bank.credit.v1.ReserveCreditResponse.hold:type_name -> bank.credit.v1.Hold
-	24, // 23: bank.credit.v1.CaptureCreditRequest.amount:type_name -> bank.common.v1.Money
+	28, // 23: bank.credit.v1.CaptureCreditRequest.amount:type_name -> bank.common.v1.Money
 	3,  // 24: bank.credit.v1.CaptureCreditResponse.hold:type_name -> bank.credit.v1.Hold
 	3,  // 25: bank.credit.v1.ReleaseCreditResponse.hold:type_name -> bank.credit.v1.Hold
-	5,  // 26: bank.credit.v1.CreditService.OpenCreditLine:input_type -> bank.credit.v1.OpenCreditLineRequest
-	7,  // 27: bank.credit.v1.CreditService.GetCreditLine:input_type -> bank.credit.v1.GetCreditLineRequest
-	9,  // 28: bank.credit.v1.CreditService.ListInvoices:input_type -> bank.credit.v1.ListInvoicesRequest
-	11, // 29: bank.credit.v1.CreditService.GetInvoice:input_type -> bank.credit.v1.GetInvoiceRequest
-	13, // 30: bank.credit.v1.CreditService.PayInvoice:input_type -> bank.credit.v1.PayInvoiceRequest
-	15, // 31: bank.credit.v1.CreditService.ReserveCredit:input_type -> bank.credit.v1.ReserveCreditRequest
-	17, // 32: bank.credit.v1.CreditService.CaptureCredit:input_type -> bank.credit.v1.CaptureCreditRequest
-	19, // 33: bank.credit.v1.CreditService.ReleaseCredit:input_type -> bank.credit.v1.ReleaseCreditRequest
-	21, // 34: bank.credit.v1.CreditService.AdvanceCycle:input_type -> bank.credit.v1.AdvanceCycleRequest
-	6,  // 35: bank.credit.v1.CreditService.OpenCreditLine:output_type -> bank.credit.v1.OpenCreditLineResponse
-	8,  // 36: bank.credit.v1.CreditService.GetCreditLine:output_type -> bank.credit.v1.GetCreditLineResponse
-	10, // 37: bank.credit.v1.CreditService.ListInvoices:output_type -> bank.credit.v1.ListInvoicesResponse
-	12, // 38: bank.credit.v1.CreditService.GetInvoice:output_type -> bank.credit.v1.GetInvoiceResponse
-	14, // 39: bank.credit.v1.CreditService.PayInvoice:output_type -> bank.credit.v1.PayInvoiceResponse
-	16, // 40: bank.credit.v1.CreditService.ReserveCredit:output_type -> bank.credit.v1.ReserveCreditResponse
-	18, // 41: bank.credit.v1.CreditService.CaptureCredit:output_type -> bank.credit.v1.CaptureCreditResponse
-	20, // 42: bank.credit.v1.CreditService.ReleaseCredit:output_type -> bank.credit.v1.ReleaseCreditResponse
-	22, // 43: bank.credit.v1.CreditService.AdvanceCycle:output_type -> bank.credit.v1.AdvanceCycleResponse
-	35, // [35:44] is the sub-list for method output_type
-	26, // [26:35] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	28, // 26: bank.credit.v1.RefundCreditRequest.amount:type_name -> bank.common.v1.Money
+	27, // 27: bank.credit.v1.RefundCreditRequest.metadata:type_name -> bank.credit.v1.RefundCreditRequest.MetadataEntry
+	28, // 28: bank.credit.v1.CreditRefund.amount:type_name -> bank.common.v1.Money
+	24, // 29: bank.credit.v1.RefundCreditResponse.refund:type_name -> bank.credit.v1.CreditRefund
+	5,  // 30: bank.credit.v1.CreditService.OpenCreditLine:input_type -> bank.credit.v1.OpenCreditLineRequest
+	7,  // 31: bank.credit.v1.CreditService.GetCreditLine:input_type -> bank.credit.v1.GetCreditLineRequest
+	9,  // 32: bank.credit.v1.CreditService.ListInvoices:input_type -> bank.credit.v1.ListInvoicesRequest
+	11, // 33: bank.credit.v1.CreditService.GetInvoice:input_type -> bank.credit.v1.GetInvoiceRequest
+	13, // 34: bank.credit.v1.CreditService.PayInvoice:input_type -> bank.credit.v1.PayInvoiceRequest
+	15, // 35: bank.credit.v1.CreditService.ReserveCredit:input_type -> bank.credit.v1.ReserveCreditRequest
+	17, // 36: bank.credit.v1.CreditService.CaptureCredit:input_type -> bank.credit.v1.CaptureCreditRequest
+	19, // 37: bank.credit.v1.CreditService.ReleaseCredit:input_type -> bank.credit.v1.ReleaseCreditRequest
+	23, // 38: bank.credit.v1.CreditService.RefundCredit:input_type -> bank.credit.v1.RefundCreditRequest
+	21, // 39: bank.credit.v1.CreditService.AdvanceCycle:input_type -> bank.credit.v1.AdvanceCycleRequest
+	6,  // 40: bank.credit.v1.CreditService.OpenCreditLine:output_type -> bank.credit.v1.OpenCreditLineResponse
+	8,  // 41: bank.credit.v1.CreditService.GetCreditLine:output_type -> bank.credit.v1.GetCreditLineResponse
+	10, // 42: bank.credit.v1.CreditService.ListInvoices:output_type -> bank.credit.v1.ListInvoicesResponse
+	12, // 43: bank.credit.v1.CreditService.GetInvoice:output_type -> bank.credit.v1.GetInvoiceResponse
+	14, // 44: bank.credit.v1.CreditService.PayInvoice:output_type -> bank.credit.v1.PayInvoiceResponse
+	16, // 45: bank.credit.v1.CreditService.ReserveCredit:output_type -> bank.credit.v1.ReserveCreditResponse
+	18, // 46: bank.credit.v1.CreditService.CaptureCredit:output_type -> bank.credit.v1.CaptureCreditResponse
+	20, // 47: bank.credit.v1.CreditService.ReleaseCredit:output_type -> bank.credit.v1.ReleaseCreditResponse
+	25, // 48: bank.credit.v1.CreditService.RefundCredit:output_type -> bank.credit.v1.RefundCreditResponse
+	22, // 49: bank.credit.v1.CreditService.AdvanceCycle:output_type -> bank.credit.v1.AdvanceCycleResponse
+	40, // [40:50] is the sub-list for method output_type
+	30, // [30:40] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_bank_credit_v1_credit_proto_init() }
@@ -1594,7 +1824,7 @@ func file_bank_credit_v1_credit_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_credit_v1_credit_proto_rawDesc), len(file_bank_credit_v1_credit_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   24,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

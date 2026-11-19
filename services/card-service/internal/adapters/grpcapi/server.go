@@ -88,7 +88,162 @@ func authPB(a domain.Authorization) *cardv1.Authorization {
 			out.Channel = k
 		}
 	}
+	out.RefundedAmount = brl(a.Refunded)
 	return out
+}
+
+func brl(minor int64) *commonv1.Money { return &commonv1.Money{MinorUnits: minor, Currency: "BRL"} }
+
+var (
+	disputeReasons = map[cardv1.DisputeReason]domain.DisputeReason{
+		cardv1.DisputeReason_DISPUTE_REASON_NOT_RECOGNIZED: domain.DisputeNotRecognized,
+		cardv1.DisputeReason_DISPUTE_REASON_NOT_RECEIVED:   domain.DisputeNotReceived,
+		cardv1.DisputeReason_DISPUTE_REASON_DUPLICATE:      domain.DisputeDuplicate,
+		cardv1.DisputeReason_DISPUTE_REASON_WRONG_AMOUNT:   domain.DisputeWrongAmount,
+		cardv1.DisputeReason_DISPUTE_REASON_CANCELLED:      domain.DisputeCancelled,
+	}
+	disputeStatuses = map[cardv1.DisputeStatus]domain.DisputeStatus{
+		cardv1.DisputeStatus_DISPUTE_STATUS_OPEN: domain.DisputeOpen,
+		cardv1.DisputeStatus_DISPUTE_STATUS_WON:  domain.DisputeWon,
+		cardv1.DisputeStatus_DISPUTE_STATUS_LOST: domain.DisputeLost,
+	}
+)
+
+func disputePB(d domain.Dispute) *cardv1.Dispute {
+	out := &cardv1.Dispute{Id: d.ID.String(), AuthorizationId: d.AuthorizationID.String(), CardId: d.CardID.String(),
+		AccountId: d.AccountID.String(), Amount: brl(d.Amount), Description: d.Description, DecidedBy: d.DecidedBy,
+		DecisionReason: d.DecisionReason, CreatedAt: timestamppb.New(d.CreatedAt), MerchantName: d.MerchantName,
+		PurchasedAt: timestamppb.New(d.PurchasedAt)}
+	for k, v := range disputeReasons {
+		if v == d.Reason {
+			out.Reason = k
+		}
+	}
+	for k, v := range disputeStatuses {
+		if v == d.Status {
+			out.Status = k
+		}
+	}
+	if d.DecidedAt != nil {
+		out.DecidedAt = timestamppb.New(*d.DecidedAt)
+	}
+	return out
+}
+
+func refundPB(r domain.Refund) *cardv1.Refund {
+	return &cardv1.Refund{Id: r.ID.String(), AuthorizationId: r.AuthorizationID.String(), Amount: brl(r.Amount),
+		Source: string(r.Source), Status: string(r.Status), FailureReason: r.FailureReason, CreatedAt: timestamppb.New(r.CreatedAt)}
+}
+
+func positive(m *commonv1.Money, optional bool) (int64, error) {
+	if m == nil && optional {
+		return 0, nil
+	}
+	if m.GetCurrency() != "BRL" || m.GetMinorUnits() <= 0 {
+		return 0, grpcserver.Error(codes.InvalidArgument, "INVALID_AMOUNT", "amount must be a positive BRL value")
+	}
+	return m.GetMinorUnits(), nil
+}
+
+func (s *Server) Refund(ctx context.Context, req *cardv1.RefundRequest) (*cardv1.RefundResponse, error) {
+	id, err := parseID(req.GetAuthorizationId())
+	if err != nil {
+		return nil, err
+	}
+	amount, err := positive(req.GetAmount(), false)
+	if err != nil {
+		return nil, err
+	}
+	r, err := s.app.Refund(ctx, id, req.GetRefundReference(), amount)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &cardv1.RefundResponse{Refund: refundPB(r)}, nil
+}
+
+func (s *Server) ListAuthorizations(ctx context.Context, req *cardv1.ListAuthorizationsRequest) (*cardv1.ListAuthorizationsResponse, error) {
+	card, err := parseID(req.GetCardId())
+	if err != nil {
+		return nil, err
+	}
+	list, err := s.app.Purchases(ctx, card, int(req.GetLimit()))
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	out := &cardv1.ListAuthorizationsResponse{}
+	for _, p := range list {
+		a := authPB(p.Authorization)
+		if p.Dispute != nil {
+			a.Dispute = disputePB(*p.Dispute)
+		}
+		out.Authorizations = append(out.Authorizations, a)
+	}
+	return out, nil
+}
+
+func (s *Server) OpenDispute(ctx context.Context, req *cardv1.OpenDisputeRequest) (*cardv1.OpenDisputeResponse, error) {
+	id, err := parseID(req.GetAuthorizationId())
+	if err != nil {
+		return nil, err
+	}
+	amount, err := positive(req.GetAmount(), true)
+	if err != nil {
+		return nil, err
+	}
+	var card uuid.UUID
+	if req.GetCardId() != "" {
+		if card, err = parseID(req.GetCardId()); err != nil {
+			return nil, err
+		}
+	}
+	d, err := s.app.OpenDispute(ctx, card, id, disputeReasons[req.GetReason()], amount, req.GetDescription())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &cardv1.OpenDisputeResponse{Dispute: disputePB(d)}, nil
+}
+
+func (s *Server) GetDispute(ctx context.Context, req *cardv1.GetDisputeRequest) (*cardv1.GetDisputeResponse, error) {
+	id, err := parseID(req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	d, err := s.app.Dispute(ctx, id)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &cardv1.GetDisputeResponse{Dispute: disputePB(d)}, nil
+}
+
+func (s *Server) ListDisputes(ctx context.Context, req *cardv1.ListDisputesRequest) (*cardv1.ListDisputesResponse, error) {
+	var account uuid.UUID
+	if req.GetAccountId() != "" {
+		var err error
+		if account, err = parseID(req.GetAccountId()); err != nil {
+			return nil, err
+		}
+	}
+	list, err := s.app.Disputes(ctx, account, disputeStatuses[req.GetStatus()], int(req.GetLimit()))
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	out := &cardv1.ListDisputesResponse{}
+	for _, d := range list {
+		out.Disputes = append(out.Disputes, disputePB(d))
+	}
+	return out, nil
+}
+
+func (s *Server) DecideDispute(ctx context.Context, req *cardv1.DecideDisputeRequest) (*cardv1.DecideDisputeResponse, error) {
+	id, err := parseID(req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	d, err := s.app.DecideDispute(ctx, id, req.GetAnalystId(), req.GetWon(), req.GetReason())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &cardv1.DecideDisputeResponse{Dispute: disputePB(d)}, nil
 }
 
 func (s *Server) IssueCard(ctx context.Context, req *cardv1.IssueCardRequest) (*cardv1.IssueCardResponse, error) {
@@ -279,6 +434,9 @@ func (s *Server) Reverse(ctx context.Context, req *cardv1.ReverseRequest) (*card
 }
 
 func toStatus(err error) error {
+	if r, ok := domain.AsRefused(err); ok {
+		return grpcserver.Error(codes.FailedPrecondition, r.Reason, r.Msg)
+	}
 	switch {
 	case errors.Is(err, domain.ErrInvalidArgument):
 		return grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", err.Error())

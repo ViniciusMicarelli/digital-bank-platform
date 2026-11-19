@@ -51,7 +51,7 @@ func (s *Service) Transfer(ctx context.Context, key string, from, to uuid.UUID, 
 // Post moves money in one step for the credit card types.
 func (s *Service) Post(ctx context.Context, key string, typ domain.Type, from, to uuid.UUID, amount money.Money, description string, metadata map[string]string) (domain.Transaction, error) {
 	switch typ {
-	case domain.TypeInternalTransfer, domain.TypeCreditPurchase, domain.TypeCreditInvoicePayment, domain.TypeCreditCharges:
+	case domain.TypeInternalTransfer, domain.TypeCreditPurchase, domain.TypeCreditInvoicePayment, domain.TypeCreditCharges, domain.TypeCreditCardRefund:
 	default:
 		return domain.Transaction{}, fmt.Errorf("%w: %s is not a one-step type", domain.ErrInvalidArgument, typ)
 	}
@@ -69,7 +69,7 @@ func (s *Service) ReserveOutgoing(ctx context.Context, key string, typ domain.Ty
 
 // CreditIncoming credits money arriving from outside to a customer account.
 func (s *Service) CreditIncoming(ctx context.Context, key string, typ domain.Type, from, to uuid.UUID, amount money.Money, description string, metadata map[string]string) (domain.Transaction, error) {
-	if typ != domain.TypePixIn {
+	if typ != domain.TypePixIn && typ != domain.TypeCardRefund {
 		return domain.Transaction{}, fmt.Errorf("%w: %s is not an incoming type", domain.ErrInvalidArgument, typ)
 	}
 	return s.start(ctx, key, typ, from, to, amount, description, metadata)

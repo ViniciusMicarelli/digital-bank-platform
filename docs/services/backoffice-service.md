@@ -39,6 +39,7 @@ The gateway writes an event **before** each staff action and refuses the action 
 | `CUSTOMER_FILE_VIEW` | customer | gateway (every look at personal data, LGPD) |
 | `KYC_APPROVE`, `KYC_REJECT` | customer | gateway |
 | `ACCOUNT_BLOCK` | account | gateway |
+| `DISPUTE_ACCEPT`, `DISPUTE_REJECT` | account | gateway (card disputes) |
 | `APPROVAL_REQUESTED`, `APPROVAL_APPROVED`, `APPROVAL_REJECTED`, `APPROVAL_EXECUTED`, `APPROVAL_FAILED`, `APPROVAL_EXPIRED` | account | backoffice-service |
 
 ## Configuration

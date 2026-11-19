@@ -138,3 +138,44 @@ export interface Notification {
   occurred_at: string
   read: boolean
 }
+
+export type DisputeReason = 'NOT_RECOGNIZED' | 'NOT_RECEIVED' | 'DUPLICATE' | 'WRONG_AMOUNT' | 'CANCELLED'
+
+export interface Dispute {
+  id: string
+  authorization_id: string
+  card_id: string
+  account_id: string
+  reason: DisputeReason
+  amount: Money
+  description: string
+  status: 'OPEN' | 'WON' | 'LOST'
+  decided_by: string
+  decision_reason: string
+  created_at: string
+  decided_at?: string
+  merchant_name: string
+  purchased_at: string
+}
+
+export interface CardPurchase {
+  id: string
+  status: 'APPROVED' | 'DECLINED' | 'CLEARED' | 'REVERSED'
+  response_code: string
+  reason: string
+  amount: Money
+  cleared_amount: Money
+  refunded_amount: Money
+  merchant_name: string
+  function: 'DEBIT' | 'CREDIT'
+  created_at: string
+  dispute?: Dispute
+}
+
+export const disputeReasons: Record<DisputeReason, string> = {
+  NOT_RECOGNIZED: 'Não reconheço esta compra',
+  NOT_RECEIVED: 'Não recebi o produto ou serviço',
+  DUPLICATE: 'Fui cobrado duas vezes',
+  WRONG_AMOUNT: 'Valor diferente do combinado',
+  CANCELLED: 'Cancelei e continuei sendo cobrado',
+}

@@ -117,3 +117,33 @@ func (c *Transactions) Compensate(ctx context.Context, id uuid.UUID, reason stri
 	resp, err := c.c.CompensateTransaction(ctx, &txv1.CompensateTransactionRequest{Id: id.String(), Reason: reason})
 	return result(resp.GetTransaction(), err)
 }
+
+// Refund credits a debit purchase back to the checking account, from card
+// clearing (CARD_REFUND).
+func (c *Transactions) Refund(ctx context.Context, key string, account uuid.UUID, amount money.Money, description string, md map[string]string) (ports.TxResult, error) {
+	resp, err := c.c.CreditIncoming(ctx, &txv1.CreditIncomingRequest{
+		IdempotencyKey: key, Type: txv1.TransactionType_TRANSACTION_TYPE_CARD_REFUND,
+		FromAccountId: CardClearingAccountID.String(), ToAccountId: account.String(),
+		Amount: moneyPB(amount), Description: description, Metadata: md,
+	})
+	return result(resp.GetTransaction(), err)
+}
+
+// Refund credits a credit purchase back on the invoice (credit-service).
+// A refusal credit-service would repeat (no line, bad request) is FAILED.
+func (c *Credit) Refund(ctx context.Context, key string, account uuid.UUID, amount money.Money, description string, md map[string]string) (ports.TxResult, error) {
+	resp, err := c.c.RefundCredit(ctx, &creditv1.RefundCreditRequest{IdempotencyKey: key, AccountId: account.String(),
+		Amount: moneyPB(amount), Description: description, Metadata: md})
+	switch status.Code(err) {
+	case codes.OK:
+	case codes.NotFound, codes.InvalidArgument, codes.FailedPrecondition, codes.AlreadyExists:
+		return ports.TxResult{Status: "FAILED", FailureReason: status.Code(err).String()}, nil
+	default:
+		return ports.TxResult{}, err
+	}
+	id, err := uuid.Parse(resp.GetRefund().GetId())
+	if err != nil {
+		return ports.TxResult{}, err
+	}
+	return ports.TxResult{ID: id, Status: "COMPLETED"}, nil
+}

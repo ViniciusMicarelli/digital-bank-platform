@@ -286,6 +286,77 @@ func (s *Service) Release(ctx context.Context, id uuid.UUID) (domain.Hold, error
 	return h, err
 }
 
+// Refund credits a card refund to the open invoice and frees the limit; the
+// money comes back from the card network (card clearing -> receivables).
+// Idempotent on key: the ledger posting and the credit happen once.
+func (s *Service) Refund(ctx context.Context, key string, account uuid.UUID, amount int64, description string, md map[string]string) (domain.Refund, error) {
+	if key == "" || amount <= 0 {
+		return domain.Refund{}, fmt.Errorf("%w: key and a positive amount are required", domain.ErrInvalidArgument)
+	}
+	if r, err := s.store.RefundByKey(ctx, key); err != nil || r != nil {
+		if r != nil && (r.AccountID != account || r.Amount != amount) {
+			return domain.Refund{}, fmt.Errorf("%w: %q", domain.ErrConflict, key)
+		}
+		return derefRefund(r), err
+	}
+	line, err := s.store.LineByAccount(ctx, account)
+	if err != nil {
+		return domain.Refund{}, err
+	}
+	if md == nil {
+		md = map[string]string{}
+	}
+	md["account_id"] = account.String()
+	res, err := s.txs.Post(ctx, "credit-refund:"+key, "CREDIT_CARD_REFUND", CardClearingAccountID, CreditReceivablesAccountID, amount, description, md)
+	if err != nil {
+		return domain.Refund{}, err
+	}
+	if res.Status != "COMPLETED" {
+		return domain.Refund{}, fmt.Errorf("ledger posting of the refund: %s %s", res.Status, res.FailureReason)
+	}
+	r := domain.Refund{ID: uuid.Must(uuid.NewV7()), IdempotencyKey: key, LineID: line.ID, AccountID: account, Amount: amount,
+		Description: description, CreatedAt: s.now()}
+	err = s.store.InTx(ctx, func(tx ports.Tx) error {
+		l, err := tx.LockLine(line.ID)
+		if err != nil {
+			return err
+		}
+		inv, err := s.openInvoice(ctx, tx, l)
+		if err != nil {
+			return err
+		}
+		r.InvoiceID = inv.ID
+		inserted, err := tx.InsertRefund(r)
+		if err != nil || !inserted {
+			return err // a concurrent retry did it
+		}
+		inv.Total -= amount
+		l.Free(amount)
+		if err := tx.AddItem(domain.NewItem(inv.ID, domain.ItemRefund, amount, description, r.ID.String(), s.now())); err != nil {
+			return err
+		}
+		if err := errors.Join(tx.SaveInvoice(inv), tx.SaveLine(l)); err != nil {
+			return err
+		}
+		return publish(ctx, tx, "credit.refund.completed", r.ID.String(), map[string]any{
+			"refund_id": r.ID, "account_id": account, "invoice_id": inv.ID, "amount": amount, "description": description, "metadata": md})
+	})
+	if err != nil {
+		return domain.Refund{}, err
+	}
+	if stored, err := s.store.RefundByKey(ctx, key); err == nil && stored != nil {
+		return *stored, nil
+	}
+	return r, nil
+}
+
+func derefRefund(r *domain.Refund) domain.Refund {
+	if r == nil {
+		return domain.Refund{}
+	}
+	return *r
+}
+
 // ---- invoice cycle ----
 
 // openInvoice returns the locked OPEN invoice of l, closing any whose
@@ -299,6 +370,9 @@ func (s *Service) openInvoice(ctx context.Context, tx ports.Tx, l domain.Line) (
 		if err := inv.Close(); err != nil {
 			return domain.Invoice{}, err
 		}
+		// Refunds larger than what was owed: the credit moves to the next invoice.
+		credit := max(-inv.Remaining(), 0)
+		inv.Total += credit
 		if err := tx.SaveInvoice(inv); err != nil {
 			return domain.Invoice{}, err
 		}
@@ -308,8 +382,17 @@ func (s *Service) openInvoice(ctx context.Context, tx ports.Tx, l domain.Line) (
 			return domain.Invoice{}, err
 		}
 		next := inv.Next()
+		next.Total -= credit
 		if err := tx.InsertInvoice(next); err != nil {
 			return domain.Invoice{}, err
+		}
+		if credit > 0 {
+			if err := errors.Join(
+				tx.AddItem(domain.NewItem(inv.ID, domain.ItemCreditCarriedOut, credit, "Crédito transferido para a próxima fatura", next.ID.String(), s.now())),
+				tx.AddItem(domain.NewItem(next.ID, domain.ItemCreditCarriedIn, credit, "Crédito da fatura anterior", inv.ID.String(), s.now())),
+			); err != nil {
+				return domain.Invoice{}, err
+			}
 		}
 		inv = next
 	}

@@ -1,6 +1,6 @@
-import { errorMessage, formatBRL, type Account, type Money, type Profile } from '@bank/core'
+import { disputeReasons, errorMessage, formatBRL, type Account, type Dispute, type Money, type Profile } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, FileClock, Inbox, Landmark, Lock, LockOpen, LogOut, Search, ShieldAlert, ShieldCheck, UserRound, Users, X } from 'lucide-react'
+import { Check, CreditCard, FileClock, Inbox, Landmark, Lock, LockOpen, LogOut, Search, ShieldAlert, ShieldCheck, UserRound, Users, X } from 'lucide-react'
 import { useState } from 'react'
 import { useMe } from '../app/queries'
 import { Aurora } from '../components/Aurora'
@@ -26,7 +26,7 @@ const actionLabels: Record<string, string> = {
   CUSTOMER_FILE_VIEW: 'Ficha consultada', KYC_APPROVE: 'Cadastro aprovado', KYC_REJECT: 'Cadastro recusado',
   ACCOUNT_BLOCK: 'Conta bloqueada', APPROVAL_REQUESTED: 'Desbloqueio solicitado', APPROVAL_APPROVED: 'Desbloqueio aprovado',
   APPROVAL_REJECTED: 'Desbloqueio recusado', APPROVAL_EXECUTED: 'Conta desbloqueada', APPROVAL_FAILED: 'Desbloqueio falhou',
-  APPROVAL_EXPIRED: 'Pedido expirado',
+  APPROVAL_EXPIRED: 'Pedido expirado', DISPUTE_ACCEPT: 'Contestação aceita (estorno)', DISPUTE_REJECT: 'Contestação recusada',
 }
 const actionLabel = (a: string) => actionLabels[a] ?? (a.endsWith('_FAILED') ? `${actionLabels[a.slice(0, -7)] ?? a} (falhou)` : a)
 const short = (id: string) => id.slice(0, 8)
@@ -226,6 +226,60 @@ function ApprovalsPanel({ me, onOpenCustomer }: { me?: string; onOpenCustomer: (
   )
 }
 
+function DisputeItem({ item, onOpen }: { item: Dispute & { customer_id?: string; holder_name?: string }; onOpen: () => void }) {
+  const qc = useQueryClient()
+  const [rejecting, setRejecting] = useState(false)
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState('')
+  const decide = useMutation({
+    mutationFn: (won: boolean) => api('POST', `/v1/backoffice/disputes/${item.id}/decide`, { body: { won, reason } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['backoffice'] }),
+    onError: (e) => setError(errorMessage(e)),
+  })
+  return (
+    <li className="space-y-3 rounded-2xl px-3 py-3 hover:bg-surface-2">
+      <div className="flex items-start gap-3">
+        <IconTile icon={CreditCard} tone={item.reason === 'NOT_RECOGNIZED' ? 'red' : 'amber'} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-fg">{item.merchant_name} · {formatBRL(item.amount)}</p>
+          <p className="text-xs text-muted">{disputeReasons[item.reason]}{item.holder_name ? ` · ${item.holder_name}` : ''} · compra em {dateTimeBR(item.purchased_at)}</p>
+          {item.description && <p className="mt-1 text-xs text-fg-2">“{item.description}”</p>}
+        </div>
+      </div>
+      {rejecting ? (
+        <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); decide.mutate(false) }}>
+          <div className="flex-1"><Field label="Motivo da recusa" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+          <Button type="submit" variant="danger" size="sm" disabled={!reason.trim()} loading={decide.isPending}>Recusar</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setRejecting(false)}>Voltar</Button>
+        </form>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" icon={Check} loading={decide.isPending} onClick={() => decide.mutate(true)}>Aceitar e estornar</Button>
+          <Button size="sm" variant="secondary" icon={X} onClick={() => setRejecting(true)}>Recusar</Button>
+          {item.customer_id && <Button size="sm" variant="ghost" onClick={onOpen}>Ver cliente</Button>}
+        </div>
+      )}
+      <Alert>{error}</Alert>
+    </li>
+  )
+}
+
+function DisputesPanel({ onOpenCustomer }: { onOpenCustomer: (customerId: string) => void }) {
+  const disputes = useQuery({
+    queryKey: ['backoffice', 'disputes'],
+    queryFn: async () => (await api<{ disputes: (Dispute & { customer_id?: string; holder_name?: string })[] }>('GET', '/v1/backoffice/disputes')).disputes,
+    refetchInterval: 15_000,
+  })
+  const list = disputes.data ?? []
+  return (
+    <Panel title={`Contestações · ${list.length}`} icon={CreditCard}>
+      {disputes.isLoading ? <Loading /> : !list.length ? <Empty icon={CreditCard}>Nenhuma compra contestada esperando análise.</Empty> : (
+        <ul className="-mx-2 space-y-1">{list.map((d) => <DisputeItem key={d.id} item={d} onOpen={() => d.customer_id && onOpenCustomer(d.customer_id)} />)}</ul>
+      )}
+    </Panel>
+  )
+}
+
 /** The back office needs a second factor; a password-only analyst enrolls here first. */
 function MFAGate() {
   const [enabled, setEnabled] = useState(false)
@@ -295,6 +349,7 @@ export function BackofficePage() {
             )}
           </Panel>
           <ApprovalsPanel me={me.data?.customer_id} onOpenCustomer={setSelected} />
+          <DisputesPanel onOpenCustomer={setSelected} />
         </div>
         <div>
           {selected ? <CustomerPanel key={selected} id={selected} onDecided={() => setSelected(selected)} /> : (

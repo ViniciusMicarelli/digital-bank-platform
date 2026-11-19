@@ -382,6 +382,18 @@ func TestReservationTimeout(t *testing.T) {
 	}
 }
 
+func TestCardRefundCredits(t *testing.T) {
+	e := setup(t)
+	e.ledger.balances[e.pix] = 1_000_000 // stands in for card clearing
+	tx, err := e.svc.CreditIncoming(context.Background(), "refund-1", domain.TypeCardRefund, e.pix, e.bob, brl("7"), "estorno", nil)
+	if err != nil || tx.Status != domain.StatusCompleted || e.ledger.balances[e.bob] != 700 || len(e.accounts.usage) != 0 {
+		t.Fatalf("card refund = %+v %v", tx, err)
+	}
+	if _, err := e.svc.CreditIncoming(context.Background(), "refund-2", domain.TypeDebitCard, e.pix, e.bob, brl("7"), "x", nil); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatalf("a purchase is not an incoming type: %v", err)
+	}
+}
+
 func TestPixInCredits(t *testing.T) {
 	e := setup(t)
 	e.ledger.balances[e.pix] = 1_000_000 // the fake has no negative internal balances

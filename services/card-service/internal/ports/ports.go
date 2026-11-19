@@ -36,6 +36,36 @@ type Store interface {
 	// transaction id, only if the stored status is still from.
 	SaveAuthorization(ctx context.Context, a domain.Authorization, from domain.AuthStatus, events ...outbox.Message) error
 	PendingReversals(ctx context.Context, before time.Time, limit int) ([]uuid.UUID, error)
+	// AuthorizationsByCard lists a card's purchases, newest first.
+	AuthorizationsByCard(ctx context.Context, card uuid.UUID, limit int) ([]domain.Authorization, error)
+
+	// InTx runs refunds and disputes in one unit of work.
+	InTx(ctx context.Context, fn func(Tx) error) error
+	Dispute(ctx context.Context, id uuid.UUID) (domain.Dispute, error)
+	// Disputes filters by account and/or status (zero values match all), newest first.
+	Disputes(ctx context.Context, account uuid.UUID, status domain.DisputeStatus, limit int) ([]domain.Dispute, error)
+	// LatestDisputes returns the newest dispute of each authorization that has one.
+	LatestDisputes(ctx context.Context, authorizations []uuid.UUID) (map[uuid.UUID]domain.Dispute, error)
+	PendingRefunds(ctx context.Context, before time.Time, limit int) ([]domain.Refund, error)
+}
+
+// Tx is a unit of work; Lock* take row locks (authorization before dispute
+// before card).
+type Tx interface {
+	LockAuthorization(id uuid.UUID) (domain.Authorization, error)
+	SetRefunded(authorization uuid.UUID, refunded int64) error
+	// OpenDispute returns the open dispute of an authorization, if any.
+	OpenDispute(authorization uuid.UUID) (*domain.Dispute, error)
+	InsertDispute(d domain.Dispute) error
+	LockDispute(id uuid.UUID) (domain.Dispute, error)
+	SaveDispute(d domain.Dispute) error
+	RefundByReference(authorization uuid.UUID, reference string) (*domain.Refund, error)
+	InsertRefund(r domain.Refund) error
+	LockRefund(id uuid.UUID) (domain.Refund, error)
+	SaveRefund(r domain.Refund) error
+	LockCard(id uuid.UUID) (domain.Card, error)
+	SaveCard(c domain.Card) error
+	Publish(m outbox.Message) error
 }
 
 type Holder struct {
@@ -59,4 +89,7 @@ type Transactions interface {
 	Reserve(ctx context.Context, key string, account uuid.UUID, amount money.Money, description string, metadata map[string]string) (TxResult, error)
 	Complete(ctx context.Context, id uuid.UUID, amount *money.Money) (TxResult, error)
 	Compensate(ctx context.Context, id uuid.UUID, reason string) (TxResult, error)
+	// Refund gives money back for a cleared purchase (idempotent on key):
+	// COMPLETED, or FAILED with a reason the next try would not change.
+	Refund(ctx context.Context, key string, account uuid.UUID, amount money.Money, description string, metadata map[string]string) (TxResult, error)
 }

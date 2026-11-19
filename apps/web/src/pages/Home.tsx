@@ -15,7 +15,7 @@ import { useCountUp } from '../lib/motion'
 
 const typeIcons: Record<string, LucideIcon> = {
   PIX: ArrowLeftRight, PIX_OUT: ArrowUpRight, PIX_IN: ArrowDownLeft, PIX_REFUND: Undo2, INTERNAL_TRANSFER: ArrowLeftRight,
-  DEBIT_CARD_PURCHASE: ShoppingBag, CREDIT_INVOICE_PAYMENT: Wallet, BOLETO_PAYMENT: FileText,
+  DEBIT_CARD_PURCHASE: ShoppingBag, CREDIT_INVOICE_PAYMENT: Wallet, BOLETO_PAYMENT: FileText, CARD_REFUND: Undo2,
 }
 
 export function FeedRow({ item }: { item: FeedItem }) {

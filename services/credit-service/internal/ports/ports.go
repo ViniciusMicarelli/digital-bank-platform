@@ -21,6 +21,7 @@ type Store interface {
 	Invoice(ctx context.Context, id uuid.UUID) (domain.Invoice, error)
 	Items(ctx context.Context, invoice uuid.UUID) ([]domain.Item, error)
 	Hold(ctx context.Context, id uuid.UUID) (domain.Hold, error)
+	RefundByKey(ctx context.Context, key string) (*domain.Refund, error)
 
 	// LinesDue lists lines with an invoice to close or to make overdue.
 	LinesDue(ctx context.Context, today time.Time, limit int) ([]uuid.UUID, error)
@@ -58,6 +59,9 @@ type Tx interface {
 	LockPayment(id uuid.UUID) (domain.Payment, error)
 	InsertPayment(p domain.Payment) error
 	SavePayment(p domain.Payment) error
+
+	// InsertRefund returns false when the key exists already.
+	InsertRefund(r domain.Refund) (bool, error)
 
 	Publish(m outbox.Message) error
 }

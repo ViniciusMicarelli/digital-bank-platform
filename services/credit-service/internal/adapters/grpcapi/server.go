@@ -173,6 +173,23 @@ func (s *Server) CaptureCredit(ctx context.Context, req *creditv1.CaptureCreditR
 	return &creditv1.CaptureCreditResponse{Hold: holdPB(h)}, nil
 }
 
+func (s *Server) RefundCredit(ctx context.Context, req *creditv1.RefundCreditRequest) (*creditv1.RefundCreditResponse, error) {
+	account, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	amt, err := amount(req.GetAmount())
+	if err != nil {
+		return nil, err
+	}
+	r, err := s.app.Refund(ctx, req.GetIdempotencyKey(), account, amt, req.GetDescription(), req.GetMetadata())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &creditv1.RefundCreditResponse{Refund: &creditv1.CreditRefund{Id: r.ID.String(), AccountId: r.AccountID.String(),
+		InvoiceId: r.InvoiceID.String(), Amount: brl(r.Amount), Status: "COMPLETED"}}, nil
+}
+
 func (s *Server) ReleaseCredit(ctx context.Context, req *creditv1.ReleaseCreditRequest) (*creditv1.ReleaseCreditResponse, error) {
 	id, err := parseID(req.GetHoldId())
 	if err != nil {
