@@ -579,6 +579,136 @@ func (s *Service) postAllCharges(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
+// ---- invoice plans ----
+
+// PlanQuotes are the ways a closed invoice can be split (2 to 12 installments).
+func (s *Service) PlanQuotes(ctx context.Context, invoiceID uuid.UUID) ([]domain.PlanQuote, error) {
+	inv, err := s.store.Invoice(ctx, invoiceID)
+	if err != nil {
+		return nil, err
+	}
+	if err := inv.Plannable(); err != nil {
+		return nil, err
+	}
+	out := make([]domain.PlanQuote, 0, domain.MaxPlanInstallments-1)
+	for n := domain.MinPlanInstallments; n <= domain.MaxPlanInstallments; n++ {
+		out = append(out, domain.QuotePlan(inv.Remaining(), n, domain.InvoicePlanRateBP))
+	}
+	return out, nil
+}
+
+// PlanInvoice splits a closed invoice into n installments with interest:
+// the invoice is settled by the plan, the first installment goes on the open
+// invoice and the others on the next ones; the interest is added to the debt
+// (and booked in the ledger after the commit). Idempotent on key.
+func (s *Service) PlanInvoice(ctx context.Context, key string, invoiceID uuid.UUID, n int) (domain.InvoicePlan, error) {
+	if key == "" {
+		return domain.InvoicePlan{}, fmt.Errorf("%w: idempotency key is required", domain.ErrInvalidArgument)
+	}
+	if n < domain.MinPlanInstallments || n > domain.MaxPlanInstallments {
+		return domain.InvoicePlan{}, fmt.Errorf("%w: from 2 to 12 installments", domain.ErrInvalidArgument)
+	}
+	if existing, err := s.store.InvoicePlanByKey(ctx, key); err != nil || existing != nil {
+		if existing != nil && (existing.InvoiceID != invoiceID || existing.Installments != n) {
+			return domain.InvoicePlan{}, fmt.Errorf("%w: %q", domain.ErrConflict, key)
+		}
+		if existing == nil {
+			return domain.InvoicePlan{}, err
+		}
+		return *existing, nil
+	}
+	inv, err := s.store.Invoice(ctx, invoiceID)
+	if err != nil {
+		return domain.InvoicePlan{}, err
+	}
+	var plan domain.InvoicePlan
+	err = s.store.InTx(ctx, func(tx ports.Tx) error {
+		l, err := tx.LockLine(inv.LineID)
+		if err != nil {
+			return err
+		}
+		closed, err := tx.LockInvoice(invoiceID)
+		if err != nil {
+			return err
+		}
+		if err := closed.Plannable(); err != nil {
+			return err
+		}
+		q := domain.QuotePlan(closed.Remaining(), n, domain.InvoicePlanRateBP)
+		plan = domain.InvoicePlan{ID: uuid.Must(uuid.NewV7()), IdempotencyKey: key, InvoiceID: closed.ID, LineID: l.ID,
+			Principal: closed.Remaining(), Installments: n, Installment: q.Installment, MonthlyBP: q.MonthlyBP, CreatedAt: s.now()}
+		if err := tx.InsertInvoicePlan(plan); err != nil {
+			return err
+		}
+		// The closed invoice is settled by the plan.
+		if err := tx.AddItem(domain.NewItem(closed.ID, domain.ItemInvoicePlan, plan.Principal,
+			fmt.Sprintf("Fatura parcelada em %dx", n), plan.ID.String(), s.now())); err != nil {
+			return err
+		}
+		closed.Paid += plan.Principal
+		closed.Status = domain.InvoicePaid
+		// The installments: the first on the open invoice, the rest to come.
+		open, err := s.openInvoice(ctx, tx, l)
+		if err != nil {
+			return err
+		}
+		list := make([]domain.Installment, n)
+		for k := range list {
+			list[k] = domain.Installment{ID: uuid.Must(uuid.NewV7()), LineID: l.ID, PlanID: plan.ID, Number: k + 1, Total: n,
+				Amount: plan.Installment, Description: "Parcelamento da fatura", CreatedAt: s.now()}
+		}
+		list[0].InvoiceID = &open.ID
+		if err := tx.InsertInstallments(list); err != nil {
+			return err
+		}
+		if err := tx.AddItem(domain.NewItem(open.ID, domain.ItemPurchase, list[0].Amount, list[0].Label(), "installment:"+list[0].ID.String(), s.now())); err != nil {
+			return err
+		}
+		open.Total += list[0].Amount
+		l.Used += plan.Interest() // the debt grows by the interest
+		if err := errors.Join(tx.SaveInvoice(closed), tx.SaveInvoice(open), tx.SaveLine(l)); err != nil {
+			return err
+		}
+		return publish(ctx, tx, "credit.invoice.planned", plan.ID.String(), map[string]any{
+			"plan_id": plan.ID, "invoice_id": closed.ID, "account_id": l.AccountID, "principal": plan.Principal,
+			"installments": n, "installment": plan.Installment, "interest": plan.Interest()})
+	})
+	if err != nil {
+		return domain.InvoicePlan{}, err
+	}
+	if err := s.postPlanInterest(ctx, plan); err != nil {
+		s.log.WarnContext(ctx, "plan interest will be posted later", "plan_id", plan.ID, "error", err)
+	}
+	return plan, nil
+}
+
+// postPlanInterest books a plan's interest as revenue (idempotent per plan).
+func (s *Service) postPlanInterest(ctx context.Context, p domain.InvoicePlan) error {
+	if p.Interest() > 0 {
+		res, err := s.txs.Post(ctx, p.InterestKey(), "CREDIT_CHARGES", CreditReceivablesAccountID, CreditRevenueAccountID, p.Interest(),
+			"Juros do parcelamento da fatura", map[string]string{"plan_id": p.ID.String()})
+		if err != nil {
+			return err
+		}
+		if res.Status != "COMPLETED" {
+			return fmt.Errorf("ledger posting of plan interest: %s %s", res.Status, res.FailureReason)
+		}
+	}
+	return s.store.MarkPlanInterestPosted(ctx, p.ID)
+}
+
+func (s *Service) postAllPlanInterest(ctx context.Context) error {
+	plans, err := s.store.UnpostedPlanInterest(ctx, 100)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, p := range plans {
+		errs = append(errs, s.postPlanInterest(ctx, p))
+	}
+	return errors.Join(errs...)
+}
+
 // ---- payments ----
 
 // Pay pays amount of an invoice from the line's checking account.
@@ -691,6 +821,9 @@ func (s *Service) RunOnce(ctx context.Context) {
 	}
 	if err := s.postAllCharges(ctx); err != nil {
 		s.log.WarnContext(ctx, "posting charges failed", "error", err)
+	}
+	if err := s.postAllPlanInterest(ctx); err != nil {
+		s.log.WarnContext(ctx, "posting invoice plan interest failed", "error", err)
 	}
 	holds, err := s.store.ExpiredHolds(ctx, s.now().Add(-domain.HoldLifetime), 100)
 	if err != nil {

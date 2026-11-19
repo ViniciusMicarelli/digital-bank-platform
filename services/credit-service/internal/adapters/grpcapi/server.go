@@ -51,7 +51,7 @@ func linePB(l domain.Line) *creditv1.CreditLine {
 func invoicePB(i domain.Invoice) *creditv1.Invoice {
 	return &creditv1.Invoice{Id: i.ID.String(), LineId: i.LineID.String(), Status: string(i.Status),
 		ClosingDate: i.ClosingDate.Format(time.DateOnly), DueDate: i.DueDate.Format(time.DateOnly),
-		Total: brl(i.Total), Paid: brl(i.Paid), Remaining: brl(max(i.Remaining(), 0))}
+		Total: brl(i.Total), Paid: brl(i.Paid), Remaining: brl(max(i.Remaining(), 0)), MinimumPayment: brl(domain.MinimumPayment(i.Remaining() - i.Pending))}
 }
 
 func holdPB(h domain.Hold) *creditv1.Hold {
@@ -92,6 +92,36 @@ func (s *Server) GetCreditLine(ctx context.Context, req *creditv1.GetCreditLineR
 	}
 	out.UpcomingInstallments = brl(upcoming)
 	return &creditv1.GetCreditLineResponse{Line: out}, nil
+}
+
+func (s *Server) QuoteInvoicePlan(ctx context.Context, req *creditv1.QuoteInvoicePlanRequest) (*creditv1.QuoteInvoicePlanResponse, error) {
+	id, err := parseID(req.GetInvoiceId())
+	if err != nil {
+		return nil, err
+	}
+	quotes, err := s.app.PlanQuotes(ctx, id)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	out := &creditv1.QuoteInvoicePlanResponse{}
+	for _, q := range quotes {
+		out.Quotes = append(out.Quotes, &creditv1.PlanQuote{Installments: int32(q.Installments), Installment: brl(q.Installment), //nolint:gosec // 2..12
+			Total: brl(q.Total), Interest: brl(q.Interest), MonthlyRateBp: int32(q.MonthlyBP), AnnualCostBp: int32(q.AnnualCostBP)}) //nolint:gosec // basis points
+	}
+	return out, nil
+}
+
+func (s *Server) PlanInvoice(ctx context.Context, req *creditv1.PlanInvoiceRequest) (*creditv1.PlanInvoiceResponse, error) {
+	id, err := parseID(req.GetInvoiceId())
+	if err != nil {
+		return nil, err
+	}
+	p, err := s.app.PlanInvoice(ctx, req.GetIdempotencyKey(), id, int(req.GetInstallments()))
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &creditv1.PlanInvoiceResponse{Plan: &creditv1.InvoicePlan{Id: p.ID.String(), InvoiceId: p.InvoiceID.String(), Principal: brl(p.Principal),
+		Installments: int32(p.Installments), Installment: brl(p.Installment), Interest: brl(p.Interest()), MonthlyRateBp: int32(p.MonthlyBP)}}, nil //nolint:gosec // small
 }
 
 func (s *Server) ListInstallmentPlans(ctx context.Context, req *creditv1.ListInstallmentPlansRequest) (*creditv1.ListInstallmentPlansResponse, error) {

@@ -100,6 +100,7 @@
 | `POST` | `/v1/accounts/{id}/credit` | Open the credit line `{closing_day?}` (Idempotency-Key) |
 | `GET` | `/v1/accounts/{id}/credit` | Limit, used, available |
 | `GET` | `/v1/accounts/{id}/credit/invoices` | Invoices, newest first |
+| `GET` · `POST` | `/v1/accounts/{id}/credit/invoices/{invoiceID}/plans` | Split a closed invoice: the options `{installments, installment, total, interest, monthly_rate, annual_cost}` / choose one `{installments}` (Idempotency-Key) → 201 (`INVOICE_NOT_PLANNABLE`, `INVOICE_TOO_SMALL`, `PAYMENT_IN_PROGRESS`). Invoices also carry `minimum_payment` |
 | `GET` | `/v1/accounts/{id}/credit/installments` | Installment purchases with installments to come: `{description, total, installments, billed, installment_amount, remaining}` (the line also has `upcoming_installments`) |
 | `GET` | `/v1/accounts/{id}/credit/invoices/{invoiceID}` | Invoice with its items |
 | `POST` | `/v1/accounts/{id}/credit/invoices/{invoiceID}/payments` | Pay `{amount}` from the account (Idempotency-Key) |

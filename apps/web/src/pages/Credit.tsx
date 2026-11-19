@@ -8,7 +8,7 @@ import { MoneyField } from '../components/MoneyField'
 import { Alert, Amount, Badge, Button, Empty, Loading, Modal, PageTitle, Panel, Sandbox, Select } from '../components/ui'
 import { dateBR, dateTimeBR } from '../lib/format'
 import { api, ApiError } from '../lib/api'
-import { errorMessage, compareBRL, formatBRL, type CreditLine, type InstallmentPlan, type Invoice } from '@bank/core'
+import { errorMessage, compareBRL, formatBRL, type CreditLine, type InstallmentPlan, type Invoice, type PlanQuote } from '@bank/core'
 
 const invoiceStatus: Record<Invoice['status'], [string, 'credit' | 'amber' | 'green' | 'red']> = {
   OPEN: ['Aberta', 'credit'], CLOSED: ['Fechada', 'amber'], PAID: ['Paga', 'green'], OVERDUE: ['Vencida', 'red'],
@@ -16,13 +16,59 @@ const invoiceStatus: Record<Invoice['status'], [string, 'credit' | 'amber' | 'gr
 const itemKinds: Record<string, string> = {
   PURCHASE: 'Compra', PAYMENT: 'Pagamento', BALANCE_CARRIED: 'Saldo anterior', FINE: 'Multa', INTEREST: 'Juros',
   REFUND: 'Estorno', CREDIT_CARRIED_IN: 'Crédito anterior', CREDIT_CARRIED_OUT: 'Crédito para a próxima fatura',
+  INVOICE_PLAN: 'Parcelamento',
 }
-const creditKinds = new Set(['PAYMENT', 'REFUND', 'CREDIT_CARRIED_IN'])
+const creditKinds = new Set(['PAYMENT', 'REFUND', 'CREDIT_CARRIED_IN', 'INVOICE_PLAN'])
+const pct = (n: number) => `${n.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`
+
+function PlanPicker({ base, invoice, onDone }: { base: string; invoice: Invoice; onDone: () => void }) {
+  const [chosen, setChosen] = useState<number | null>(null)
+  const [error, setError] = useState('')
+  const quotes = useQuery({
+    queryKey: ['plan-quotes', invoice.id],
+    queryFn: async () => (await api<{ quotes: PlanQuote[] }>('GET', `${base}/invoices/${invoice.id}/plans`)).quotes,
+  })
+  const plan = useMutation({
+    mutationFn: () => api('POST', `${base}/invoices/${invoice.id}/plans`, { body: { installments: chosen }, idempotent: true }),
+    onSuccess: onDone,
+    onError: (e) => setError(errorMessage(e)),
+  })
+  if (quotes.isLoading) return <Loading />
+  if (quotes.isError) return <Alert>{errorMessage(quotes.error)}</Alert>
+  const pick = quotes.data!.find((q) => q.installments === chosen)
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-fg-2">Divida {formatBRL(invoice.remaining)} em parcelas fixas nas próximas faturas, com juros menores que os do rotativo.</p>
+      <ul role="radiogroup" aria-label="Parcelas" className="max-h-56 space-y-1.5 overflow-y-auto">
+        {quotes.data!.map((q) => (
+          <li key={q.installments}>
+            <button type="button" role="radio" aria-checked={chosen === q.installments} onClick={() => setChosen(q.installments)}
+              className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-sm transition ${chosen === q.installments ? 'bg-credit-soft ring-2 ring-credit' : 'ring-1 ring-line hover:bg-surface-2'}`}>
+              <span className="font-semibold text-fg">{q.installments}x de {formatBRL(q.installment)}</span>
+              <span className="text-xs text-muted">total {formatBRL(q.total)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {pick && (
+        <p className="text-xs text-muted">
+          Juros de {pct(pick.monthly_rate)} ao mês ({formatBRL(pick.interest)} no total) · CET de {pct(pick.annual_cost)} ao ano.
+          A primeira parcela entra na fatura atual e esta fatura fica quitada.
+        </p>
+      )}
+      <Alert>{error}</Alert>
+      <Button variant="credit" disabled={!pick} loading={plan.isPending} onClick={() => plan.mutate()}>
+        {pick ? `Parcelar em ${pick.installments}x` : 'Escolha as parcelas'}
+      </Button>
+    </div>
+  )
+}
 
 function InvoiceModal({ base, invoice, onClose }: { base: string; invoice: Invoice | null; onClose: () => void }) {
   const qc = useQueryClient()
   const [amount, setAmount] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [planning, setPlanning] = useState(false)
   const detail = useQuery({
     queryKey: ['invoices', invoice?.id],
     enabled: !!invoice,
@@ -36,7 +82,7 @@ function InvoiceModal({ base, invoice, onClose }: { base: string; invoice: Invoi
   const inv = detail.data ?? invoice
   const payable = inv && (inv.status === 'OPEN' || inv.status === 'CLOSED') && compareBRL(inv.remaining.amount, '0.00') > 0
   return (
-    <Modal open={!!invoice} onClose={onClose} title={`Fatura de ${inv ? dateBR(inv.closing_date) : ''}`}>
+    <Modal open={!!invoice} onClose={() => { setPlanning(false); onClose() }} title={`Fatura de ${inv ? dateBR(inv.closing_date) : ''}`}>
       {inv && (
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-2 text-sm">
@@ -55,11 +101,20 @@ function InvoiceModal({ base, invoice, onClose }: { base: string; invoice: Invoi
               ))}
             </ul>
           )}
-          {payable && (
+          {payable && planning && <PlanPicker base={base} invoice={inv} onDone={() => { setPlanning(false); for (const k of ['invoices', 'credit', 'installments']) qc.invalidateQueries({ queryKey: [k] }); onClose() }} />}
+          {payable && !planning && (
             <form onSubmit={(e) => { e.preventDefault(); pay.mutate() }} className="space-y-3 border-t border-line pt-4">
+              {inv.minimum_payment && compareBRL(inv.minimum_payment.amount, inv.remaining.amount) < 0 && (
+                <p className="text-xs text-muted">Pagamento mínimo: {formatBRL(inv.minimum_payment)}. O que faltar vai para a próxima fatura com juros do rotativo.</p>
+              )}
               <MoneyField label={`Pagar (falta ${formatBRL(inv.remaining)})`} onValue={setAmount} />
               <Alert>{error}</Alert>
-              <Button type="submit" loading={pay.isPending} disabled={!amount}>Pagar com saldo da conta</Button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" loading={pay.isPending} disabled={!amount}>Pagar com saldo da conta</Button>
+                {inv.status === 'CLOSED' && compareBRL(inv.remaining.amount, '100.00') >= 0 && (
+                  <Button type="button" variant="secondary" onClick={() => setPlanning(true)}>Parcelar fatura</Button>
+                )}
+              </div>
             </form>
           )}
         </div>
@@ -71,7 +126,7 @@ function InvoiceModal({ base, invoice, onClose }: { base: string; invoice: Invoi
 function CreditHero({ line, usedPct }: { line: CreditLine; usedPct: number }) {
   const ref = useCountUp(Number(line.available.amount), (n) => formatBRL(n.toFixed(2)))
   return (
-    <section data-reveal className="relative overflow-hidden rounded-[28px] bg-[radial-gradient(120%_140%_at_100%_0%,rgb(164_139_255/0.55),transparent_45%),linear-gradient(135deg,#1a1240,#0b1220)] p-6 text-white shadow-lift sm:p-8">
+    <section data-reveal className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#4a37a8_0%,#2d2075_55%,#1c1450_100%)] p-6 text-white shadow-lift sm:p-8">
       <p className="text-sm text-white/70">Limite disponível</p>
       <p className="tabular mt-1 text-4xl font-bold tracking-tight"><span ref={ref}>{formatBRL(line.available)}</span></p>
       <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-white/15">

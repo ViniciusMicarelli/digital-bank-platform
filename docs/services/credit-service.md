@@ -18,7 +18,9 @@ Credit card credit: the **credit line** (limit), holds for card authorizations, 
 | Sandbox: close the open invoice now / make the closed one overdue (`AdvanceCycle`) | ✅ |
 | Card refunds (`RefundCredit`, idempotent on the key): card clearing → credit-receivables in the ledger (`CREDIT_CARD_REFUND`), a `REFUND` credit on the open invoice and the limit freed; a credit larger than the invoice moves to the next one when it closes (`CREDIT_CARRIED_OUT` / `CREDIT_CARRIED_IN`) | ✅ |
 | Interest-free installment purchases (`parcelado sem juros`, 2 to 12, at least R$ 5,00 each): the whole amount is held on the limit and posted to the ledger at capture; the first installment (with the remainder centavo) goes on the invoice the purchase is captured on, and each new invoice takes the next installment of every plan (robust to early closings); `upcoming_installments` on the line, `ListInstallmentPlans` | ✅ |
-| Installments with interest, minimum payment, limit changes, blocking the line with the account | planned |
+| Minimum payment on every invoice: 15% of the balance, at least R$ 50 (or all of it); what is not paid by the due date rolls over with the fine and revolving interest | ✅ |
+| Invoice plans (`parcelamento da fatura`): a closed invoice of at least R$ 100 split into 2 to 12 fixed installments (Price table, 4.99% a month, below the revolving rate), quoted with the total, the interest and the CET; the invoice is settled by the plan, the first installment goes on the open invoice and one more on each new invoice; the interest is added to the debt and booked as revenue in the ledger (retried until posted); idempotent | ✅ |
+| Limit changes, blocking the line with the account | planned |
 
 ## Money in the Ledger
 

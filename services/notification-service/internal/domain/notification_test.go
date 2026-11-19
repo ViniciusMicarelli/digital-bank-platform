@@ -47,6 +47,8 @@ func TestFromEvent(t *testing.T) {
 			"Contestação recusada", "Sua contestação de R$ 80,00 em LOJA X foi recusada: comprovante de entrega."},
 		{"card.purchase.refunded", map[string]any{"account_id": acc, "amount_minor": 2500, "merchant_name": "LOJA X", "function": "CREDIT"},
 			"Estorno recebido", "R$ 25,00 de LOJA X voltaram na sua fatura."},
+		{"credit.invoice.planned", map[string]any{"account_id": acc, "installments": 6, "installment": 11807},
+			"Fatura parcelada", "Sua fatura foi parcelada em 6x de R$ 118,07. A primeira parcela já está na fatura atual."},
 		{"credit.invoice.closed", map[string]any{"account_id": acc, "remaining": 25000, "due_date": "2026-12-20"},
 			"Sua fatura fechou", "Fatura de R$ 250,00 com vencimento em 20/12/2026."},
 		{"user.kyc.approved", map[string]any{"customer_id": "c-1"}, "Cadastro aprovado",

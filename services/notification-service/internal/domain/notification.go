@@ -136,6 +136,8 @@ type payload struct {
 	FromAccountID   string            `json:"from_account_id"`
 	Metadata        map[string]string `json:"metadata"`
 	DecisionReason  string            `json:"decision_reason"`
+	Installments    int               `json:"installments"`
+	Installment     int64             `json:"installment"`
 	Source          string            `json:"source"`
 }
 
@@ -230,6 +232,9 @@ func FromEvent(ev Event, now time.Time) ([]Draft, error) {
 		d.Category, d.Title, d.Important = CategoryCredit, "Fatura em atraso", true
 		d.Body = fmt.Sprintf("%s não foram pagos e foram para a próxima fatura, com multa de %s e juros de %s.",
 			BRL(p.Unpaid), BRL(p.Fine), BRL(p.Interest))
+	case "credit.invoice.planned":
+		d.Category, d.Title, d.Important = CategoryCredit, "Fatura parcelada", true
+		d.Body = fmt.Sprintf("Sua fatura foi parcelada em %dx de %s. A primeira parcela já está na fatura atual.", p.Installments, BRL(p.Installment))
 	case "credit.invoice.payment.completed":
 		d.Category, d.Title = CategoryCredit, "Pagamento de fatura recebido"
 		d.Body = fmt.Sprintf("Recebemos o pagamento de %s da sua fatura.", BRL(p.Amount))

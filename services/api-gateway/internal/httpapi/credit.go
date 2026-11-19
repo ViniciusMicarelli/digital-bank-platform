@@ -35,7 +35,46 @@ func (a *API) installmentPlans(w http.ResponseWriter, r *http.Request, acc *acco
 func invoiceJSON(i *creditv1.Invoice) map[string]any {
 	return map[string]any{"id": i.GetId(), "status": i.GetStatus(), "closing_date": i.GetClosingDate(),
 		"due_date": i.GetDueDate(), "total": moneyJSON(i.GetTotal()), "paid": moneyJSON(i.GetPaid()),
-		"remaining": moneyJSON(i.GetRemaining())}
+		"remaining": moneyJSON(i.GetRemaining()), "minimum_payment": moneyJSON(i.GetMinimumPayment())}
+}
+
+// planQuotes lists the ways a closed invoice can be split.
+func (a *API) planQuotes(w http.ResponseWriter, r *http.Request, inv *creditv1.GetInvoiceResponse) {
+	resp, err := a.c.Credit.QuoteInvoicePlan(r.Context(), &creditv1.QuoteInvoicePlanRequest{InvoiceId: inv.GetInvoice().GetId()})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	out := []map[string]any{}
+	for _, q := range resp.GetQuotes() {
+		out = append(out, map[string]any{"installments": q.GetInstallments(), "installment": moneyJSON(q.GetInstallment()),
+			"total": moneyJSON(q.GetTotal()), "interest": moneyJSON(q.GetInterest()),
+			"monthly_rate": float64(q.GetMonthlyRateBp()) / 100, "annual_cost": float64(q.GetAnnualCostBp()) / 100})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"quotes": out})
+}
+
+// planInvoice splits a closed invoice {installments} (Idempotency-Key).
+func (a *API) planInvoice(w http.ResponseWriter, r *http.Request, inv *creditv1.GetInvoiceResponse) {
+	key, ok := idempotencyKey(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Installments int32 `json:"installments"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	resp, err := a.c.Credit.PlanInvoice(r.Context(), &creditv1.PlanInvoiceRequest{IdempotencyKey: key, InvoiceId: inv.GetInvoice().GetId(), Installments: req.Installments})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	p := resp.GetPlan()
+	writeJSON(w, http.StatusCreated, map[string]any{"id": p.GetId(), "invoice_id": p.GetInvoiceId(), "principal": moneyJSON(p.GetPrincipal()),
+		"installments": p.GetInstallments(), "installment": moneyJSON(p.GetInstallment()), "interest": moneyJSON(p.GetInterest()),
+		"monthly_rate": float64(p.GetMonthlyRateBp()) / 100})
 }
 
 func (a *API) openCreditLine(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {

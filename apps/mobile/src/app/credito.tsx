@@ -1,14 +1,14 @@
-import { ApiError, compareBRL, errorMessage, formatBRL, type CreditLine, type InstallmentPlan, type Invoice } from '@bank/core'
+import { ApiError, compareBRL, errorMessage, formatBRL, type CreditLine, type InstallmentPlan, type Invoice, type PlanQuote } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { View } from 'react-native'
 import { CalendarClock, Layers, Receipt, Wallet } from 'lucide-react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { Button, Card, Loading, MoneyField, Muted, Notice, Row, Sandbox, Screen, Txt } from '../components/ui'
+import { Button, Card, Loading, MoneyField, Muted, Notice, Press, Row, Sandbox, Screen, Txt } from '../components/ui'
 import { useCountUp } from '../lib/motion'
 import { api } from '../lib/client'
 import { date, useAccount } from '../lib/queries'
-import { creditGradient, font } from '../lib/theme'
+import { creditGradient, font, useTheme } from '../lib/theme'
 
 const label: Record<Invoice['status'], string> = { OPEN: 'Aberta', CLOSED: 'Fechada', PAID: 'Paga', OVERDUE: 'Vencida' }
 
@@ -29,19 +29,46 @@ function CreditHero({ available, used, limit, pct }: { available: string; used: 
   )
 }
 
+function PlanPicker({ base, invoice, onDone }: { base: string; invoice: Invoice; onDone: () => void }) {
+  const { c } = useTheme()
+  const [chosen, setChosen] = useState<number | null>(null)
+  const [error, setError] = useState('')
+  const quotes = useQuery({ queryKey: ['plan-quotes', invoice.id], queryFn: async () => (await api<{ quotes: PlanQuote[] }>('GET', `${base}/invoices/${invoice.id}/plans`)).quotes })
+  const plan = useMutation({ mutationFn: () => api('POST', `${base}/invoices/${invoice.id}/plans`, { body: { installments: chosen }, idempotent: true }), onSuccess: onDone, onError: (e) => setError(errorMessage(e)) })
+  if (!quotes.data) return <Loading />
+  const pick = quotes.data.find((q) => q.installments === chosen)
+  return (
+    <View style={{ gap: 8 }}>
+      {quotes.data.filter((q) => [2, 3, 4, 6, 10, 12].includes(q.installments)).map((q) => (
+        <Press key={q.installments} accessibilityLabel={`${q.installments}x`} onPress={() => setChosen(q.installments)}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12, borderRadius: 16, borderWidth: chosen === q.installments ? 2 : 1,
+            borderColor: chosen === q.installments ? c.credit : c.line, backgroundColor: chosen === q.installments ? c.creditSoft : 'transparent' }}>
+            <Txt variant="label" style={{ fontFamily: font.semibold }}>{q.installments}x de {formatBRL(q.installment)}</Txt>
+            <Txt variant="caption" tone="muted">total {formatBRL(q.total)}</Txt>
+          </View>
+        </Press>
+      ))}
+      {pick && <Txt variant="caption" tone="muted">Juros de {pick.monthly_rate.toLocaleString('pt-BR')}% ao mês · CET de {pick.annual_cost.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}% ao ano. A primeira parcela entra na fatura atual.</Txt>}
+      <Notice>{error}</Notice>
+      <Button title={pick ? `Parcelar em ${pick.installments}x` : 'Escolha as parcelas'} variant="credit" disabled={!pick} loading={plan.isPending} onPress={() => plan.mutate()} />
+    </View>
+  )
+}
+
 export default function Credit() {
   const account = useAccount()
   const qc = useQueryClient()
   const base = `/v1/accounts/${account?.id}/credit`
   const [amount, setAmount] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [planning, setPlanning] = useState(false)
   const line = useQuery({
     queryKey: ['credit', account?.id], enabled: !!account,
     queryFn: async () => { try { return await api<CreditLine>('GET', base) } catch (e) { if (e instanceof ApiError && e.status === 404) return null; throw e } },
   })
   const invoices = useQuery({ queryKey: ['invoices', account?.id], enabled: !!line.data, queryFn: async () => (await api<{ invoices: Invoice[] }>('GET', `${base}/invoices`)).invoices })
   const plans = useQuery({ queryKey: ['installments', account?.id], enabled: !!line.data, queryFn: async () => (await api<{ plans: InstallmentPlan[] }>('GET', `${base}/installments`)).plans })
-  const refresh = () => { for (const k of ['credit', 'invoices', 'balance', 'installments']) qc.invalidateQueries({ queryKey: [k] }) }
+  const refresh = () => { for (const k of ['credit', 'invoices', 'balance', 'installments', 'plan-quotes']) qc.invalidateQueries({ queryKey: [k] }) }
   const activate = useMutation({ mutationFn: () => api('POST', base, { body: { closing_day: 10 }, idempotent: true }), onSuccess: refresh, onError: (e) => setError(errorMessage(e)) })
   const toPay = invoices.data?.find((i) => i.status === 'CLOSED')
   const pay = useMutation({ mutationFn: () => api('POST', `${base}/invoices/${toPay!.id}/payments`, { body: { amount }, idempotent: true }), onSuccess: () => { setError(''); refresh() }, onError: (e) => setError(errorMessage(e)) })
@@ -63,9 +90,15 @@ export default function Credit() {
       {toPay && compareBRL(toPay.remaining.amount, '0.00') > 0 && (
         <Card title={`Fatura a pagar · vence ${date(toPay.due_date)}`} icon={CalendarClock} index={1}>
           <Txt variant="heading" style={{ fontSize: 22 }}>{formatBRL(toPay.remaining)}</Txt>
-          <MoneyField label="Pagar" onValue={setAmount} />
-          <Notice>{error}</Notice>
-          <Button title="Pagar com saldo" variant="credit" disabled={!amount} loading={pay.isPending} onPress={() => pay.mutate()} />
+          {toPay.minimum_payment && <Txt variant="caption" tone="muted">Pagamento mínimo {formatBRL(toPay.minimum_payment)}; o que faltar vai para a próxima fatura com juros do rotativo.</Txt>}
+          {planning ? <PlanPicker base={base} invoice={toPay} onDone={() => { setPlanning(false); refresh() }} /> : (
+            <>
+              <MoneyField label="Pagar" onValue={setAmount} />
+              <Notice>{error}</Notice>
+              <Button title="Pagar com saldo" variant="credit" disabled={!amount} loading={pay.isPending} onPress={() => pay.mutate()} />
+              {compareBRL(toPay.remaining.amount, '100.00') >= 0 && <Button title="Parcelar fatura" variant="secondary" onPress={() => setPlanning(true)} />}
+            </>
+          )}
         </Card>
       )}
       {!!plans.data?.length && (

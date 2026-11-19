@@ -5,6 +5,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -164,11 +165,13 @@ func Split(amount int64, n int) []int64 {
 	return out
 }
 
-// Installment is one part of an installment purchase, billed on one invoice.
+// Installment is one part of an installment purchase (HoldID) or of an
+// invoice plan (PlanID), billed on one invoice.
 type Installment struct {
 	ID          uuid.UUID
 	LineID      uuid.UUID
 	HoldID      uuid.UUID
+	PlanID      uuid.UUID
 	Number      int
 	Total       int
 	Amount      int64
@@ -307,6 +310,8 @@ const (
 	ItemCreditCarriedIn ItemKind = "CREDIT_CARRIED_IN"
 	// A credit larger than the invoice, moved to the next one.
 	ItemCreditCarriedOut ItemKind = "CREDIT_CARRIED_OUT"
+	// The balance of a closed invoice settled by an installment plan.
+	ItemInvoicePlan ItemKind = "INVOICE_PLAN"
 )
 
 // Refund is a card refund credited to an invoice.
@@ -360,3 +365,87 @@ type Payment struct {
 
 // TransferKey is the idempotency key of the money movement of a payment.
 func (p Payment) TransferKey() string { return "credit-payment:" + p.ID.String() }
+
+// ---- minimum payment and invoice plans ----
+
+// Brazilian practice: paying less than this lets the rest roll over with
+// charges; the minimum is 15% of the balance, at least R$ 50 (or all of it).
+const (
+	MinimumPaymentBP  = 1500
+	MinimumPaymentMin = 50_00
+)
+
+// MinimumPayment of a balance.
+func MinimumPayment(remaining int64) int64 {
+	if remaining <= 0 {
+		return 0
+	}
+	return min(remaining, max(percent(remaining, MinimumPaymentBP), MinimumPaymentMin))
+}
+
+// Invoice plans ("parcelamento da fatura").
+const (
+	// InvoicePlanRateBP is the monthly interest of a plan (4.99%), below the
+	// revolving rate, as banks offer it.
+	InvoicePlanRateBP   = 499
+	MinInvoicePlan      = 100_00
+	MinPlanInstallments = 2
+	MaxPlanInstallments = 12
+)
+
+// PlanQuote is one way to split a balance.
+type PlanQuote struct {
+	Installments int
+	Installment  int64
+	Total        int64
+	Interest     int64
+	MonthlyBP    int
+	// AnnualCostBP is the CET (custo efetivo total) a year, in basis points.
+	AnnualCostBP int
+}
+
+// QuotePlan splits principal into n equal installments (Price table),
+// rounded up to the centavo.
+func QuotePlan(principal int64, n, monthlyBP int) PlanQuote {
+	i := float64(monthlyBP) / 10_000
+	pmt := float64(principal) / float64(n)
+	if i > 0 {
+		pmt = float64(principal) * i / (1 - math.Pow(1+i, -float64(n)))
+	}
+	installment := int64(math.Ceil(pmt))
+	total := installment * int64(n)
+	return PlanQuote{Installments: n, Installment: installment, Total: total, Interest: total - principal, MonthlyBP: monthlyBP,
+		AnnualCostBP: int(math.Round((math.Pow(1+i, 12) - 1) * 10_000))}
+}
+
+// Plannable checks that a closed invoice can be split.
+func (i Invoice) Plannable() error {
+	switch {
+	case i.Status != InvoiceClosed:
+		return Refuse("INVOICE_NOT_PLANNABLE", "only a closed invoice not yet due can be split")
+	case i.Pending > 0:
+		return Refuse("PAYMENT_IN_PROGRESS", "a payment of this invoice is in progress")
+	case i.Remaining() < MinInvoicePlan:
+		return Refuse("INVOICE_TOO_SMALL", "invoices of at least R$ 100,00 can be split")
+	}
+	return nil
+}
+
+// InvoicePlan is a closed invoice split into installments.
+type InvoicePlan struct {
+	ID             uuid.UUID
+	IdempotencyKey string
+	InvoiceID      uuid.UUID
+	LineID         uuid.UUID
+	Principal      int64
+	Installments   int
+	Installment    int64
+	MonthlyBP      int
+	CreatedAt      time.Time
+}
+
+// Interest is what the plan adds to the debt.
+func (p InvoicePlan) Interest() int64 { return p.Installment*int64(p.Installments) - p.Principal }
+
+// InterestKey is the idempotency key of the ledger posting of the interest.
+func (p InvoicePlan) InterestKey() string { return "invoice-plan-interest:" + p.ID.String() }

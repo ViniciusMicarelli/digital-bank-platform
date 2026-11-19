@@ -28,6 +28,8 @@ const (
 	CreditService_CaptureCredit_FullMethodName        = "/bank.credit.v1.CreditService/CaptureCredit"
 	CreditService_ReleaseCredit_FullMethodName        = "/bank.credit.v1.CreditService/ReleaseCredit"
 	CreditService_RefundCredit_FullMethodName         = "/bank.credit.v1.CreditService/RefundCredit"
+	CreditService_QuoteInvoicePlan_FullMethodName     = "/bank.credit.v1.CreditService/QuoteInvoicePlan"
+	CreditService_PlanInvoice_FullMethodName          = "/bank.credit.v1.CreditService/PlanInvoice"
 	CreditService_ListInstallmentPlans_FullMethodName = "/bank.credit.v1.CreditService/ListInstallmentPlans"
 	CreditService_AdvanceCycle_FullMethodName         = "/bank.credit.v1.CreditService/AdvanceCycle"
 )
@@ -57,7 +59,14 @@ type CreditServiceClient interface {
 	// dispute): a credit on the open invoice and the limit freed. Idempotent
 	// on the key.
 	RefundCredit(ctx context.Context, in *RefundCreditRequest, opts ...grpc.CallOption) (*RefundCreditResponse, error)
-	// Installment purchases with installments still to come, newest first.
+	// The ways a closed invoice can be split (2 to 12 installments with
+	// interest, Price table). FAILED_PRECONDITION: INVOICE_NOT_PLANNABLE,
+	// PAYMENT_IN_PROGRESS, INVOICE_TOO_SMALL.
+	QuoteInvoicePlan(ctx context.Context, in *QuoteInvoicePlanRequest, opts ...grpc.CallOption) (*QuoteInvoicePlanResponse, error)
+	// Splits a closed invoice: it is settled by the plan and one installment
+	// goes on each invoice from the open one. Idempotent on the key.
+	PlanInvoice(ctx context.Context, in *PlanInvoiceRequest, opts ...grpc.CallOption) (*PlanInvoiceResponse, error)
+	// Installment purchases and invoice plans with installments still to come.
 	ListInstallmentPlans(ctx context.Context, in *ListInstallmentPlansRequest, opts ...grpc.CallOption) (*ListInstallmentPlansResponse, error)
 	// Sandbox: close the open invoice now, or make the closed one overdue.
 	AdvanceCycle(ctx context.Context, in *AdvanceCycleRequest, opts ...grpc.CallOption) (*AdvanceCycleResponse, error)
@@ -161,6 +170,26 @@ func (c *creditServiceClient) RefundCredit(ctx context.Context, in *RefundCredit
 	return out, nil
 }
 
+func (c *creditServiceClient) QuoteInvoicePlan(ctx context.Context, in *QuoteInvoicePlanRequest, opts ...grpc.CallOption) (*QuoteInvoicePlanResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuoteInvoicePlanResponse)
+	err := c.cc.Invoke(ctx, CreditService_QuoteInvoicePlan_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *creditServiceClient) PlanInvoice(ctx context.Context, in *PlanInvoiceRequest, opts ...grpc.CallOption) (*PlanInvoiceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PlanInvoiceResponse)
+	err := c.cc.Invoke(ctx, CreditService_PlanInvoice_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *creditServiceClient) ListInstallmentPlans(ctx context.Context, in *ListInstallmentPlansRequest, opts ...grpc.CallOption) (*ListInstallmentPlansResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListInstallmentPlansResponse)
@@ -206,7 +235,14 @@ type CreditServiceServer interface {
 	// dispute): a credit on the open invoice and the limit freed. Idempotent
 	// on the key.
 	RefundCredit(context.Context, *RefundCreditRequest) (*RefundCreditResponse, error)
-	// Installment purchases with installments still to come, newest first.
+	// The ways a closed invoice can be split (2 to 12 installments with
+	// interest, Price table). FAILED_PRECONDITION: INVOICE_NOT_PLANNABLE,
+	// PAYMENT_IN_PROGRESS, INVOICE_TOO_SMALL.
+	QuoteInvoicePlan(context.Context, *QuoteInvoicePlanRequest) (*QuoteInvoicePlanResponse, error)
+	// Splits a closed invoice: it is settled by the plan and one installment
+	// goes on each invoice from the open one. Idempotent on the key.
+	PlanInvoice(context.Context, *PlanInvoiceRequest) (*PlanInvoiceResponse, error)
+	// Installment purchases and invoice plans with installments still to come.
 	ListInstallmentPlans(context.Context, *ListInstallmentPlansRequest) (*ListInstallmentPlansResponse, error)
 	// Sandbox: close the open invoice now, or make the closed one overdue.
 	AdvanceCycle(context.Context, *AdvanceCycleRequest) (*AdvanceCycleResponse, error)
@@ -246,6 +282,12 @@ func (UnimplementedCreditServiceServer) ReleaseCredit(context.Context, *ReleaseC
 }
 func (UnimplementedCreditServiceServer) RefundCredit(context.Context, *RefundCreditRequest) (*RefundCreditResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RefundCredit not implemented")
+}
+func (UnimplementedCreditServiceServer) QuoteInvoicePlan(context.Context, *QuoteInvoicePlanRequest) (*QuoteInvoicePlanResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method QuoteInvoicePlan not implemented")
+}
+func (UnimplementedCreditServiceServer) PlanInvoice(context.Context, *PlanInvoiceRequest) (*PlanInvoiceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PlanInvoice not implemented")
 }
 func (UnimplementedCreditServiceServer) ListInstallmentPlans(context.Context, *ListInstallmentPlansRequest) (*ListInstallmentPlansResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListInstallmentPlans not implemented")
@@ -436,6 +478,42 @@ func _CreditService_RefundCredit_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CreditService_QuoteInvoicePlan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuoteInvoicePlanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CreditServiceServer).QuoteInvoicePlan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CreditService_QuoteInvoicePlan_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CreditServiceServer).QuoteInvoicePlan(ctx, req.(*QuoteInvoicePlanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CreditService_PlanInvoice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PlanInvoiceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CreditServiceServer).PlanInvoice(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CreditService_PlanInvoice_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CreditServiceServer).PlanInvoice(ctx, req.(*PlanInvoiceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CreditService_ListInstallmentPlans_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListInstallmentPlansRequest)
 	if err := dec(in); err != nil {
@@ -514,6 +592,14 @@ var CreditService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RefundCredit",
 			Handler:    _CreditService_RefundCredit_Handler,
+		},
+		{
+			MethodName: "QuoteInvoicePlan",
+			Handler:    _CreditService_QuoteInvoicePlan_Handler,
+		},
+		{
+			MethodName: "PlanInvoice",
+			Handler:    _CreditService_PlanInvoice_Handler,
 		},
 		{
 			MethodName: "ListInstallmentPlans",

@@ -25,6 +25,10 @@ type Store interface {
 	UpcomingInstallments(ctx context.Context, line uuid.UUID) (int64, error)
 	// InstallmentPlans lists purchases with installments still to come, newest first.
 	InstallmentPlans(ctx context.Context, line uuid.UUID) ([]domain.InstallmentPlan, error)
+	InvoicePlanByKey(ctx context.Context, key string) (*domain.InvoicePlan, error)
+	// UnpostedPlanInterest lists plans whose interest is not in the ledger yet.
+	UnpostedPlanInterest(ctx context.Context, limit int) ([]domain.InvoicePlan, error)
+	MarkPlanInterestPosted(ctx context.Context, id uuid.UUID) error
 	RefundByKey(ctx context.Context, key string) (*domain.Refund, error)
 
 	// LinesDue lists lines with an invoice to close or to make overdue.
@@ -65,7 +69,10 @@ type Tx interface {
 	SavePayment(p domain.Payment) error
 
 	InsertInstallments(list []domain.Installment) error
-	// NextInstallments locks the lowest pending installment of each plan of a line.
+	// InsertInvoicePlan fails with a refusal when the invoice has a plan already.
+	InsertInvoicePlan(p domain.InvoicePlan) error
+	// NextInstallments lists the lowest pending installment of each plan of a
+	// line (the caller holds the line lock).
 	NextInstallments(line uuid.UUID) ([]domain.Installment, error)
 	BillInstallment(id, invoice uuid.UUID) error
 

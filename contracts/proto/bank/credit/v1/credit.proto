@@ -28,7 +28,15 @@ service CreditService {
   // on the key.
   rpc RefundCredit(RefundCreditRequest) returns (RefundCreditResponse);
 
-  // Installment purchases with installments still to come, newest first.
+  // The ways a closed invoice can be split (2 to 12 installments with
+  // interest, Price table). FAILED_PRECONDITION: INVOICE_NOT_PLANNABLE,
+  // PAYMENT_IN_PROGRESS, INVOICE_TOO_SMALL.
+  rpc QuoteInvoicePlan(QuoteInvoicePlanRequest) returns (QuoteInvoicePlanResponse);
+  // Splits a closed invoice: it is settled by the plan and one installment
+  // goes on each invoice from the open one. Idempotent on the key.
+  rpc PlanInvoice(PlanInvoiceRequest) returns (PlanInvoiceResponse);
+
+  // Installment purchases and invoice plans with installments still to come.
   rpc ListInstallmentPlans(ListInstallmentPlansRequest) returns (ListInstallmentPlansResponse);
 
   // Sandbox: close the open invoice now, or make the closed one overdue.
@@ -63,6 +71,9 @@ message Invoice {
   bank.common.v1.Money total = 6;
   bank.common.v1.Money paid = 7;
   bank.common.v1.Money remaining = 8;
+  // The minimum payment: 15% of the balance, at least R$ 50 (or all of it).
+  // Whatever is not paid by the due date rolls over with charges.
+  bank.common.v1.Money minimum_payment = 9;
 }
 
 message InvoiceItem {
@@ -226,4 +237,42 @@ message ListInstallmentPlansRequest {
 
 message ListInstallmentPlansResponse {
   repeated InstallmentPlan plans = 1;
+}
+
+message PlanQuote {
+  int32 installments = 1;
+  bank.common.v1.Money installment = 2;
+  bank.common.v1.Money total = 3;
+  bank.common.v1.Money interest = 4;
+  int32 monthly_rate_bp = 5;
+  // CET: the total yearly cost, in basis points.
+  int32 annual_cost_bp = 6;
+}
+
+message QuoteInvoicePlanRequest {
+  string invoice_id = 1;
+}
+
+message QuoteInvoicePlanResponse {
+  repeated PlanQuote quotes = 1;
+}
+
+message PlanInvoiceRequest {
+  string idempotency_key = 1;
+  string invoice_id = 2;
+  int32 installments = 3;
+}
+
+message InvoicePlan {
+  string id = 1;
+  string invoice_id = 2;
+  bank.common.v1.Money principal = 3;
+  int32 installments = 4;
+  bank.common.v1.Money installment = 5;
+  bank.common.v1.Money interest = 6;
+  int32 monthly_rate_bp = 7;
+}
+
+message PlanInvoiceResponse {
+  InvoicePlan plan = 1;
 }

@@ -330,9 +330,9 @@ func (u *unit) Publish(m outbox.Message) error { return outbox.Insert(u.ctx, u.t
 
 func (u *unit) InsertInstallments(list []domain.Installment) error {
 	for _, i := range list {
-		if err := u.exec(`INSERT INTO installments (id, line_id, hold_id, number, total, amount, description, invoice_id, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (hold_id, number) DO NOTHING`,
-			i.ID, i.LineID, i.HoldID, i.Number, i.Total, i.Amount, i.Description, i.InvoiceID, i.CreatedAt); err != nil {
+		if err := u.exec(`INSERT INTO installments (id, line_id, hold_id, plan_id, number, total, amount, description, invoice_id, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT DO NOTHING`,
+			i.ID, i.LineID, nullable(i.HoldID), nullable(i.PlanID), i.Number, i.Total, i.Amount, i.Description, i.InvoiceID, i.CreatedAt); err != nil {
 			return err
 		}
 	}
@@ -340,8 +340,9 @@ func (u *unit) InsertInstallments(list []domain.Installment) error {
 }
 
 func (u *unit) NextInstallments(line uuid.UUID) ([]domain.Installment, error) {
-	rows, err := u.tx.Query(u.ctx, `SELECT DISTINCT ON (hold_id) id, line_id, hold_id, number, total, amount, description, created_at
-		FROM installments WHERE line_id = $1 AND invoice_id IS NULL ORDER BY hold_id, number`, line)
+	rows, err := u.tx.Query(u.ctx, `SELECT DISTINCT ON (COALESCE(hold_id, plan_id)) id, line_id, COALESCE(hold_id, plan_id),
+			number, total, amount, description, created_at
+		FROM installments WHERE line_id = $1 AND invoice_id IS NULL ORDER BY COALESCE(hold_id, plan_id), number`, line) // the caller holds the line lock
 	if err != nil {
 		return nil, err
 	}
@@ -368,12 +369,11 @@ func (s *Store) UpcomingInstallments(ctx context.Context, line uuid.UUID) (int64
 }
 
 func (s *Store) InstallmentPlans(ctx context.Context, line uuid.UUID) ([]domain.InstallmentPlan, error) {
-	rows, err := s.pool.Query(ctx, `SELECT i.hold_id, min(i.description), h.captured, max(i.total),
-			count(*) FILTER (WHERE i.invoice_id IS NOT NULL), min(i.amount),
-			COALESCE(sum(i.amount) FILTER (WHERE i.invoice_id IS NULL), 0), h.created_at
-		FROM installments i JOIN holds h ON h.id = i.hold_id
-		WHERE i.line_id = $1 GROUP BY i.hold_id, h.captured, h.created_at
-		HAVING count(*) FILTER (WHERE i.invoice_id IS NULL) > 0 ORDER BY h.created_at DESC`, line)
+	rows, err := s.pool.Query(ctx, `SELECT COALESCE(hold_id, plan_id), min(description), sum(amount), max(total),
+			count(*) FILTER (WHERE invoice_id IS NOT NULL), min(amount),
+			COALESCE(sum(amount) FILTER (WHERE invoice_id IS NULL), 0), min(created_at)
+		FROM installments WHERE line_id = $1 GROUP BY COALESCE(hold_id, plan_id)
+		HAVING count(*) FILTER (WHERE invoice_id IS NULL) > 0 ORDER BY min(created_at) DESC`, line)
 	if err != nil {
 		return nil, err
 	}
@@ -387,4 +387,56 @@ func (s *Store) InstallmentPlans(ctx context.Context, line uuid.UUID) ([]domain.
 		out = append(out, p)
 	}
 	return out, rows.Err()
+}
+
+// ---- invoice plans ----
+
+const planCols = `id, idempotency_key, invoice_id, line_id, principal, installments, installment_amount, monthly_rate_bp, created_at`
+
+func scanPlan(row pgx.Row) (domain.InvoicePlan, error) {
+	var p domain.InvoicePlan
+	err := row.Scan(&p.ID, &p.IdempotencyKey, &p.InvoiceID, &p.LineID, &p.Principal, &p.Installments, &p.Installment, &p.MonthlyBP, &p.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return p, fmt.Errorf("%w: invoice plan", domain.ErrNotFound)
+	}
+	return p, err
+}
+
+func (u *unit) InsertInvoicePlan(p domain.InvoicePlan) error {
+	err := u.exec(`INSERT INTO invoice_plans (`+planCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		p.ID, p.IdempotencyKey, p.InvoiceID, p.LineID, p.Principal, p.Installments, p.Installment, p.MonthlyBP, p.CreatedAt)
+	if pg.IsUniqueViolation(err, "invoice_plans_invoice_id_key") {
+		return domain.Refuse("INVOICE_ALREADY_PLANNED", "this invoice was split already")
+	}
+	return err
+}
+
+func (s *Store) InvoicePlanByKey(ctx context.Context, key string) (*domain.InvoicePlan, error) {
+	p, err := scanPlan(s.pool.QueryRow(ctx, `SELECT `+planCols+` FROM invoice_plans WHERE idempotency_key = $1`, key))
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil, nil
+	}
+	return &p, err
+}
+
+func (s *Store) UnpostedPlanInterest(ctx context.Context, limit int) ([]domain.InvoicePlan, error) {
+	rows, err := s.pool.Query(ctx, `SELECT `+planCols+` FROM invoice_plans WHERE NOT interest_posted ORDER BY created_at LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.InvoicePlan
+	for rows.Next() {
+		p, err := scanPlan(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) MarkPlanInterestPosted(ctx context.Context, id uuid.UUID) error {
+	_, err := s.pool.Exec(ctx, `UPDATE invoice_plans SET interest_posted = true WHERE id = $1`, id)
+	return err
 }

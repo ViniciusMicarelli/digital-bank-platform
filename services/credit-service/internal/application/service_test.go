@@ -389,3 +389,73 @@ func TestInstallments(t *testing.T) {
 		t.Fatalf("nothing more to bill: %+v", open)
 	}
 }
+
+func TestInvoicePlan(t *testing.T) {
+	e := setup(t)
+	_, _ = e.svc.OpenLine(e.ctx, "k", e.account, 10)
+	h, _ := e.svc.Reserve(e.ctx, "tv", e.account, 600_00, 1, "LOJA DE TV", nil)
+	_, _ = e.svc.Capture(e.ctx, h.ID, nil)
+	open := e.invoices(t)[0]
+	if _, err := e.svc.PlanQuotes(e.ctx, open.ID); reason(err) != "INVOICE_NOT_PLANNABLE" {
+		t.Fatalf("an open invoice cannot be split: %v", err)
+	}
+	if err := e.svc.AdvanceCycle(e.ctx, e.account, "CLOSE"); err != nil {
+		t.Fatal(err)
+	}
+	closed := e.invoices(t)[1]
+	if closed.Status != domain.InvoiceClosed || domain.MinimumPayment(closed.Remaining()) != 90_00 {
+		t.Fatalf("closed = %+v, minimum %d", closed, domain.MinimumPayment(closed.Remaining()))
+	}
+	quotes, err := e.svc.PlanQuotes(e.ctx, closed.ID)
+	if err != nil || len(quotes) != 11 || quotes[4].Installments != 6 || quotes[4].Interest <= 0 || quotes[4].AnnualCostBP < 7_000 {
+		t.Fatalf("quotes = %+v %v", quotes, err)
+	}
+	q := quotes[4]
+	plan, err := e.svc.PlanInvoice(e.ctx, "p1", closed.ID, 6)
+	if err != nil || plan.Installment != q.Installment || plan.Interest() != q.Interest {
+		t.Fatalf("plan = %+v %v", plan, err)
+	}
+	if again, _ := e.svc.PlanInvoice(e.ctx, "p1", closed.ID, 6); again.ID != plan.ID {
+		t.Fatal("same key, same plan")
+	}
+	if _, err := e.svc.PlanInvoice(e.ctx, "p2", closed.ID, 3); reason(err) != "INVOICE_NOT_PLANNABLE" {
+		t.Fatalf("a settled invoice: %v", err)
+	}
+	list := e.invoices(t)
+	if list[1].Status != domain.InvoicePaid || list[0].Total != q.Installment {
+		t.Fatalf("after the plan: closed %+v, open %+v", list[1], list[0])
+	}
+	if e.line(t).Used != 600_00+q.Interest {
+		t.Fatalf("used = %d", e.line(t).Used)
+	}
+	e.checkLedger(t, 0) // the interest is in the ledger too
+
+	// The next invoice gets 2/6.
+	if err := e.svc.AdvanceCycle(e.ctx, e.account, "CLOSE"); err != nil {
+		t.Fatal(err)
+	}
+	d, _ := e.svc.Invoice(e.ctx, e.invoices(t)[0].ID)
+	if len(d.Items) != 1 || d.Items[0].Description != "Parcelamento da fatura (2/6)" {
+		t.Fatalf("next invoice = %+v", d.Items)
+	}
+	plans, _ := e.svc.InstallmentPlans(e.ctx, e.account)
+	if len(plans) != 1 || plans[0].Billed != 2 || plans[0].Remaining != 4*q.Installment {
+		t.Fatalf("plans = %+v", plans)
+	}
+}
+
+func TestMinimumPayment(t *testing.T) {
+	for remaining, want := range map[int64]int64{0: 0, 30_00: 30_00, 200_00: 50_00, 1_000_00: 150_00} {
+		if got := domain.MinimumPayment(remaining); got != want {
+			t.Errorf("MinimumPayment(%d) = %d, want %d", remaining, got, want)
+		}
+	}
+}
+
+func reason(err error) string {
+	var r *domain.RefusedError
+	if errors.As(err, &r) {
+		return r.Reason
+	}
+	return ""
+}

@@ -205,6 +205,12 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Card events now name the account on clearing and reversal; older events are placed through the card.
 - Web and mobile: *Gastos* screen (month by month, donut / bar by category, change from last month, where the most was spent).
 
+## Phase 29 — Minimum payment and invoice plans ✅
+
+- Every invoice shows its minimum payment (15%, at least R$ 50).
+- A closed invoice can be split into 2 to 12 fixed installments with interest (Price table, 4.99% a month), with the total, the interest and the CET shown before confirming; the invoice is settled by the plan, the installments follow on the next invoices, the interest is booked in the ledger.
+- Web and mobile: minimum payment and *Parcelar fatura* on the invoice to pay.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

@@ -117,7 +117,18 @@ export interface Invoice {
   total: Money
   paid: Money
   remaining: Money
+  minimum_payment?: Money
   items?: { kind: string; amount: Money; description: string; occurred_at: string }[]
+}
+
+export interface PlanQuote {
+  installments: number
+  installment: Money
+  total: Money
+  interest: Money
+  monthly_rate: number
+  /** CET: total yearly cost, in percent. */
+  annual_cost: number
 }
 
 export interface BoletoQuote {
