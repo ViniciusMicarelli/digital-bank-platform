@@ -303,6 +303,267 @@ func (x *ListFeedResponse) GetNextPageToken() string {
 	return ""
 }
 
+type GetSpendingRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	AccountId string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// YYYY-MM; the current month when empty.
+	Month         string `protobuf:"bytes,2,opt,name=month,proto3" json:"month,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSpendingRequest) Reset() {
+	*x = GetSpendingRequest{}
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSpendingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSpendingRequest) ProtoMessage() {}
+
+func (x *GetSpendingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSpendingRequest.ProtoReflect.Descriptor instead.
+func (*GetSpendingRequest) Descriptor() ([]byte, []int) {
+	return file_bank_statement_v1_statement_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetSpendingRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GetSpendingRequest) GetMonth() string {
+	if x != nil {
+		return x.Month
+	}
+	return ""
+}
+
+type CategorySpending struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// FOOD, TRANSPORT, SHOPPING, SUBSCRIPTIONS, HEALTH, LEISURE, TRAVEL, HOME,
+	// EDUCATION, BILLS, TRANSFERS, OTHER.
+	Category      string    `protobuf:"bytes,1,opt,name=category,proto3" json:"category,omitempty"`
+	Amount        *v1.Money `protobuf:"bytes,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	Count         int32     `protobuf:"varint,3,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CategorySpending) Reset() {
+	*x = CategorySpending{}
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CategorySpending) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CategorySpending) ProtoMessage() {}
+
+func (x *CategorySpending) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CategorySpending.ProtoReflect.Descriptor instead.
+func (*CategorySpending) Descriptor() ([]byte, []int) {
+	return file_bank_statement_v1_statement_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CategorySpending) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
+func (x *CategorySpending) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *CategorySpending) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+type MerchantSpending struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Category      string                 `protobuf:"bytes,2,opt,name=category,proto3" json:"category,omitempty"`
+	Amount        *v1.Money              `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	Count         int32                  `protobuf:"varint,4,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MerchantSpending) Reset() {
+	*x = MerchantSpending{}
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MerchantSpending) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MerchantSpending) ProtoMessage() {}
+
+func (x *MerchantSpending) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MerchantSpending.ProtoReflect.Descriptor instead.
+func (*MerchantSpending) Descriptor() ([]byte, []int) {
+	return file_bank_statement_v1_statement_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *MerchantSpending) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *MerchantSpending) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
+func (x *MerchantSpending) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *MerchantSpending) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
+type GetSpendingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Month         string                 `protobuf:"bytes,1,opt,name=month,proto3" json:"month,omitempty"`
+	Total         *v1.Money              `protobuf:"bytes,2,opt,name=total,proto3" json:"total,omitempty"`
+	PreviousTotal *v1.Money              `protobuf:"bytes,3,opt,name=previous_total,json=previousTotal,proto3" json:"previous_total,omitempty"`
+	// Largest first.
+	Categories []*CategorySpending `protobuf:"bytes,4,rep,name=categories,proto3" json:"categories,omitempty"`
+	// The five places with the most spent (Pix and transfers excluded).
+	Merchants     []*MerchantSpending `protobuf:"bytes,5,rep,name=merchants,proto3" json:"merchants,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSpendingResponse) Reset() {
+	*x = GetSpendingResponse{}
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSpendingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSpendingResponse) ProtoMessage() {}
+
+func (x *GetSpendingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSpendingResponse.ProtoReflect.Descriptor instead.
+func (*GetSpendingResponse) Descriptor() ([]byte, []int) {
+	return file_bank_statement_v1_statement_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetSpendingResponse) GetMonth() string {
+	if x != nil {
+		return x.Month
+	}
+	return ""
+}
+
+func (x *GetSpendingResponse) GetTotal() *v1.Money {
+	if x != nil {
+		return x.Total
+	}
+	return nil
+}
+
+func (x *GetSpendingResponse) GetPreviousTotal() *v1.Money {
+	if x != nil {
+		return x.PreviousTotal
+	}
+	return nil
+}
+
+func (x *GetSpendingResponse) GetCategories() []*CategorySpending {
+	if x != nil {
+		return x.Categories
+	}
+	return nil
+}
+
+func (x *GetSpendingResponse) GetMerchants() []*MerchantSpending {
+	if x != nil {
+		return x.Merchants
+	}
+	return nil
+}
+
 var File_bank_statement_v1_statement_proto protoreflect.FileDescriptor
 
 const file_bank_statement_v1_statement_proto_rawDesc = "" +
@@ -331,13 +592,35 @@ const file_bank_statement_v1_statement_proto_rawDesc = "" +
 	"page_token\x18\x03 \x01(\tR\tpageToken\"m\n" +
 	"\x10ListFeedResponse\x121\n" +
 	"\x05items\x18\x01 \x03(\v2\x1b.bank.statement.v1.FeedItemR\x05items\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken*Q\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"I\n" +
+	"\x12GetSpendingRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x14\n" +
+	"\x05month\x18\x02 \x01(\tR\x05month\"s\n" +
+	"\x10CategorySpending\x12\x1a\n" +
+	"\bcategory\x18\x01 \x01(\tR\bcategory\x12-\n" +
+	"\x06amount\x18\x02 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12\x14\n" +
+	"\x05count\x18\x03 \x01(\x05R\x05count\"\x87\x01\n" +
+	"\x10MerchantSpending\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
+	"\bcategory\x18\x02 \x01(\tR\bcategory\x12-\n" +
+	"\x06amount\x18\x03 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12\x14\n" +
+	"\x05count\x18\x04 \x01(\x05R\x05count\"\x9e\x02\n" +
+	"\x13GetSpendingResponse\x12\x14\n" +
+	"\x05month\x18\x01 \x01(\tR\x05month\x12+\n" +
+	"\x05total\x18\x02 \x01(\v2\x15.bank.common.v1.MoneyR\x05total\x12<\n" +
+	"\x0eprevious_total\x18\x03 \x01(\v2\x15.bank.common.v1.MoneyR\rpreviousTotal\x12C\n" +
+	"\n" +
+	"categories\x18\x04 \x03(\v2#.bank.statement.v1.CategorySpendingR\n" +
+	"categories\x12A\n" +
+	"\tmerchants\x18\x05 \x03(\v2#.bank.statement.v1.MerchantSpendingR\tmerchants*Q\n" +
 	"\tDirection\x12\x19\n" +
 	"\x15DIRECTION_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fDIRECTION_DEBIT\x10\x01\x12\x14\n" +
-	"\x10DIRECTION_CREDIT\x10\x022g\n" +
+	"\x10DIRECTION_CREDIT\x10\x022\xc5\x01\n" +
 	"\x10StatementService\x12S\n" +
-	"\bListFeed\x12\".bank.statement.v1.ListFeedRequest\x1a#.bank.statement.v1.ListFeedResponseB\xf0\x01\n" +
+	"\bListFeed\x12\".bank.statement.v1.ListFeedRequest\x1a#.bank.statement.v1.ListFeedResponse\x12\\\n" +
+	"\vGetSpending\x12%.bank.statement.v1.GetSpendingRequest\x1a&.bank.statement.v1.GetSpendingResponseB\xf0\x01\n" +
 	"\x15com.bank.statement.v1B\x0eStatementProtoP\x01Zagithub.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1;statementv1\xa2\x02\x03BSX\xaa\x02\x11Bank.Statement.V1\xca\x02\x11Bank\\Statement\\V1\xe2\x02\x1dBank\\Statement\\V1\\GPBMetadata\xea\x02\x13Bank::Statement::V1b\x06proto3"
 
 var (
@@ -353,27 +636,39 @@ func file_bank_statement_v1_statement_proto_rawDescGZIP() []byte {
 }
 
 var file_bank_statement_v1_statement_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_bank_statement_v1_statement_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_bank_statement_v1_statement_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_bank_statement_v1_statement_proto_goTypes = []any{
 	(Direction)(0),                // 0: bank.statement.v1.Direction
 	(*FeedItem)(nil),              // 1: bank.statement.v1.FeedItem
 	(*ListFeedRequest)(nil),       // 2: bank.statement.v1.ListFeedRequest
 	(*ListFeedResponse)(nil),      // 3: bank.statement.v1.ListFeedResponse
-	(*v1.Money)(nil),              // 4: bank.common.v1.Money
-	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(*GetSpendingRequest)(nil),    // 4: bank.statement.v1.GetSpendingRequest
+	(*CategorySpending)(nil),      // 5: bank.statement.v1.CategorySpending
+	(*MerchantSpending)(nil),      // 6: bank.statement.v1.MerchantSpending
+	(*GetSpendingResponse)(nil),   // 7: bank.statement.v1.GetSpendingResponse
+	(*v1.Money)(nil),              // 8: bank.common.v1.Money
+	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
 }
 var file_bank_statement_v1_statement_proto_depIdxs = []int32{
-	0, // 0: bank.statement.v1.FeedItem.direction:type_name -> bank.statement.v1.Direction
-	4, // 1: bank.statement.v1.FeedItem.amount:type_name -> bank.common.v1.Money
-	5, // 2: bank.statement.v1.FeedItem.occurred_at:type_name -> google.protobuf.Timestamp
-	1, // 3: bank.statement.v1.ListFeedResponse.items:type_name -> bank.statement.v1.FeedItem
-	2, // 4: bank.statement.v1.StatementService.ListFeed:input_type -> bank.statement.v1.ListFeedRequest
-	3, // 5: bank.statement.v1.StatementService.ListFeed:output_type -> bank.statement.v1.ListFeedResponse
-	5, // [5:6] is the sub-list for method output_type
-	4, // [4:5] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	0,  // 0: bank.statement.v1.FeedItem.direction:type_name -> bank.statement.v1.Direction
+	8,  // 1: bank.statement.v1.FeedItem.amount:type_name -> bank.common.v1.Money
+	9,  // 2: bank.statement.v1.FeedItem.occurred_at:type_name -> google.protobuf.Timestamp
+	1,  // 3: bank.statement.v1.ListFeedResponse.items:type_name -> bank.statement.v1.FeedItem
+	8,  // 4: bank.statement.v1.CategorySpending.amount:type_name -> bank.common.v1.Money
+	8,  // 5: bank.statement.v1.MerchantSpending.amount:type_name -> bank.common.v1.Money
+	8,  // 6: bank.statement.v1.GetSpendingResponse.total:type_name -> bank.common.v1.Money
+	8,  // 7: bank.statement.v1.GetSpendingResponse.previous_total:type_name -> bank.common.v1.Money
+	5,  // 8: bank.statement.v1.GetSpendingResponse.categories:type_name -> bank.statement.v1.CategorySpending
+	6,  // 9: bank.statement.v1.GetSpendingResponse.merchants:type_name -> bank.statement.v1.MerchantSpending
+	2,  // 10: bank.statement.v1.StatementService.ListFeed:input_type -> bank.statement.v1.ListFeedRequest
+	4,  // 11: bank.statement.v1.StatementService.GetSpending:input_type -> bank.statement.v1.GetSpendingRequest
+	3,  // 12: bank.statement.v1.StatementService.ListFeed:output_type -> bank.statement.v1.ListFeedResponse
+	7,  // 13: bank.statement.v1.StatementService.GetSpending:output_type -> bank.statement.v1.GetSpendingResponse
+	12, // [12:14] is the sub-list for method output_type
+	10, // [10:12] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_bank_statement_v1_statement_proto_init() }
@@ -387,7 +682,7 @@ func file_bank_statement_v1_statement_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_statement_v1_statement_proto_rawDesc), len(file_bank_statement_v1_statement_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   3,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

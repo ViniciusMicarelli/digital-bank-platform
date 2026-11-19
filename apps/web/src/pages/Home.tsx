@@ -1,7 +1,7 @@
 import { addBRL, ApiError, formatBRL, type Card, type CreditLine, type FeedItem, type Invoice, type SavingsSummary } from '@bank/core'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Barcode, Bell, ChevronRight, CreditCard, Eye, EyeOff, FileText, PiggyBank, QrCode, ShoppingBag, Sparkles,
+  ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Barcode, Bell, ChevronRight, CreditCard, Eye, EyeOff, FileText, PieChart, PiggyBank, QrCode, ShoppingBag, Sparkles,
   Undo2, Wallet, Zap, type LucideIcon,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -84,13 +84,14 @@ const shortcuts: [string, string, LucideIcon][] = [
   ['/pix?aba=enviar', 'Transferir', ArrowUpRight],
   ['/pix?aba=cobrar', 'Cobrar', QrCode],
   ['/caixinhas', 'Caixinhas', PiggyBank],
+  ['/gastos', 'Gastos', PieChart],
   ['/credito', 'Crédito', Wallet],
   ['/cartoes', 'Cartões', CreditCard],
 ]
 
 function Shortcuts() {
   return (
-    <div data-reveal className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-7 sm:px-0">
+    <div data-reveal className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-8 sm:px-0">
       {shortcuts.map(([to, label, Icon]) => (
         <Link key={to} to={to} className="group flex w-[72px] shrink-0 flex-col items-center gap-2 text-center sm:w-auto">
           <span className="glass grid size-[68px] place-items-center rounded-full text-fg transition duration-300 group-hover:-translate-y-1 group-hover:text-brand-strong group-active:scale-90">

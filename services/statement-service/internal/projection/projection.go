@@ -38,6 +38,8 @@ func (p *Projector) Handle(ctx context.Context, ev outbox.Event) error {
 		return p.account(ctx, ev)
 	case ev.Type == "transaction.completed":
 		return p.transaction(ctx, ev)
+	case ev.Type == "card.issued", ev.Type == "card.purchase.cleared", ev.Type == "card.purchase.refunded":
+		return p.card(ctx, ev)
 	}
 	return nil
 }
@@ -145,6 +147,9 @@ func (p *Projector) transaction(ctx context.Context, ev outbox.Event) error {
 			if err != nil {
 				return err
 			}
+		}
+		if category, merchant, ok := transactionSpending(t); ok {
+			return insertSpending(ctx, tx, t.FromAccountID, "tx:"+t.TransactionID, category, merchant, t.AmountMinor, t.OccurredAt)
 		}
 		return nil
 	})

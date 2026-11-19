@@ -345,7 +345,7 @@ func (s *Service) decide(ctx context.Context, a domain.Authorization, st domain.
 
 // Clear settles an approved authorization for its amount or less.
 func (s *Service) Clear(ctx context.Context, id uuid.UUID, amount *money.Money) (domain.Authorization, error) {
-	a, err := s.store.Authorization(ctx, id)
+	a, err := s.authorization(ctx, id)
 	if err != nil {
 		return domain.Authorization{}, err
 	}
@@ -375,7 +375,7 @@ func (s *Service) Clear(ctx context.Context, id uuid.UUID, amount *money.Money) 
 
 // Reverse cancels an approved authorization and releases the money.
 func (s *Service) Reverse(ctx context.Context, id uuid.UUID) (domain.Authorization, error) {
-	a, err := s.store.Authorization(ctx, id)
+	a, err := s.authorization(ctx, id)
 	if err != nil {
 		return domain.Authorization{}, err
 	}
@@ -466,6 +466,18 @@ func (s *Service) event(ctx context.Context, eventType, key string, payload any)
 }
 
 // Events never carry the card number: id and last4 only.
+// authorization loads an authorization with its account (from the card), so
+// the events it causes name the account.
+func (s *Service) authorization(ctx context.Context, id uuid.UUID) (domain.Authorization, error) {
+	a, err := s.store.Authorization(ctx, id)
+	if err != nil || a.CardID == uuid.Nil {
+		return a, err
+	}
+	c, err := s.store.Card(ctx, a.CardID)
+	a.AccountID = c.AccountID
+	return a, err
+}
+
 func cardPayload(c domain.Card) map[string]any {
 	return map[string]any{"card_id": c.ID.String(), "account_id": c.AccountID.String(), "kind": string(c.Kind),
 		"status": string(c.Status), "reason": c.StatusReason, "last4": c.Last4}
@@ -477,6 +489,6 @@ func authPayload(a domain.Authorization) map[string]any {
 		"response_code": a.Code, "reason": a.Reason, "amount_minor": a.Purchase.Amount.Minor(),
 		"cleared_minor": a.Cleared, "merchant_name": a.Purchase.MerchantName, "mcc": a.Purchase.MCC,
 		"country": a.Purchase.Country, "channel": string(a.Purchase.Channel), "function": string(a.Purchase.Function),
-		"account_id": a.AccountID.String(),
+		"account_id": a.AccountID.String(), "installments": max(a.Purchase.Installments, 1),
 	}
 }

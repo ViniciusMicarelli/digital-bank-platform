@@ -10,6 +10,10 @@ import "google/protobuf/timestamp.proto";
 service StatementService {
   // Newest first, cursor-paginated.
   rpc ListFeed(ListFeedRequest) returns (ListFeedResponse);
+  // Where the money went in a month (Brasília time): card purchases by
+  // category (from the merchant category code), Pix and transfers sent and
+  // bills paid; refunds count against their category.
+  rpc GetSpending(GetSpendingRequest) returns (GetSpendingResponse);
 }
 
 enum Direction {
@@ -43,4 +47,35 @@ message ListFeedRequest {
 message ListFeedResponse {
   repeated FeedItem items = 1;
   string next_page_token = 2;
+}
+
+message GetSpendingRequest {
+  string account_id = 1;
+  // YYYY-MM; the current month when empty.
+  string month = 2;
+}
+
+message CategorySpending {
+  // FOOD, TRANSPORT, SHOPPING, SUBSCRIPTIONS, HEALTH, LEISURE, TRAVEL, HOME,
+  // EDUCATION, BILLS, TRANSFERS, OTHER.
+  string category = 1;
+  bank.common.v1.Money amount = 2;
+  int32 count = 3;
+}
+
+message MerchantSpending {
+  string name = 1;
+  string category = 2;
+  bank.common.v1.Money amount = 3;
+  int32 count = 4;
+}
+
+message GetSpendingResponse {
+  string month = 1;
+  bank.common.v1.Money total = 2;
+  bank.common.v1.Money previous_total = 3;
+  // Largest first.
+  repeated CategorySpending categories = 4;
+  // The five places with the most spent (Pix and transfers excluded).
+  repeated MerchantSpending merchants = 5;
 }

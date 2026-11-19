@@ -219,3 +219,44 @@ export interface SavingsSummary {
   total: Money
   yielded: Money
 }
+
+export type SpendingCategory =
+  | 'FOOD' | 'TRANSPORT' | 'SHOPPING' | 'SUBSCRIPTIONS' | 'HEALTH' | 'LEISURE' | 'TRAVEL' | 'HOME' | 'EDUCATION' | 'BILLS' | 'TRANSFERS' | 'OTHER'
+
+export interface SpendingSummary {
+  month: string
+  total: Money
+  previous_total: Money
+  categories: { category: SpendingCategory; amount: Money; count: number }[]
+  merchants: { name: string; category: SpendingCategory; amount: Money; count: number }[]
+}
+
+/** Label and chart color of each spending category (the same in both themes). */
+export const spendingCategories: Record<SpendingCategory, { label: string; color: string }> = {
+  FOOD: { label: 'Alimentação', color: '#f59e0b' },
+  TRANSPORT: { label: 'Transporte', color: '#0ea5e9' },
+  SHOPPING: { label: 'Compras', color: '#8b5cf6' },
+  SUBSCRIPTIONS: { label: 'Assinaturas', color: '#ec4899' },
+  HEALTH: { label: 'Saúde', color: '#10b981' },
+  LEISURE: { label: 'Lazer', color: '#f97316' },
+  TRAVEL: { label: 'Viagens', color: '#06b6d4' },
+  HOME: { label: 'Casa', color: '#84cc16' },
+  EDUCATION: { label: 'Educação', color: '#6366f1' },
+  BILLS: { label: 'Contas e boletos', color: '#64748b' },
+  TRANSFERS: { label: 'Pix e transferências', color: '#14b8a6' },
+  OTHER: { label: 'Outros', color: '#a1a1aa' },
+}
+
+/** The month before or after a YYYY-MM month. */
+export function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split('-').map(Number)
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1))
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+/** "Novembro de 2026" for 2026-11. */
+export function monthLabel(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  const s = new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}

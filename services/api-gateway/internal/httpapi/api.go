@@ -169,6 +169,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/accounts/{id}/limits", a.authenticated(a.owned(a.getLimits)))
 	mux.HandleFunc("PUT /v1/accounts/{id}/limits", a.authenticated(a.owned(a.updateLimits)))
 	mux.HandleFunc("GET /v1/accounts/{id}/statement", a.authenticated(a.owned(a.statement)))
+	mux.HandleFunc("GET /v1/accounts/{id}/spending", a.authenticated(a.owned(a.spending)))
 	mux.HandleFunc("POST /v1/accounts/{id}/transfers", a.authenticated(a.owned(a.transfer)))
 	mux.HandleFunc("GET /v1/accounts/{id}/pix/keys", a.authenticated(a.owned(a.listKeys)))
 	mux.HandleFunc("POST /v1/accounts/{id}/pix/keys", a.authenticated(a.owned(a.registerKey)))

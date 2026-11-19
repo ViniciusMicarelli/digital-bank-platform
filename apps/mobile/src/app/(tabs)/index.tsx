@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Barcode, Bell, ChevronRight, CreditCard, Eye, EyeOff, FileText, QrCode, ShoppingBag, Sparkles,
-  Undo2, Wallet, Zap, type LucideIcon, PiggyBank } from 'lucide-react-native'
+  Undo2, Wallet, Zap, type LucideIcon, PiggyBank, PieChart } from 'lucide-react-native'
 import { useState } from 'react'
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
@@ -30,10 +30,10 @@ function FeedRow({ item }: { item: FeedItem }) {
   )
 }
 
-type Href = '/pix' | '/boletos' | '/cartoes' | '/credito' | '/caixinhas'
+type Href = '/pix' | '/boletos' | '/cartoes' | '/credito' | '/caixinhas' | '/gastos'
 const shortcuts: [string, LucideIcon, Href][] = [
   ['Área Pix', Zap, '/pix'], ['Pagar', Barcode, '/boletos'], ['Transferir', ArrowUpRight, '/pix'],
-  ['Cobrar', QrCode, '/pix'], ['Caixinhas', PiggyBank, '/caixinhas'], ['Crédito', Wallet, '/credito'], ['Cartões', CreditCard, '/cartoes'],
+  ['Cobrar', QrCode, '/pix'], ['Caixinhas', PiggyBank, '/caixinhas'], ['Gastos', PieChart, '/gastos'], ['Crédito', Wallet, '/credito'], ['Cartões', CreditCard, '/cartoes'],
 ]
 
 function Credit({ accountId, hidden }: { accountId: string; hidden: boolean }) {

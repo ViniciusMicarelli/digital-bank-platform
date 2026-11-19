@@ -4,6 +4,7 @@ package grpcapi
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
@@ -53,4 +54,29 @@ func (s *Server) ListFeed(ctx context.Context, req *statementv1.ListFeedRequest)
 		})
 	}
 	return resp, nil
+}
+
+func brl(minor int64) *commonv1.Money { return &commonv1.Money{MinorUnits: minor, Currency: "BRL"} }
+
+func (s *Server) GetSpending(ctx context.Context, req *statementv1.GetSpendingRequest) (*statementv1.GetSpendingResponse, error) {
+	account, err := uuid.Parse(req.GetAccountId())
+	if err != nil {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", "account_id must be a UUID")
+	}
+	start, err := projection.ParseMonth(req.GetMonth(), time.Now())
+	if err != nil {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_MONTH", err.Error())
+	}
+	sp, err := s.p.Spending(ctx, account, start)
+	if err != nil {
+		return nil, grpcserver.Error(codes.Internal, "INTERNAL", "internal error")
+	}
+	out := &statementv1.GetSpendingResponse{Month: sp.Month, Total: brl(sp.Total), PreviousTotal: brl(sp.PreviousTotal)}
+	for _, c := range sp.Categories {
+		out.Categories = append(out.Categories, &statementv1.CategorySpending{Category: c.Category, Amount: brl(c.Amount), Count: int32(c.Count)}) //nolint:gosec // counts
+	}
+	for _, m := range sp.Merchants {
+		out.Merchants = append(out.Merchants, &statementv1.MerchantSpending{Name: m.Name, Category: m.Category, Amount: brl(m.Amount), Count: int32(m.Count)}) //nolint:gosec // counts
+	}
+	return out, nil
 }

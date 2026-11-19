@@ -34,6 +34,7 @@ function Navigator({ signedIn }: { signedIn: boolean }) {
         <Stack.Screen name="boletos" options={{ ...header, title: 'Boletos' }} />
         <Stack.Screen name="credito" options={{ ...header, title: 'Crédito' }} />
         <Stack.Screen name="caixinhas" options={{ ...header, title: 'Caixinhas' }} />
+        <Stack.Screen name="gastos" options={{ ...header, title: 'Gastos' }} />
       </Stack.Protected>
     </Stack>
   )

@@ -8,6 +8,7 @@ import (
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
 	savingsv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/savings/v1"
+	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
 )
 
 func boxJSON(b *savingsv1.Box) map[string]any {
@@ -197,4 +198,23 @@ func (a *API) simulateYield(w http.ResponseWriter, r *http.Request, b *savingsv1
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"movement": movementJSON(resp.GetMovement()), "box": boxJSON(resp.GetBox())})
+}
+
+// spending summarizes where the money went in a month (?month=YYYY-MM).
+func (a *API) spending(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	resp, err := a.c.Statement.GetSpending(r.Context(), &statementv1.GetSpendingRequest{AccountId: acc.GetId(), Month: r.URL.Query().Get("month")})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	cats := []map[string]any{}
+	for _, c := range resp.GetCategories() {
+		cats = append(cats, map[string]any{"category": c.GetCategory(), "amount": moneyJSON(c.GetAmount()), "count": c.GetCount()})
+	}
+	merchants := []map[string]any{}
+	for _, m := range resp.GetMerchants() {
+		merchants = append(merchants, map[string]any{"name": m.GetName(), "category": m.GetCategory(), "amount": moneyJSON(m.GetAmount()), "count": m.GetCount()})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"month": resp.GetMonth(), "total": moneyJSON(resp.GetTotal()),
+		"previous_total": moneyJSON(resp.GetPreviousTotal()), "categories": cats, "merchants": merchants})
 }

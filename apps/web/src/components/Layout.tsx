@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeftRight, Bell, CreditCard, FileText, Home, LogOut, Menu, PiggyBank, ReceiptText, Settings, Wallet, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, Bell, CreditCard, FileText, Home, LogOut, Menu, PieChart, PiggyBank, ReceiptText, Settings, Wallet, type LucideIcon } from 'lucide-react'
 import { Suspense, useRef } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { useLiveConnected } from '../app/contexts'
@@ -18,6 +18,7 @@ const nav: Item[] = [
   { to: '/pix', label: 'Pix', icon: ArrowLeftRight, mobile: true },
   { to: '/cartoes', label: 'Cartões', icon: CreditCard, mobile: true },
   { to: '/caixinhas', label: 'Caixinhas', icon: PiggyBank, mobile: false },
+  { to: '/gastos', label: 'Gastos', icon: PieChart, mobile: false },
   { to: '/credito', label: 'Crédito', icon: Wallet, mobile: false },
   { to: '/boletos', label: 'Boletos', icon: FileText, mobile: false },
   { to: '/notificacoes', label: 'Notificações', icon: Bell, mobile: false },

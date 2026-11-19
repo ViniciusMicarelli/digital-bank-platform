@@ -199,6 +199,12 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Credit purchases in 2 to 12 interest-free installments (at least R$ 5,00 each): the whole amount on the limit, paid to the merchant at clearing; one installment per invoice from the capture invoice on, the first with the remainder centavo; upcoming installments on the line and a list of plans.
 - Web and mobile: choose the installments when simulating a credit purchase, "em 6x" on the card's purchases, *Compras parceladas* on the credit screen with what is still to come.
 
+## Phase 28 — Spending by category ✅
+
+- statement-service projects spending from card, transaction and refund events: card purchases categorized by merchant category code, Pix and transfers sent, bills paid; refunds subtract; month in Brasília time with the previous month and the top merchants.
+- Card events now name the account on clearing and reversal; older events are placed through the card.
+- Web and mobile: *Gastos* screen (month by month, donut / bar by category, change from last month, where the most was spent).
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

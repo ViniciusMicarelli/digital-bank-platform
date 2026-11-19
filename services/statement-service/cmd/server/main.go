@@ -45,7 +45,7 @@ func main() {
 		defer kafka.Start(ctx, kafka.ConsumerConfig{
 			Brokers: brokers,
 			Group:   config.String("CONSUMER_GROUP", "statement-service"),
-			Topics:  []string{"bank.account.events", "bank.transaction.events"},
+			Topics:  []string{"bank.account.events", "bank.transaction.events", "bank.card.events"},
 		}, log, p.Handle)()
 	} else {
 		log.Warn("KAFKA_BROKERS not set: the feed will not be updated")

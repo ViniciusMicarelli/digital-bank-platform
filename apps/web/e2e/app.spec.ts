@@ -145,3 +145,24 @@ test('credit purchase in installments', async ({ page }) => {
   await expect(page.getByText('a vencer R$ 500,00')).toBeVisible()
   await shot(page, '14-installments')
 })
+
+test('spending by category', async ({ page }) => {
+  await onboard(page)
+  await fund(page, '300,00')
+  await page.goto('/cartoes')
+  await page.getByRole('button', { name: 'Criar cartão virtual' }).click()
+  await page.getByLabel('Simular compra de').fill('80')
+  await page.getByLabel('Loja', { exact: true }).fill('PADARIA DO BAIRRO')
+  await page.getByRole('button', { name: 'Passar o cartão' }).click()
+  await page.getByLabel('Senha').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Confirmar' }).click()
+  await expect(page.getByText(/Aprovada: R\$ 80,00/)).toBeVisible()
+
+  // Projected from events: the page may need a moment.
+  await expect(async () => {
+    await page.goto('/gastos')
+    await expect(page.getByText('Alimentação', { exact: true })).toBeVisible({ timeout: 2000 })
+  }).toPass({ timeout: 20_000 })
+  await expect(page.getByText('PADARIA DO BAIRRO')).toBeVisible()
+  await shot(page, '15-spending')
+})

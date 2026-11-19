@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	StatementService_ListFeed_FullMethodName = "/bank.statement.v1.StatementService/ListFeed"
+	StatementService_ListFeed_FullMethodName    = "/bank.statement.v1.StatementService/ListFeed"
+	StatementService_GetSpending_FullMethodName = "/bank.statement.v1.StatementService/GetSpending"
 )
 
 // StatementServiceClient is the client API for StatementService service.
@@ -31,6 +32,10 @@ const (
 type StatementServiceClient interface {
 	// Newest first, cursor-paginated.
 	ListFeed(ctx context.Context, in *ListFeedRequest, opts ...grpc.CallOption) (*ListFeedResponse, error)
+	// Where the money went in a month (Brasília time): card purchases by
+	// category (from the merchant category code), Pix and transfers sent and
+	// bills paid; refunds count against their category.
+	GetSpending(ctx context.Context, in *GetSpendingRequest, opts ...grpc.CallOption) (*GetSpendingResponse, error)
 }
 
 type statementServiceClient struct {
@@ -51,6 +56,16 @@ func (c *statementServiceClient) ListFeed(ctx context.Context, in *ListFeedReque
 	return out, nil
 }
 
+func (c *statementServiceClient) GetSpending(ctx context.Context, in *GetSpendingRequest, opts ...grpc.CallOption) (*GetSpendingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSpendingResponse)
+	err := c.cc.Invoke(ctx, StatementService_GetSpending_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StatementServiceServer is the server API for StatementService service.
 // All implementations must embed UnimplementedStatementServiceServer
 // for forward compatibility.
@@ -60,6 +75,10 @@ func (c *statementServiceClient) ListFeed(ctx context.Context, in *ListFeedReque
 type StatementServiceServer interface {
 	// Newest first, cursor-paginated.
 	ListFeed(context.Context, *ListFeedRequest) (*ListFeedResponse, error)
+	// Where the money went in a month (Brasília time): card purchases by
+	// category (from the merchant category code), Pix and transfers sent and
+	// bills paid; refunds count against their category.
+	GetSpending(context.Context, *GetSpendingRequest) (*GetSpendingResponse, error)
 	mustEmbedUnimplementedStatementServiceServer()
 }
 
@@ -72,6 +91,9 @@ type UnimplementedStatementServiceServer struct{}
 
 func (UnimplementedStatementServiceServer) ListFeed(context.Context, *ListFeedRequest) (*ListFeedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListFeed not implemented")
+}
+func (UnimplementedStatementServiceServer) GetSpending(context.Context, *GetSpendingRequest) (*GetSpendingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSpending not implemented")
 }
 func (UnimplementedStatementServiceServer) mustEmbedUnimplementedStatementServiceServer() {}
 func (UnimplementedStatementServiceServer) testEmbeddedByValue()                          {}
@@ -112,6 +134,24 @@ func _StatementService_ListFeed_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StatementService_GetSpending_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSpendingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StatementServiceServer).GetSpending(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StatementService_GetSpending_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StatementServiceServer).GetSpending(ctx, req.(*GetSpendingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StatementService_ServiceDesc is the grpc.ServiceDesc for StatementService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -122,6 +162,10 @@ var StatementService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListFeed",
 			Handler:    _StatementService_ListFeed_Handler,
+		},
+		{
+			MethodName: "GetSpending",
+			Handler:    _StatementService_GetSpending_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
