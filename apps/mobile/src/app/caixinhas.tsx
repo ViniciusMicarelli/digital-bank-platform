@@ -1,0 +1,125 @@
+import { errorMessage, formatBRL, type SavingsBox, type SavingsSummary } from '@bank/core'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowDownLeft, ArrowUpRight, PiggyBank, Plus, Sparkles, X } from 'lucide-react-native'
+import { useState } from 'react'
+import { View } from 'react-native'
+import { Button, Card, Field, Loading, MoneyField, Muted, Notice, Press, Row, Sandbox, Screen, Segmented, Txt } from '../components/ui'
+import { api } from '../lib/client'
+import { dateTime, useAccount } from '../lib/queries'
+import { font, useTheme } from '../lib/theme'
+
+const movementLabel = { DEPOSIT: 'Guardado', WITHDRAWAL: 'Resgate', YIELD: 'Rendimento' } as const
+const rate = (bp: number) => `${(bp / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`
+
+function NewBox({ base, onDone }: { base: string; onDone: (b: SavingsBox) => void }) {
+  const [name, setName] = useState('')
+  const [goal, setGoal] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const create = useMutation({
+    mutationFn: () => api<SavingsBox>('POST', base, { body: { name, goal: goal ?? '' }, idempotent: true }),
+    onSuccess: onDone,
+    onError: (e) => setError(errorMessage(e)),
+  })
+  return (
+    <Card title="Nova caixinha" icon={Plus}>
+      <Field label="Nome" placeholder="Viagem, reserva…" maxLength={40} value={name} onChangeText={setName} />
+      <MoneyField label="Meta (opcional)" onValue={setGoal} />
+      <Notice>{error}</Notice>
+      <Button title="Criar caixinha" icon={Plus} disabled={!name.trim()} loading={create.isPending} onPress={() => create.mutate()} />
+    </Card>
+  )
+}
+
+function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId: string; id: string; onClosed: () => void }) {
+  const qc = useQueryClient()
+  const [tab, setTab] = useState<'in' | 'out'>('in')
+  const [amount, setAmount] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ tone: 'green' | 'red'; text: string } | null>(null)
+  const detail = useQuery({ queryKey: ['savings', accountId, id], queryFn: () => api<SavingsBox>('GET', `${base}/${id}`) })
+  const refresh = () => { for (const k of ['savings', 'balance', 'statement']) qc.invalidateQueries({ queryKey: [k] }) }
+  const fail = (e: unknown) => setMessage({ tone: 'red', text: errorMessage(e) })
+  const move = useMutation({
+    mutationFn: () => api('POST', `${base}/${id}/${tab === 'in' ? 'deposits' : 'withdrawals'}`, { body: { amount }, idempotent: true }),
+    onSuccess: () => { setMessage({ tone: 'green', text: tab === 'in' ? `${formatBRL(amount!)} guardados.` : `${formatBRL(amount!)} voltaram para a conta.` }); refresh() },
+    onError: fail,
+  })
+  const close = useMutation({ mutationFn: () => api('DELETE', `${base}/${id}`, { idempotent: true }), onSuccess: () => { refresh(); onClosed() }, onError: fail })
+  const simulate = useMutation({ mutationFn: () => api('POST', `/v1/sandbox/accounts/${accountId}/savings/${id}/yield`, { body: { days: 30 } }), onSuccess: refresh, onError: fail })
+  const b = detail.data
+  if (!b) return <Loading />
+  return (
+    <>
+      <Card title={b.name} icon={PiggyBank} index={1}>
+        <View style={{ flexDirection: 'row', gap: 24 }}>
+          <View><Txt variant="caption" tone="muted">Saldo</Txt><Txt variant="heading" style={{ fontSize: 22 }}>{formatBRL(b.balance)}</Txt></View>
+          <View><Txt variant="caption" tone="muted">Rendeu</Txt><Txt variant="heading" tone="positive" style={{ fontSize: 22 }}>{formatBRL(b.yielded)}</Txt></View>
+        </View>
+        <Txt variant="caption" tone="muted">Rende {rate(b.annual_rate_bp)} ao ano, todo dia. Resgate quando quiser.</Txt>
+        <Segmented value={tab} onChange={(t) => { setTab(t); setMessage(null) }} options={[['in', 'Guardar'], ['out', 'Resgatar']]} />
+        <MoneyField key={tab} label={tab === 'in' ? 'Quanto guardar' : 'Quanto resgatar'} onValue={setAmount} />
+        <Button title={tab === 'in' ? 'Guardar' : 'Resgatar'} icon={tab === 'in' ? ArrowDownLeft : ArrowUpRight} disabled={!amount} loading={move.isPending} onPress={() => move.mutate()} />
+        {message && <Notice tone={message.tone}>{message.text}</Notice>}
+      </Card>
+      <Card title="Histórico" index={2}>
+        {!b.movements?.length ? <Muted>Nada guardado ainda.</Muted> : b.movements.map((m) => (
+          <Row key={m.id} title={movementLabel[m.kind] + (m.status === 'PENDING' ? ' · processando' : '')} subtitle={dateTime(m.created_at)}
+            right={<Txt variant="label" tone={m.kind === 'WITHDRAWAL' ? 'fg' : 'positive'} style={{ fontFamily: font.semibold }}>{m.kind === 'WITHDRAWAL' ? '− ' : '+ '}{formatBRL(m.amount)}</Txt>} />
+        ))}
+      </Card>
+      <Sandbox>
+        <Button title="Simular 30 dias de rendimento" icon={Sparkles} variant="secondary" loading={simulate.isPending} onPress={() => simulate.mutate()} />
+      </Sandbox>
+      <Button title="Encerrar e resgatar tudo" icon={X} variant="danger" loading={close.isPending} onPress={() => close.mutate()} />
+    </>
+  )
+}
+
+export default function Savings() {
+  const { c } = useTheme()
+  const account = useAccount()
+  const qc = useQueryClient()
+  const [selected, setSelected] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const base = `/v1/accounts/${account?.id}/savings`
+  const summary = useQuery({ queryKey: ['savings', account?.id], enabled: !!account, queryFn: () => api<SavingsSummary>('GET', base) })
+  if (!account || summary.isLoading || !summary.data) return <Screen><Loading /></Screen>
+  const s = summary.data
+  const current = s.boxes.find((b) => b.id === selected) ?? s.boxes[0]
+  return (
+    <Screen>
+      {s.boxes.length > 0 && (
+        <View style={{ flexDirection: 'row', gap: 24, paddingHorizontal: 4 }}>
+          <View><Txt variant="caption" tone="muted">Total guardado</Txt><Txt variant="title" style={{ fontSize: 28 }}>{formatBRL(s.total)}</Txt></View>
+          <View><Txt variant="caption" tone="muted">Já rendeu</Txt><Txt variant="title" tone="positive" style={{ fontSize: 28 }}>{formatBRL(s.yielded)}</Txt></View>
+        </View>
+      )}
+      {(creating || s.boxes.length === 0) ? (
+        <NewBox base={base} onDone={(b) => { setCreating(false); setSelected(b.id); qc.invalidateQueries({ queryKey: ['savings'] }) }} />
+      ) : (
+        <Button title="Nova caixinha" icon={Plus} variant="secondary" onPress={() => setCreating(true)} />
+      )}
+      {s.boxes.map((b) => {
+        const pct = b.goal ? Math.min(100, (Number(b.balance.amount) / Number(b.goal.amount)) * 100) : null
+        return (
+          <Press key={b.id} accessibilityLabel={b.name} onPress={() => setSelected(b.id)}>
+            <Card style={b.id === current?.id ? { borderColor: c.brand, borderWidth: 2 } : undefined}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <Txt variant="heading">{b.name}</Txt>
+                <Txt variant="heading">{formatBRL(b.balance)}</Txt>
+              </View>
+              {pct !== null && (
+                <View style={{ gap: 6 }}>
+                  <View style={{ height: 6, borderRadius: 3, backgroundColor: c.surface2, overflow: 'hidden' }}>
+                    <View style={{ height: 6, width: `${pct}%`, backgroundColor: c.brand }} />
+                  </View>
+                  <Txt variant="caption" tone="muted">{Math.floor(pct)}% de {formatBRL(b.goal)} · rendeu {formatBRL(b.yielded)}</Txt>
+                </View>
+              )}
+            </Card>
+          </Press>
+        )
+      })}
+      {current && <BoxDetail key={current.id} base={base} accountId={account.id} id={current.id} onClosed={() => setSelected(null)} />}
+    </Screen>
+  )
+}

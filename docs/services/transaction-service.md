@@ -16,6 +16,9 @@ Orchestrates money movements that involve more than one step or service, using *
 | `CREDIT_CARD_PURCHASE`, `CREDIT_INVOICE_PAYMENT`, `CREDIT_CHARGES` | credit-service | post entry (one step) |
 | `CARD_REFUND` | card-service | check destination → post entry (card clearing → customer) |
 | `CREDIT_CARD_REFUND` | credit-service | post entry (card clearing → credit-receivables) |
+| `SAVINGS_DEPOSIT` | savings-service | check source → post entry (checking → box; no limits) |
+| `SAVINGS_WITHDRAWAL` | savings-service | check destination → post entry (box → checking) |
+| `SAVINGS_YIELD` | savings-service | post entry (savings-yield → box) |
 
 ## State Machine
 

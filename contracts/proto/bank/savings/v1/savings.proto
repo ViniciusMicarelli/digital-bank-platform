@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package bank.savings.v1;
+
+import "bank/common/v1/money.proto";
+import "google/protobuf/timestamp.proto";
+
+// SavingsService runs savings boxes ("caixinhas"): money the customer sets
+// apart from the checking account, optionally towards a goal, that yields
+// daily. Each box is its own customer account in the ledger, so the money
+// stays the customer's and can never go negative.
+service SavingsService {
+  rpc CreateBox(CreateBoxRequest) returns (CreateBoxResponse);
+  rpc GetBox(GetBoxRequest) returns (GetBoxResponse);
+  rpc ListBoxes(ListBoxesRequest) returns (ListBoxesResponse);
+  rpc UpdateBox(UpdateBoxRequest) returns (UpdateBoxResponse);
+  // Moves everything back to the checking account and closes the box.
+  rpc CloseBox(CloseBoxRequest) returns (CloseBoxResponse);
+
+  // Checking account -> box, and back. Idempotent on idempotency_key;
+  // a refusal (INSUFFICIENT_FUNDS) is a FAILED movement, not an error.
+  rpc Deposit(DepositRequest) returns (DepositResponse);
+  rpc Withdraw(WithdrawRequest) returns (WithdrawResponse);
+  // Deposits, withdrawals and yields, newest first.
+  rpc ListMovements(ListMovementsRequest) returns (ListMovementsResponse);
+
+  // Sandbox: pays the yield of `days` days at once, on today's balance.
+  rpc SimulateYield(SimulateYieldRequest) returns (SimulateYieldResponse);
+}
+
+message Box {
+  string id = 1;
+  string account_id = 2;
+  string name = 3;
+  // Zero when the box has no goal.
+  bank.common.v1.Money goal = 4;
+  bank.common.v1.Money balance = 5;
+  // Everything the box has yielded so far.
+  bank.common.v1.Money yielded = 6;
+  // ACTIVE, CLOSED.
+  string status = 7;
+  google.protobuf.Timestamp created_at = 8;
+  // Yearly rate paid, in basis points (e.g. 1065 = 10.65% a year).
+  int32 annual_rate_bp = 9;
+}
+
+message Movement {
+  string id = 1;
+  string box_id = 2;
+  // DEPOSIT, WITHDRAWAL, YIELD.
+  string kind = 3;
+  bank.common.v1.Money amount = 4;
+  // PENDING (retried), COMPLETED, FAILED.
+  string status = 5;
+  string failure_reason = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message CreateBoxRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  string name = 3;
+  bank.common.v1.Money goal = 4;
+}
+
+message CreateBoxResponse {
+  Box box = 1;
+}
+
+message GetBoxRequest {
+  string id = 1;
+}
+
+message GetBoxResponse {
+  Box box = 1;
+}
+
+message ListBoxesRequest {
+  string account_id = 1;
+}
+
+message ListBoxesResponse {
+  repeated Box boxes = 1;
+}
+
+message UpdateBoxRequest {
+  string id = 1;
+  string name = 2;
+  // Zero removes the goal.
+  bank.common.v1.Money goal = 3;
+}
+
+message UpdateBoxResponse {
+  Box box = 1;
+}
+
+message CloseBoxRequest {
+  string id = 1;
+  string idempotency_key = 2;
+}
+
+message CloseBoxResponse {
+  Box box = 1;
+}
+
+message DepositRequest {
+  string idempotency_key = 1;
+  string box_id = 2;
+  bank.common.v1.Money amount = 3;
+}
+
+message DepositResponse {
+  Movement movement = 1;
+  Box box = 2;
+}
+
+message WithdrawRequest {
+  string idempotency_key = 1;
+  string box_id = 2;
+  bank.common.v1.Money amount = 3;
+}
+
+message WithdrawResponse {
+  Movement movement = 1;
+  Box box = 2;
+}
+
+message ListMovementsRequest {
+  string box_id = 1;
+  int32 limit = 2;
+}
+
+message ListMovementsResponse {
+  repeated Movement movements = 1;
+}
+
+message SimulateYieldRequest {
+  string box_id = 1;
+  int32 days = 2;
+}
+
+message SimulateYieldResponse {
+  Movement movement = 1;
+  Box box = 2;
+}

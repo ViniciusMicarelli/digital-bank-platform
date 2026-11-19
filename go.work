@@ -14,6 +14,7 @@ use (
 	./services/ledger-service
 	./services/notification-service
 	./services/payment-service
+	./services/savings-service
 	./services/pix-service
 	./services/statement-service
 	./services/transaction-service

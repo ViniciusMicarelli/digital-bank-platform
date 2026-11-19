@@ -179,3 +179,30 @@ export const disputeReasons: Record<DisputeReason, string> = {
   WRONG_AMOUNT: 'Valor diferente do combinado',
   CANCELLED: 'Cancelei e continuei sendo cobrado',
 }
+
+export interface SavingsBox {
+  id: string
+  name: string
+  goal?: Money
+  balance: Money
+  yielded: Money
+  status: 'ACTIVE' | 'CLOSED'
+  created_at: string
+  annual_rate_bp: number
+  movements?: SavingsMovement[]
+}
+
+export interface SavingsMovement {
+  id: string
+  kind: 'DEPOSIT' | 'WITHDRAWAL' | 'YIELD'
+  amount: Money
+  status: 'PENDING' | 'COMPLETED' | 'FAILED'
+  failure_reason: string
+  created_at: string
+}
+
+export interface SavingsSummary {
+  boxes: SavingsBox[]
+  total: Money
+  yielded: Money
+}

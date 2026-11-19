@@ -36,6 +36,9 @@ var types = map[txv1.TransactionType]domain.Type{
 	txv1.TransactionType_TRANSACTION_TYPE_BOLETO_PAYMENT:         domain.TypeBoletoPayment,
 	txv1.TransactionType_TRANSACTION_TYPE_CARD_REFUND:            domain.TypeCardRefund,
 	txv1.TransactionType_TRANSACTION_TYPE_CREDIT_CARD_REFUND:     domain.TypeCreditCardRefund,
+	txv1.TransactionType_TRANSACTION_TYPE_SAVINGS_DEPOSIT:        domain.TypeSavingsDeposit,
+	txv1.TransactionType_TRANSACTION_TYPE_SAVINGS_WITHDRAWAL:     domain.TypeSavingsWithdrawal,
+	txv1.TransactionType_TRANSACTION_TYPE_SAVINGS_YIELD:          domain.TypeSavingsYield,
 }
 
 func (s *Server) CreateTransfer(ctx context.Context, req *txv1.CreateTransferRequest) (*txv1.CreateTransferResponse, error) {

@@ -16,6 +16,7 @@ const PixPage = page(() => import('./pages/Pix'), 'PixPage')
 const CardsPage = page(() => import('./pages/Cards'), 'CardsPage')
 const CreditPage = page(() => import('./pages/Credit'), 'CreditPage')
 const BoletosPage = page(() => import('./pages/Boletos'), 'BoletosPage')
+const SavingsPage = page(() => import('./pages/Savings'), 'SavingsPage')
 const NotificationsPage = page(() => import('./pages/Notifications'), 'NotificationsPage')
 const SettingsPage = page(() => import('./pages/Settings'), 'SettingsPage')
 const BackofficePage = page(() => import('./pages/Backoffice'), 'BackofficePage')
@@ -79,6 +80,7 @@ export default function App() {
               <Route path="/cartoes" element={<CardsPage />} />
               <Route path="/credito" element={<CreditPage />} />
               <Route path="/boletos" element={<BoletosPage />} />
+              <Route path="/caixinhas" element={<SavingsPage />} />
               <Route path="/notificacoes" element={<NotificationsPage />} />
               <Route path="/ajustes" element={<SettingsPage />} />
               <Route path="/mais" element={<MorePage />} />

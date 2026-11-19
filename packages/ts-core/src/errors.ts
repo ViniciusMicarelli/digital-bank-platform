@@ -46,6 +46,9 @@ const messages: Record<string, string> = {
   NOTHING_TO_DISPUTE: 'Esta compra já foi totalmente estornada.',
   DISPUTE_NOT_OPEN: 'Esta contestação já foi decidida.',
   CARD_COMPROMISED: 'Este cartão foi bloqueado por segurança. Peça um novo.',
+  TOO_MANY_BOXES: 'Você chegou ao máximo de 20 caixinhas.',
+  BOX_CLOSED: 'Esta caixinha foi encerrada.',
+  NOTHING_TO_YIELD: 'Guarde algum valor na caixinha primeiro.',
   GATEWAY_DOWN: 'O servidor do banco está desligado. Rode make up no computador.',
 }
 

@@ -16,7 +16,6 @@ function CreditHero({ available, used, limit, pct }: { available: string; used: 
   const shown = useCountUp(Number(available))
   return (
     <LinearGradient colors={[...creditGradient]} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={{ borderRadius: 28, padding: 22, gap: 12, overflow: 'hidden' }}>
-      <View style={{ position: 'absolute', width: 240, height: 240, borderRadius: 120, top: -120, right: -80, backgroundColor: '#a48bff', opacity: 0.35 }} />
       <Txt variant="label" style={{ color: '#ffffffb3' }}>Limite disponível</Txt>
       <Txt variant="display" tone="white">{Math.abs(shown - Number(available)) < 0.005 ? formatBRL(available) : formatBRL(shown.toFixed(2))}</Txt>
       <View style={{ height: 10, backgroundColor: '#ffffff26', borderRadius: 5, overflow: 'hidden' }}>

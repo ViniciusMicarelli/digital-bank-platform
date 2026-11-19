@@ -90,3 +90,33 @@ test('credit invoice and boleto', async ({ page }) => {
   await expect(page.getByText('Cadastro aprovado')).toBeVisible()
   await shot(page, '08-notifications')
 })
+
+test('savings box: create, save, withdraw, yield, close', async ({ page }) => {
+  await onboard(page)
+  await fund(page, '500,00')
+  await page.goto('/caixinhas')
+  await page.getByRole('button', { name: 'Criar minha primeira caixinha' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Nome').fill('Viagem')
+  await dialog.getByLabel('Meta').fill('1000')
+  await dialog.getByRole('button', { name: 'Criar caixinha' }).click()
+  await expect(page.getByRole('heading', { name: 'Viagem' })).toBeVisible()
+
+  await page.getByLabel('Quanto guardar').fill('200')
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await expect(page.getByText('R$ 200,00 guardados.')).toBeVisible()
+  await expect(page.getByText('20% de R$ 1.000,00')).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Resgatar' }).click()
+  await page.getByLabel('Quanto resgatar').fill('50')
+  await page.getByRole('button', { name: 'Resgatar', exact: true }).click()
+  await expect(page.getByText('R$ 50,00 voltaram para a conta.')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Simular 30 dias de rendimento' }).click()
+  await expect(page.getByText('Rendimento').first()).toBeVisible()
+  await shot(page, '13-savings')
+
+  await page.getByRole('button', { name: 'Encerrar caixinha' }).click()
+  await page.getByRole('button', { name: 'Encerrar e resgatar tudo' }).click()
+  await expect(page.getByRole('button', { name: 'Criar minha primeira caixinha' })).toBeVisible()
+})

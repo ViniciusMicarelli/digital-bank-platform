@@ -4,7 +4,8 @@
 # to show. Safe to run again: customers that exist are left as they are.
 #
 #   Ana Souza    ana@example.com    balance, Pix, debit and credit card, invoice,
-#                                    a merchant refund and an open card dispute
+#                                    a merchant refund, an open card dispute and
+#                                    a savings box with a goal
 #   Bruno Lima   bruno@example.com  account blocked by an analyst, with an unblock
 #                                    request waiting for a second analyst
 #   Carla Dias   carla@example.com  politically exposed: KYC in manual review
@@ -85,6 +86,13 @@ if [[ $(call GET "/v1/accounts/$ANA_ACC/cards" "$ANA" | jq '.cards | length') ==
   buy 54.90 "STREAMING PLUS" 4899 CREDIT >/dev/null
   BOLETO=$(call POST /v1/sandbox/boletos "$ANA" '{"amount":"189.90","due_date":"2030-01-10","payee_name":"CIA PAULISTA DE ENERGIA"}' | jq -r .formatted_line)
   echo "  boleto para testar o pagamento: $BOLETO"
+fi
+
+# A savings box (caixinha) with a goal and two months of yield.
+if [[ $(call GET "/v1/accounts/$ANA_ACC/savings" "$ANA" | jq '.boxes | length') == 0 ]]; then
+  BOX=$(call POST "/v1/accounts/$ANA_ACC/savings" "$ANA" '{"name":"Reserva de emergência","goal":"10000.00"}' "$(uuid)" | jq -r .id)
+  call POST "/v1/accounts/$ANA_ACC/savings/$BOX/deposits" "$ANA" '{"amount":"1500.00"}' "$(uuid)" >/dev/null
+  call POST "/v1/sandbox/accounts/$ANA_ACC/savings/$BOX/yield" "$ANA" '{"days":60}' >/dev/null
 fi
 
 say "Bruno Lima"

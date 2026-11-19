@@ -51,7 +51,8 @@ func (s *Service) Transfer(ctx context.Context, key string, from, to uuid.UUID, 
 // Post moves money in one step for the credit card types.
 func (s *Service) Post(ctx context.Context, key string, typ domain.Type, from, to uuid.UUID, amount money.Money, description string, metadata map[string]string) (domain.Transaction, error) {
 	switch typ {
-	case domain.TypeInternalTransfer, domain.TypeCreditPurchase, domain.TypeCreditInvoicePayment, domain.TypeCreditCharges, domain.TypeCreditCardRefund:
+	case domain.TypeInternalTransfer, domain.TypeCreditPurchase, domain.TypeCreditInvoicePayment, domain.TypeCreditCharges, domain.TypeCreditCardRefund,
+		domain.TypeSavingsDeposit, domain.TypeSavingsWithdrawal, domain.TypeSavingsYield:
 	default:
 		return domain.Transaction{}, fmt.Errorf("%w: %s is not a one-step type", domain.ErrInvalidArgument, typ)
 	}

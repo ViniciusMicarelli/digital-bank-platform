@@ -80,6 +80,10 @@
 | `GET` | `/v1/accounts/{id}/cards/{cardID}/purchases` | The card's purchases, newest first, with `refunded_amount` and the latest `dispute` |
 | `POST` | `/v1/accounts/{id}/cards/{cardID}/purchases/{authID}/disputes` | Dispute a cleared purchase `{reason, amount?, description?}` (`NOT_RECOGNIZED` blocks the card) → 201 (`NOT_CLEARED`, `DISPUTE_WINDOW_CLOSED`, `DISPUTE_ALREADY_OPEN`, `NOTHING_TO_DISPUTE`) |
 | `GET` | `/v1/accounts/{id}/disputes` | The account's disputes, newest first |
+| `GET` · `POST` | `/v1/accounts/{id}/savings` | Savings boxes with `total` and `yielded` / open one `{name, goal?}` (Idempotency-Key) → 201 (`TOO_MANY_BOXES`) |
+| `GET` · `PUT` · `DELETE` | `/v1/accounts/{id}/savings/{boxID}` | A box with its `movements` / rename and set the goal `{name, goal?}` / close it, everything back to the account (Idempotency-Key) |
+| `POST` | `/v1/accounts/{id}/savings/{boxID}/deposits` · `/withdrawals` | `{amount}` (Idempotency-Key); 422 `INSUFFICIENT_FUNDS` with the movement when there is not enough |
+| `POST` | `/v1/sandbox/accounts/{id}/savings/{boxID}/yield` | *(sandbox)* Pay `{days}` of yield at once |
 | `POST` | `/v1/sandbox/card-network/authorizations` | *(sandbox)* Network authorization `{pan, expiry_month, expiry_year, cvv, amount, merchant_name, mcc, country, channel, function?}` (`function`: `DEBIT` default, or `CREDIT`) |
 | `POST` | `/v1/sandbox/card-network/authorizations/{id}/clear` · `/reverse` | *(sandbox)* Clearing `{amount?}` / merchant reversal |
 | `POST` | `/v1/sandbox/card-network/authorizations/{id}/refund` | *(sandbox)* Merchant refund `{amount, refund_reference?}` of a cleared purchase (`REFUND_TOO_LARGE`) |

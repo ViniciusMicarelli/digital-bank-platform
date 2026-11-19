@@ -32,7 +32,7 @@ Password for every account: `correct horse battery staple`.
 
 | Login | Who | What to try |
 |---|---|---|
-| `ana@example.com` | Customer with R$ 4.5k, Pix key, virtual card, credit line with an open invoice | Pix (key, QR code, refund, schedule), card (reveal with step-up, wallet, purchases, dispute), invoice payment, the boleto printed by `make seed`, notifications live; her "LOJA ONLINE BRASIL" purchase is under dispute |
+| `ana@example.com` | Customer with a balance, Pix key, virtual card, credit line with an open invoice and a savings box (*Caixinhas*) | Pix (key, QR code, refund, schedule), card (reveal with step-up, wallet, purchases, dispute), savings boxes (save, withdraw, simulate a month of yield), invoice payment, the boleto printed by `make seed`, notifications live; her "LOJA ONLINE BRASIL" purchase is under dispute |
 | `bruno@example.com` | Customer whose account an analyst blocked | Everything is refused while blocked; an unblock request waits for a second analyst |
 | `carla@example.com` | Politically exposed person | Her KYC is in manual review: no account until an analyst decides |
 | `analista@digitalbank.dev` | Analyst (TOTP) | Back office: KYC queue (Carla), customer files, card disputes (Ana), block accounts, ask to unblock |

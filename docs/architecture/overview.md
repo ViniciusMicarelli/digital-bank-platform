@@ -52,6 +52,7 @@ The platform is designed as a cloud-native, event-driven system optimized for fi
 │   ├── notification-service/ # ✅ notifications and live stream
 │   ├── user-service/      # ✅ onboarding and KYC
 │   ├── backoffice-service/ # ✅ staff audit trail and four-eyes approvals
+│   ├── savings-service/   # ✅ savings boxes (caixinhas) with daily yield
 │   └── kms-service/       # ✅ envelope encryption
 ├── tests/e2e/             # end-to-end tests against docker compose
 └── infrastructure/        # docker (Postgres init), monitoring (Prometheus, alerts, Grafana)
@@ -89,6 +90,7 @@ flowchart LR
         STM[statement-service]
         NOT[notification-service]
         BO[backoffice-service]
+        SAV[savings-service]
     end
 
     WEB & AND & IOS -->|HTTPS / REST| GW
@@ -102,6 +104,8 @@ flowchart LR
     GW -->|gRPC| CRE
     GW -->|gRPC| STM
     GW -->|gRPC| BO
+    GW -->|gRPC| SAV
+    SAV -->|gRPC| TRX
     BO -->|gRPC| ACC
 
     TRX -->|gRPC| LED

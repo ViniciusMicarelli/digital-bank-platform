@@ -60,10 +60,16 @@ const (
 	// credit-receivables (credit, one step).
 	TypeCardRefund       Type = "CARD_REFUND"
 	TypeCreditCardRefund Type = "CREDIT_CARD_REFUND"
+	// Savings boxes: own money moving between the checking account and a box
+	// (no transfer limits), and the yield paid into a box.
+	TypeSavingsDeposit    Type = "SAVINGS_DEPOSIT"
+	TypeSavingsWithdrawal Type = "SAVINGS_WITHDRAWAL"
+	TypeSavingsYield      Type = "SAVINGS_YIELD"
 )
 
 var validTypes = []Type{TypeInternalTransfer, TypePixOut, TypePixIn, TypeDebitCard,
-	TypeCreditPurchase, TypeCreditInvoicePayment, TypeCreditCharges, TypeBoletoPayment, TypeCardRefund, TypeCreditCardRefund}
+	TypeCreditPurchase, TypeCreditInvoicePayment, TypeCreditCharges, TypeBoletoPayment, TypeCardRefund, TypeCreditCardRefund,
+	TypeSavingsDeposit, TypeSavingsWithdrawal, TypeSavingsYield}
 
 type Status string
 
@@ -137,13 +143,15 @@ func (t Transaction) ConsumesLimit() bool {
 
 // DebitsCustomerWithoutLimit reports whether the debited side is a customer
 // account that must be active although no limit is consumed.
-func (t Transaction) DebitsCustomerWithoutLimit() bool { return t.Type == TypeCreditInvoicePayment }
+func (t Transaction) DebitsCustomerWithoutLimit() bool {
+	return t.Type == TypeCreditInvoicePayment || t.Type == TypeSavingsDeposit
+}
 
 // CreditsCustomer reports whether the receiving side is a customer account
 // (which must exist and be active), rather than a bank-internal account such
 // as Pix settlement or card clearing.
 func (t Transaction) CreditsCustomer() bool {
-	return t.Type == TypeInternalTransfer || t.Type == TypePixIn || t.Type == TypeCardRefund
+	return t.Type == TypeInternalTransfer || t.Type == TypePixIn || t.Type == TypeCardRefund || t.Type == TypeSavingsWithdrawal
 }
 
 // TwoPhase reports whether the money is held before an external confirmation.

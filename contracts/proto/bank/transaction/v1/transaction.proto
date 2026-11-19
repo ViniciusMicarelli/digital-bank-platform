@@ -44,6 +44,11 @@ enum TransactionType {
   TRANSACTION_TYPE_CARD_REFUND = 9;
   // Credit card refund: card clearing -> credit-receivables (one step).
   TRANSACTION_TYPE_CREDIT_CARD_REFUND = 10;
+  // Savings boxes (one step, no transfer limits): checking account -> box,
+  // box -> checking account, and the daily yield (savings-yield -> box).
+  TRANSACTION_TYPE_SAVINGS_DEPOSIT = 11;
+  TRANSACTION_TYPE_SAVINGS_WITHDRAWAL = 12;
+  TRANSACTION_TYPE_SAVINGS_YIELD = 13;
 }
 
 enum TransactionStatus {

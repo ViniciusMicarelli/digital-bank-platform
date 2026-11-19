@@ -87,7 +87,7 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/ledger-service.pem
       TLS_KEY: /certs/ledger-service-key.pem
-      ALLOWED_CALLERS: account-service,transaction-service,dev-client
+      ALLOWED_CALLERS: account-service,transaction-service,savings-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/ledger?sslmode=disable
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -174,6 +174,31 @@ services:
       postgres: { condition: service_healthy }
       account-service: { condition: service_healthy }
 
+  savings-service:
+    build: { context: ., args: { SERVICE: savings-service } }
+    healthcheck:
+      test: ["CMD", "/server", "healthcheck"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ./infrastructure/certs:/certs:ro
+    environment:
+      TLS_CA: /certs/ca.pem
+      TLS_CERT: /certs/savings-service.pem
+      TLS_KEY: /certs/savings-service-key.pem
+      ALLOWED_CALLERS: api-gateway,dev-client
+      DATABASE_URL: postgres://bank:bank@postgres:5432/savings?sslmode=disable
+      OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
+      GRPC_ADDR: ":9014"
+      LEDGER_ADDR: ledger-service:9001
+      TRANSACTION_ADDR: transaction-service:9003
+    ports: ["9014:9014"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      ledger-service: { condition: service_healthy }
+      transaction-service: { condition: service_healthy }
+
   transaction-service:
     build: { context: ., args: { SERVICE: transaction-service } }
     healthcheck:
@@ -187,7 +212,7 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/transaction-service.pem
       TLS_KEY: /certs/transaction-service-key.pem
-      ALLOWED_CALLERS: api-gateway,pix-service,card-service,credit-service,payment-service,dev-client
+      ALLOWED_CALLERS: api-gateway,pix-service,card-service,credit-service,payment-service,savings-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/transaction?sslmode=disable
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
@@ -425,6 +450,7 @@ services:
       NOTIFICATION_ADDR: notification-service:9011
       USER_ADDR: user-service:9012
       BACKOFFICE_ADDR: backoffice-service:9013
+      SAVINGS_ADDR: savings-service:9014
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
     ports: ["8000:8080"]
     depends_on:
@@ -439,6 +465,7 @@ services:
       payment-service: { condition: service_healthy }
       notification-service: { condition: service_healthy }
       backoffice-service: { condition: service_healthy }
+      savings-service: { condition: service_healthy }
 
   web:
     build: { context: ., dockerfile: apps/web/Dockerfile }

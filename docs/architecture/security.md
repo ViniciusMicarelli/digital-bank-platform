@@ -38,13 +38,13 @@ Planned: staff from the bank's SSO (OIDC) with phishing-resistant MFA (WebAuthn)
 
 | Service | Allowed callers |
 |---|---|
-| ledger-service | account-service, transaction-service |
+| ledger-service | account-service, transaction-service, savings-service |
 | account-service | api-gateway, transaction-service, pix-service, card-service, credit-service, notification-service, backoffice-service |
 | user-service | api-gateway, account-service |
-| transaction-service | api-gateway, pix-service, card-service, credit-service, payment-service |
+| transaction-service | api-gateway, pix-service, card-service, credit-service, payment-service, savings-service |
 | credit-service | api-gateway, card-service |
 | kms-service | identity-service, account-service, card-service, pix-service, user-service |
-| pix-service, statement-service, identity-service, card-service, payment-service, notification-service, backoffice-service | api-gateway |
+| pix-service, statement-service, identity-service, card-service, payment-service, notification-service, backoffice-service, savings-service | api-gateway |
 
 Unary and streaming RPCs go through the same check (`mtls.Authorize` / `mtls.AuthorizeStream`); only the health service is open to every workload.
 

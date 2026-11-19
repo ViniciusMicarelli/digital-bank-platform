@@ -25,6 +25,7 @@ import (
 	notificationv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/notification/v1"
 	paymentv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/payment/v1"
 	pixv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/pix/v1"
+	savingsv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/savings/v1"
 	statementv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1"
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
 	userv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/user/v1"
@@ -85,6 +86,7 @@ func main() {
 	notifications := dial("NOTIFICATION_ADDR", "127.0.0.1:9011")
 	users := dial("USER_ADDR", "127.0.0.1:9012")
 	backoffice := dial("BACKOFFICE_ADDR", "127.0.0.1:9013")
+	savings := dial("SAVINGS_ADDR", "127.0.0.1:9014")
 
 	identityClient := identityv1.NewIdentityServiceClient(identity)
 	verifier := auth.NewVerifier(func(ctx context.Context) ([]auth.JWK, error) {
@@ -111,6 +113,7 @@ func main() {
 		Notifications: notificationv1.NewNotificationServiceClient(notifications),
 		Users:         userv1.NewUserServiceClient(users),
 		BackOffice:    backofficev1.NewBackOfficeServiceClient(backoffice),
+		Savings:       savingsv1.NewSavingsServiceClient(savings),
 	}, verifier, log, limiters(log))
 
 	mux := http.NewServeMux()

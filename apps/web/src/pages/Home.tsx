@@ -1,7 +1,7 @@
-import { addBRL, ApiError, formatBRL, type Card, type CreditLine, type FeedItem, type Invoice } from '@bank/core'
+import { addBRL, ApiError, formatBRL, type Card, type CreditLine, type FeedItem, type Invoice, type SavingsSummary } from '@bank/core'
 import { useQuery } from '@tanstack/react-query'
 import {
-  ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Barcode, Bell, ChevronRight, CreditCard, Eye, EyeOff, FileText, QrCode, ShoppingBag, Sparkles,
+  ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Barcode, Bell, ChevronRight, CreditCard, Eye, EyeOff, FileText, PiggyBank, QrCode, ShoppingBag, Sparkles,
   Undo2, Wallet, Zap, type LucideIcon,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -16,6 +16,7 @@ import { useCountUp } from '../lib/motion'
 const typeIcons: Record<string, LucideIcon> = {
   PIX: ArrowLeftRight, PIX_OUT: ArrowUpRight, PIX_IN: ArrowDownLeft, PIX_REFUND: Undo2, INTERNAL_TRANSFER: ArrowLeftRight,
   DEBIT_CARD_PURCHASE: ShoppingBag, CREDIT_INVOICE_PAYMENT: Wallet, BOLETO_PAYMENT: FileText, CARD_REFUND: Undo2,
+  SAVINGS_DEPOSIT: PiggyBank, SAVINGS_WITHDRAWAL: PiggyBank,
 }
 
 export function FeedRow({ item }: { item: FeedItem }) {
@@ -82,13 +83,14 @@ const shortcuts: [string, string, LucideIcon][] = [
   ['/boletos', 'Pagar', Barcode],
   ['/pix?aba=enviar', 'Transferir', ArrowUpRight],
   ['/pix?aba=cobrar', 'Cobrar', QrCode],
+  ['/caixinhas', 'Caixinhas', PiggyBank],
   ['/credito', 'Crédito', Wallet],
   ['/cartoes', 'Cartões', CreditCard],
 ]
 
 function Shortcuts() {
   return (
-    <div data-reveal className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-6 sm:px-0">
+    <div data-reveal className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-7 sm:px-0">
       {shortcuts.map(([to, label, Icon]) => (
         <Link key={to} to={to} className="group flex w-[72px] shrink-0 flex-col items-center gap-2 text-center sm:w-auto">
           <span className="glass grid size-[68px] place-items-center rounded-full text-fg transition duration-300 group-hover:-translate-y-1 group-hover:text-brand-strong group-active:scale-90">
@@ -154,6 +156,25 @@ function CreditSection({ accountId, hidden }: { accountId: string; hidden: boole
   )
 }
 
+function SavingsSection({ accountId, hidden }: { accountId: string; hidden: boolean }) {
+  const savings = useQuery({ queryKey: ['savings', accountId], queryFn: () => api<SavingsSummary>('GET', `/v1/accounts/${accountId}/savings`) })
+  const s = savings.data
+  if (!s) return null
+  return (
+    <Link to="/caixinhas" data-reveal className="glass group flex items-center gap-4 rounded-[30px] p-5 transition hover:-translate-y-0.5">
+      <IconTile icon={PiggyBank} tone="brand" className="size-12" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-semibold text-fg">Caixinhas</p>
+        <p className="text-[13px] text-muted">
+          {s.boxes.length === 0 ? 'Separe dinheiro para seus planos, rendendo todo dia.'
+            : <>Guardado <span className="tabular font-semibold text-fg">{hidden ? 'R$ ••••' : formatBRL(s.total)}</span> · rendeu {hidden ? '••••' : formatBRL(s.yielded)}</>}
+        </p>
+      </div>
+      <ChevronRight className="size-5 text-subtle transition group-hover:translate-x-0.5" />
+    </Link>
+  )
+}
+
 function CardPreview({ accountId }: { accountId: string }) {
   const cards = useQuery({ queryKey: ['cards', accountId], queryFn: async () => (await api<{ cards: Card[] }>('GET', `/v1/accounts/${accountId}/cards`)).cards })
   const card = cards.data?.[0]
@@ -200,6 +221,7 @@ export function HomePage() {
           <Link to="/cartoes" data-reveal className="glass flex items-center gap-3 rounded-full px-5 py-4 text-[15px] font-semibold text-fg transition hover:-translate-y-0.5">
             <CreditCard className="size-5 text-fg-2" /> Meus cartões <ChevronRight className="ml-auto size-5 text-subtle" />
           </Link>
+          {account && <SavingsSection accountId={account.id} hidden={hidden} />}
           {account && <div className="xl:hidden"><CreditSection accountId={account.id} hidden={hidden} /></div>}
           <Panel title="Movimentações" action={<Link to="/extrato" className="text-sm font-semibold text-brand-strong">Ver tudo</Link>}>
             {recent.isLoading ? <Loading /> : items.length === 0 ? (
