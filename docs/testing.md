@@ -21,7 +21,7 @@ make totp     # current TOTP codes of the analysts
 |---|---|
 | http://localhost:8081 | Web app: customers and, for analysts, the back office |
 | http://localhost:8000 | REST API ([reference](api/README.md)) |
-| `make mobile` | Mobile app with Expo: scan the QR code with Expo Go on a phone on the same Wi-Fi (it talks to the API on this computer); `w` opens it in the browser |
+| `make mobile` | Mobile app with Expo: scan the QR code with Expo Go on a phone on the same network. The Expo dev server also forwards the API (`/v1/*`) to the gateway, so if the app loads, the API answers; `w` opens it in the browser. On iPhone, allow Expo Go to use the local network (Settings → Privacy → Local Network) |
 | http://localhost:16686 | Jaeger: a trace per request across services |
 | http://localhost:9090 | Prometheus: metrics and alert rules |
 | http://localhost:3000 | Grafana (`make up-obs`), anonymous viewer |

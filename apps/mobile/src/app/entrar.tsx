@@ -7,7 +7,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated'
 import { AuthHero } from '../components/AuthHero'
 import { AuroraBackground, Glass } from '../components/Glass'
 import { Button, Field, Notice, Txt } from '../components/ui'
-import { client } from '../lib/client'
+import { apiURL, client } from '../lib/client'
 import { font, useTheme } from '../lib/theme'
 
 export default function Login() {
@@ -25,7 +25,8 @@ export default function Login() {
       await client.login(email.trim(), password, totp)
     } catch (e) {
       if (e instanceof ApiError && e.code === 'MFA_REQUIRED') setNeedsTotp(true)
-      setError(errorMessage(e))
+      // Without a connection, say where the app looked for the server.
+      setError(e instanceof ApiError ? errorMessage(e) : `${errorMessage(e)} (${apiURL()})`)
     } finally {
       setBusy(false)
     }

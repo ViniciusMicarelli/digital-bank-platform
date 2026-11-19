@@ -19,7 +19,7 @@ make up        # the backend (repo root)
 make mobile    # starts Expo; scan the QR code with Expo Go
 ```
 
-The phone must be on the same Wi-Fi: the app calls the gateway at the address of the computer running Expo, port 8000 (or set `EXPO_PUBLIC_API_URL`). Everything it uses ships in Expo Go, so no native build is needed for development; store builds go through EAS (`npx eas-cli build`). `ios/` and `android/` are generated (`npx expo prebuild`) and not committed.
+The phone must reach the computer running Expo (same network). In development the Expo dev server forwards the API (`/v1/*`, streams included) to the gateway on port 8000 (`metro.config.js`, `API_PROXY_TARGET` to change it), so the app calls the same address it was loaded from; set `EXPO_PUBLIC_API_URL` to call a gateway directly. Everything it uses ships in Expo Go, so no native build is needed for development; store builds go through EAS (`npx eas-cli build`). `ios/` and `android/` are generated (`npx expo prebuild`) and not committed.
 
 ## Notes
 

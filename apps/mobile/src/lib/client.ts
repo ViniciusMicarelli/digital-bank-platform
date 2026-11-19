@@ -10,14 +10,15 @@ g.crypto ??= {}
 g.crypto.randomUUID ??= () => Crypto.randomUUID()
 
 /**
- * The gateway: EXPO_PUBLIC_API_URL, or the computer running the Expo dev
- * server (a phone on the same Wi-Fi reaches it by its LAN address), port 8000.
+ * The gateway: EXPO_PUBLIC_API_URL, or, in development, the Expo dev server
+ * itself, which forwards /v1/* to the gateway (metro.config.js): whatever
+ * address the phone used to load the app also reaches the API.
  */
-function apiURL(): string {
+export function apiURL(): string {
   if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL
-  if (Platform.OS === 'web') return 'http://localhost:8000'
-  const host = Constants.expoConfig?.hostUri?.split(':')[0] ?? 'localhost'
-  return `http://${host}:8000`
+  if (Platform.OS === 'web') return globalThis.location?.origin ?? 'http://localhost:8000'
+  const hostUri = Constants.expoConfig?.hostUri
+  return hostUri ? `http://${hostUri}` : 'http://localhost:8000'
 }
 
 const KEY = 'db.refresh'
