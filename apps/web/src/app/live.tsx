@@ -21,7 +21,7 @@ function Toast({ t }: { t: ToastItem }) {
   })
   const Icon = icons[t.category] ?? Bell
   return (
-    <div ref={el} className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl bg-ink/95 p-4 text-white shadow-lift ring-1 ring-white/10 backdrop-blur-xl">
+    <div ref={el} className="pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl bg-ink/95 p-4 text-white shadow-lift ring-1 ring-white/10">
       <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#2ed3a0]/15 text-[#2ed3a0]"><Icon className="size-[18px]" /></span>
       <div className="min-w-0">
         <p className="text-sm font-semibold">{t.title}</p>

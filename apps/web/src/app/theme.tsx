@@ -8,6 +8,8 @@ const media = () => window.matchMedia('(prefers-color-scheme: dark)')
 function apply(mode: ThemeMode) {
   const dark = mode === 'dark' || (mode === 'system' && media().matches)
   document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+  // The browser's bars take the page background (no white strips on phones).
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0a0a0c' : '#f2f3f5')
 }
 
 function read(): ThemeMode {

@@ -1,14 +1,13 @@
 import { ArrowRight, Bell, ShieldCheck, Zap } from 'lucide-react'
 import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { Aurora } from '../components/Aurora'
 import { BankCard } from '../components/BankCard'
 import { Brand } from '../components/Brand'
 import { ThemeSwitch } from '../components/ThemeSwitch'
 import { Alert, Button, Field } from '../components/ui'
 import { ApiError, login, register } from '../lib/api'
 import { errorMessage } from '@bank/core'
-import { gsap, reducedMotion, useGSAP } from '../lib/motion'
+import { gsap, reducedMotion, useGSAP, reveal } from '../lib/motion'
 
 function Showcase() {
   const root = useRef<HTMLDivElement>(null)
@@ -48,14 +47,13 @@ function Showcase() {
 function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
   const form = useRef<HTMLDivElement>(null)
   useGSAP(() => {
-    if (!reducedMotion()) gsap.from('[data-reveal]', { y: 16, autoAlpha: 0, duration: 0.6, stagger: 0.06, ease: 'power3.out', clearProps: 'all' })
+    if (!reducedMotion()) gsap.from('[data-reveal]', reveal)
   }, { scope: form })
   return (
     <div className="grid min-h-full lg:grid-cols-[1.1fr_1fr]">
-      <Aurora />
       <Showcase />
-      <div className="relative flex items-center justify-center px-5 py-12">
-        <div className="absolute top-5 right-5"><ThemeSwitch compact /></div>
+      <div className="safe-top relative flex flex-col items-center justify-center px-5 pb-12 lg:py-12">
+        <div className="mb-5 flex w-full max-w-md justify-end lg:absolute lg:top-5 lg:right-5 lg:mb-0 lg:w-auto"><ThemeSwitch compact /></div>
         <div ref={form} className="glass-strong w-full max-w-md rounded-[34px] p-7 sm:p-9">
           <div data-reveal className="mb-10 lg:hidden"><Brand /></div>
           <h1 data-reveal className="text-[30px] font-bold tracking-[-0.02em] text-fg">{title}</h1>

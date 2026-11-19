@@ -182,6 +182,12 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Refunds left pending by an outage are retried; notifications for disputes and refunds; refunds in the statement.
 - Web and mobile: the card's purchases with "Contestar"; back-office disputes panel.
 
+## Phase 25 — Performance on phones and a calmer look ✅
+
+- No animated aurora and no blur per card (they made phones drop frames until taps stopped working): solid surfaces with hairline borders over a plain background; only the two bars blur. Card skins and hero are clean jade / violet gradients.
+- Full-bleed on phones: `viewport-fit=cover`, safe areas, the page color behind the browser bars (`theme-color` follows the theme). Page reveals animate opacity only, once.
+- Mobile: the Expo dev server forwards the API, so a phone that loads the app always reaches it; demo seed (`make seed`), analyst codes (`make totp`) and a testing guide.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

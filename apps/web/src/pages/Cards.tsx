@@ -222,7 +222,7 @@ function CardView({ accountId, card }: { accountId: string; card: Card }) {
         </div>
         <div data-reveal className="grid grid-cols-2 gap-3">
           {details ? <Button variant="secondary" icon={EyeOff} onClick={() => setDetails(null)}>Ocultar dados</Button>
-            : <Button variant="secondary" icon={Eye} loading={show.isPending} onClick={() => show.mutate()} disabled={card.status !== 'ACTIVE'}>Ver dados do cartão</Button>}
+            : <Button variant="secondary" icon={Eye} loading={show.isPending} onClick={() => show.mutate()} disabled={card.status !== 'ACTIVE'}>Ver dados</Button>}
           <Button variant={card.status === 'ACTIVE' ? 'danger' : 'primary'} icon={card.status === 'ACTIVE' ? Lock : LockOpen} loading={block.isPending}
             disabled={compromised} onClick={() => block.mutate()}>
             {card.status === 'ACTIVE' ? 'Bloquear' : 'Desbloquear'}

@@ -6,8 +6,7 @@ import { useLiveConnected } from '../app/contexts'
 import { useAccount } from '../app/queries'
 import { api, logout } from '../lib/api'
 import { cx } from '../lib/format'
-import { gsap, reducedMotion, useGSAP } from '../lib/motion'
-import { Aurora } from './Aurora'
+import { gsap, reducedMotion, reveal, useGSAP } from '../lib/motion'
 import { Brand } from './Brand'
 import { ThemeSwitch } from './ThemeSwitch'
 
@@ -35,7 +34,7 @@ function useUnread() {
 function Initials({ name }: { name?: string }) {
   const parts = (name ?? '').split(' ').filter(Boolean)
   return (
-    <span className="grid size-9 place-items-center rounded-full bg-gradient-to-br from-brand to-credit text-xs font-bold text-white">
+    <span className="grid size-9 place-items-center rounded-full bg-brand-soft text-xs font-bold text-brand-strong">
       {(parts[0]?.[0] ?? '') + (parts.at(-1)?.[0] ?? '')}
     </span>
   )
@@ -51,12 +50,11 @@ export function Layout() {
   // Page transition, then the page's own [data-reveal] cascade.
   useGSAP(() => {
     if (reducedMotion()) return
-    gsap.from('[data-reveal]', { y: 18, autoAlpha: 0, duration: 0.55, ease: 'power3.out', stagger: 0.05, clearProps: 'all' })
+    gsap.from('[data-reveal]', reveal)
   }, { scope: main, dependencies: [pathname] })
 
   return (
     <div className="min-h-full lg:flex">
-      <Aurora />
       <aside className="glass sticky top-3 m-3 hidden h-[calc(100vh-1.5rem)] w-[260px] shrink-0 flex-col self-start rounded-[30px] px-3.5 py-6 lg:flex">
         <div className="px-2"><Brand /></div>
         <nav className="mt-9 flex flex-1 flex-col gap-1">
@@ -92,14 +90,14 @@ export function Layout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="glass sticky top-0 z-30 flex items-center justify-between rounded-none border-x-0 border-t-0 px-4 py-3 lg:hidden">
+        <header className="bar safe-top sticky top-0 z-30 flex items-center justify-between border-b px-4 pb-3 lg:hidden">
           <Brand />
           <NavLink to="/notificacoes" className="relative grid size-10 place-items-center rounded-xl text-fg-2" aria-label="Notificações">
             <Bell className="size-5" />
             {unread > 0 && <span className="absolute top-1.5 right-1.5 grid min-w-4 place-items-center rounded-full bg-brand px-1 text-[10px] font-bold text-brand-fg">{unread}</span>}
           </NavLink>
         </header>
-        <main ref={main} className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-32 sm:px-6 lg:px-8 lg:py-9">
+        <main ref={main} data-layout-main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-[calc(8rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:py-9">
           <Suspense fallback={<div className="space-y-4"><div className="skeleton h-10 w-48 rounded-xl" /><div className="skeleton h-64 rounded-3xl" /></div>}>
             <Outlet />
           </Suspense>
@@ -112,7 +110,7 @@ export function Layout() {
         </p>
       </div>
 
-      <nav className="glass-strong fixed inset-x-3 bottom-4 z-40 grid grid-cols-5 rounded-full p-1.5 lg:hidden">
+      <nav className="bar safe-bottom fixed inset-x-3 z-40 grid grid-cols-5 rounded-full border p-1.5 shadow-lift lg:hidden">
         {nav.filter((n) => n.mobile).map((n) => (
           <NavLink key={n.to} to={n.to} end={n.to === '/'}
             className={({ isActive }) => cx('flex flex-col items-center gap-0.5 rounded-full py-2 text-[10px] font-semibold transition',

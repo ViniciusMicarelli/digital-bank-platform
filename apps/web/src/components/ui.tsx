@@ -10,7 +10,7 @@ export function Button({ variant = 'primary', loading, className, children, disa
   ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; loading?: boolean; icon?: LucideIcon; size?: 'sm' | 'md' | 'lg' }) {
   const styles: Record<Variant, string> = {
     primary: 'gloss bg-brand text-brand-fg hover:brightness-105 shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_8px_24px_-8px_var(--brand)]',
-    secondary: 'glass text-fg hover:bg-glass-strong',
+    secondary: 'glass text-fg hover:bg-surface-2',
     ghost: 'text-brand-strong hover:bg-surface-2',
     danger: 'glass text-danger hover:bg-danger-soft',
     credit: 'gloss bg-credit text-white hover:brightness-110 shadow-[inset_0_1px_0_rgb(255_255_255/0.3),0_8px_24px_-8px_var(--credit)]',
@@ -43,7 +43,7 @@ export function Spinner({ small }: { small?: boolean }) {
   return <span aria-hidden className={cx('inline-block animate-spin rounded-full border-2 border-current border-r-transparent', small ? 'size-4' : 'size-6')} />
 }
 
-const control = 'block w-full rounded-2xl border-0 bg-surface-2 px-4 py-3.5 text-[15px] text-fg ring-1 ring-transparent placeholder:text-subtle transition focus:bg-glass-strong focus:ring-2 focus:ring-brand focus:outline-none disabled:opacity-60'
+const control = 'block w-full rounded-2xl border-0 bg-surface-2 px-4 py-3.5 text-[15px] text-fg ring-1 ring-transparent placeholder:text-subtle transition focus:bg-surface focus:ring-2 focus:ring-brand focus:outline-none disabled:opacity-60'
 
 export function Field({ label, hint, error, ...rest }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string; error?: string }) {
   const id = useId()
@@ -188,7 +188,7 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
   }, [open])
   return (
     <dialog ref={ref} onClose={onClose}
-      className="glass-strong mx-auto mt-auto mb-0 w-full max-w-none rounded-t-[32px] rounded-b-none p-0 text-fg backdrop:bg-black/40 backdrop:backdrop-blur-sm sm:m-auto sm:w-[min(30rem,calc(100%-2rem))] sm:rounded-[32px]">
+      className="glass-strong mx-auto mt-auto mb-0 w-full max-w-none rounded-t-[32px] rounded-b-none p-0 text-fg backdrop:bg-black/50 sm:m-auto sm:w-[min(30rem,calc(100%-2rem))] sm:rounded-[32px]">
       <div className="p-6 pb-8">
         <span aria-hidden className="mx-auto -mt-2 mb-4 block h-[5px] w-10 rounded-full bg-fg/20 sm:hidden" />
         <div className="mb-5 flex items-start justify-between gap-4">
@@ -231,7 +231,7 @@ export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; on
 /** Test-only helpers, set apart from real features. */
 export function Sandbox({ children }: { children: ReactNode }) {
   return (
-    <div data-reveal className="rounded-[28px] border border-dashed border-warning/40 bg-warning-soft/40 p-5 backdrop-blur-xl">
+    <div data-reveal className="rounded-[28px] border border-dashed border-warning/40 bg-warning-soft/40 p-5">
       <p className="mb-3 flex items-center gap-2 text-xs font-bold tracking-wider text-warning uppercase">
         <FlaskConical className="size-4" /> Ambiente de testes
       </p>

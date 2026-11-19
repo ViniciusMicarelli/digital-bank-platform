@@ -3,7 +3,6 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { keys, useAccounts, useProfile } from '../app/queries'
 import { Check, IdCard, Landmark, LogOut, ScanFace, ShieldCheck } from 'lucide-react'
-import { Aurora } from '../components/Aurora'
 import { Brand } from '../components/Brand'
 import { ThemeSwitch } from '../components/ThemeSwitch'
 import { useReveal } from '../lib/motion'
@@ -126,7 +125,6 @@ export function OnboardingPage() {
 
   return (
     <div className="min-h-full">
-      <Aurora />
       <header className="flex items-center justify-between px-5 py-4 sm:px-8">
         <Brand />
         <div className="flex items-center gap-2">

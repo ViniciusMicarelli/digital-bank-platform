@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, CreditCard, FileClock, Inbox, Landmark, Lock, LockOpen, LogOut, Search, ShieldAlert, ShieldCheck, UserRound, Users, X } from 'lucide-react'
 import { useState } from 'react'
 import { useMe } from '../app/queries'
-import { Aurora } from '../components/Aurora'
 import { Brand } from '../components/Brand'
 import { ThemeSwitch } from '../components/ThemeSwitch'
 import { Alert, Badge, Button, Empty, Field, IconTile, Loading, Panel, Select } from '../components/ui'
@@ -310,8 +309,7 @@ export function BackofficePage() {
   const list = queue.data ?? []
   return (
     <div className="min-h-full">
-      <Aurora />
-      <header className="glass sticky top-0 z-30 flex items-center justify-between gap-3 rounded-none border-x-0 border-t-0 px-5 py-3 sm:px-8">
+      <header className="bar safe-top sticky top-0 z-30 flex items-center justify-between gap-3 border-b px-5 pb-3 sm:px-8">
         <div className="flex items-center gap-3"><Brand /><Badge tone="credit">Back office</Badge></div>
         <div className="flex items-center gap-2">
           <ThemeSwitch compact />

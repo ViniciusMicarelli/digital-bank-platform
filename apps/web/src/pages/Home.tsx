@@ -37,7 +37,7 @@ const cents = (amount?: string) => (amount ? Number(amount) : 0)
 function Initials({ name }: { name?: string }) {
   const p = (name ?? '').split(' ').filter(Boolean)
   return (
-    <span className="gloss grid size-12 place-items-center rounded-full bg-gradient-to-br from-brand to-credit text-[15px] font-bold text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.4)]">
+    <span className="gloss grid size-12 place-items-center rounded-full bg-brand-soft text-[15px] font-bold text-brand-strong">
       {(p[0]?.[0] ?? '') + (p.at(-1)?.[0] ?? '')}
     </span>
   )
@@ -251,7 +251,7 @@ export function StatementPage() {
           <>
             {groups.map(([label, list]) => (
               <div key={label} className="mb-2">
-                <p className={cx('sticky top-0 z-10 -mx-2 bg-surface/90 px-2 py-2 text-xs font-semibold tracking-wide text-muted capitalize backdrop-blur')}>{label}</p>
+                <p className={cx('sticky top-0 z-10 -mx-2 bg-surface px-2 py-2 text-xs font-semibold tracking-wide text-muted capitalize')}>{label}</p>
                 <ul className="divide-y divide-line">{list.map((i) => <FeedRow key={i.id} item={i} />)}</ul>
               </div>
             ))}

@@ -9,8 +9,8 @@ import { Txt } from './ui'
 export type CardSkin = 'debit' | 'credit' | 'blocked'
 
 const skins: Record<CardSkin, [string, string, string]> = {
-  debit: ['#13233a', '#0b1220', '#0f766e'],
-  credit: ['#2a1b6b', '#1a1240', '#0b1220'],
+  debit: ['#0e7a5f', '#0a4d3c', '#07362a'],
+  credit: ['#4a37a8', '#2d2075', '#1c1450'],
   blocked: ['#667085', '#475467', '#1d2939'],
 }
 
@@ -46,7 +46,6 @@ export function BankCard({ holder, last4, expiry, skin = 'debit', label = 'Débi
     <View accessibilityRole="image" accessibilityLabel={`Cartão ${label.toLowerCase()} final ${last4}`} style={st.wrap}>
       <Animated.View style={[StyleSheet.absoluteFill, front]}>
         <LinearGradient colors={colors} start={{ x: 1, y: 0 }} end={{ x: 0, y: 1 }} style={st.face}>
-          <View style={[st.glow, { backgroundColor: skin === 'credit' ? '#a48bff' : '#2ed3a0' }]} />
           <View style={st.between}>
             <Txt variant="heading" tone="white" style={{ fontFamily: font.bold }}>Digital Bank</Txt>
             <View style={st.pillLabel}><Txt variant="caption" tone="white" style={{ fontFamily: font.semibold, letterSpacing: 1 }}>{label.toUpperCase()}</Txt></View>
@@ -90,7 +89,6 @@ export function BankCard({ holder, last4, expiry, skin = 'debit', label = 'Débi
 const st = StyleSheet.create({
   wrap: { width: '100%', aspectRatio: 1.586 },
   face: { flex: 1, borderRadius: 22, padding: 20, justifyContent: 'space-between', overflow: 'hidden', borderWidth: 1, borderColor: '#ffffff1a' },
-  glow: { position: 'absolute', width: 220, height: 220, borderRadius: 110, top: -110, right: -70, opacity: 0.45 },
   between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   pillLabel: { backgroundColor: '#ffffff26', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3 },
   pan: { fontSize: 19, letterSpacing: 2.5, fontVariant: ['tabular-nums'], fontFamily: 'Courier' },

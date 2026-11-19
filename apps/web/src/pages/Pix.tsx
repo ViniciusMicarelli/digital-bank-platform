@@ -25,7 +25,7 @@ const keyIcons: Record<string, LucideIcon> = { EMAIL: Mail, PHONE: Smartphone, C
 
 function Avatar({ name }: { name: string }) {
   const p = name.split(' ').filter(Boolean)
-  return <span className="grid size-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand to-credit text-sm font-bold text-white">{(p[0]?.[0] ?? '') + (p.at(-1)?.[0] ?? '')}</span>
+  return <span className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-soft text-sm font-bold text-brand-strong">{(p[0]?.[0] ?? '') + (p.at(-1)?.[0] ?? '')}</span>
 }
 
 function Receipt({ t, title }: { t: PixTransfer; title: string }) {

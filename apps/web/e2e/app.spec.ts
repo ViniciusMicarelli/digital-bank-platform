@@ -47,7 +47,7 @@ test('cards: step-up to reveal, purchase, wallet', async ({ page }) => {
   await fund(page, '200,00')
   await page.goto('/cartoes')
   await page.getByRole('button', { name: 'Criar cartão virtual' }).click()
-  await page.getByRole('button', { name: 'Ver dados do cartão' }).click()
+  await page.getByRole('button', { name: 'Ver dados' }).click()
   await expect(page.getByText('Confirme que é você')).toBeVisible()
   await page.getByLabel('Senha').fill(PASSWORD)
   await page.getByRole('button', { name: 'Confirmar' }).click()

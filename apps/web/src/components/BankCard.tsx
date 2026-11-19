@@ -6,8 +6,8 @@ import { gsap, reducedMotion, useGSAP } from '../lib/motion'
 export type CardSkin = 'debit' | 'credit' | 'blocked'
 
 const skins: Record<CardSkin, string> = {
-  debit: 'bg-[radial-gradient(120%_120%_at_100%_0%,#2ed3a0_0%,transparent_42%),radial-gradient(90%_100%_at_0%_100%,#0f766e_0%,transparent_55%),linear-gradient(135deg,#0b1220,#13233a)]',
-  credit: 'bg-[radial-gradient(120%_120%_at_100%_0%,#a48bff_0%,transparent_45%),radial-gradient(90%_100%_at_0%_100%,#2ed3a0_0%,transparent_55%),linear-gradient(135deg,#1a1240,#0b1220)]',
+  debit: 'bg-[linear-gradient(135deg,#0e7a5f_0%,#0a4d3c_55%,#07362a_100%)]',
+  credit: 'bg-[linear-gradient(135deg,#4a37a8_0%,#2d2075_55%,#1c1450_100%)]',
   blocked: 'bg-[linear-gradient(135deg,#475467,#1d2939)] grayscale',
 }
 
@@ -91,11 +91,14 @@ export function BankCard({ holder, last4, expiry, skin = 'debit', label = 'Débi
     <div className={cx('@container [perspective:1200px]', className)}>
       <div ref={root} className="relative aspect-[1.586] w-full [transform-style:preserve-3d]" aria-label={`Cartão ${label.toLowerCase()} final ${last4}`} role="img">
         <div ref={inner} className="absolute inset-0 [transform-style:preserve-3d]">
-          <div className={face}>
+          {/* Each face is also hidden outright when it is not the one shown:
+              backface-visibility alone fails when an ancestor fades (opacity
+              flattens 3D), and the empty back would cover the front. */}
+          <div className={cx(face, revealed && 'invisible transition-[visibility] delay-300')}>
             <div ref={shine} aria-hidden className="pointer-events-none absolute inset-0 opacity-0 [background:radial-gradient(circle_at_var(--x,50%)_var(--y,50%),rgb(255_255_255/0.28),transparent_45%)]" />
             <div className="flex items-start justify-between">
               <span className="text-[4.6cqw] leading-none font-bold tracking-tight">Digital Bank</span>
-              <span className="rounded-full bg-white/15 px-[2.6cqw] py-[0.8cqw] text-[2.9cqw] leading-none font-semibold tracking-wide uppercase backdrop-blur">{label}</span>
+              <span className="rounded-full bg-white/15 px-[2.6cqw] py-[0.8cqw] text-[2.9cqw] leading-none font-semibold tracking-wide uppercase">{label}</span>
             </div>
             <div className="space-y-[4cqw]">
               <div className="flex items-center gap-[3cqw]"><Chip /><Nfc aria-hidden className="size-[6.5cqw] rotate-90 opacity-80" /></div>
@@ -112,7 +115,7 @@ export function BankCard({ holder, last4, expiry, skin = 'debit', label = 'Débi
               </div>
             </div>
           </div>
-          <div aria-hidden={!revealed} className={cx(face, '[transform:rotateY(180deg)] justify-start gap-[5cqw]')}>
+          <div aria-hidden={!revealed} className={cx(face, '[transform:rotateY(180deg)] justify-start gap-[5cqw]', !revealed && 'invisible')}>
             {revealed && <>
               <div className="-mx-[6.5cqw] mt-[2cqw] h-[11cqw] bg-black/70" />
               <p className={pan}>{revealed.pan.replace(/(\d{4})(?=\d)/g, '$1 ')}</p>
