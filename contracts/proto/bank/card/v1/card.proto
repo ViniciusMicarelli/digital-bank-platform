@@ -57,6 +57,8 @@ enum CardKind {
   CARD_KIND_UNSPECIFIED = 0;
   CARD_KIND_PHYSICAL = 1;
   CARD_KIND_VIRTUAL = 2;
+  // Single use: cancelled by its first approved purchase, expires in 24 h.
+  CARD_KIND_TEMPORARY = 3;
 }
 
 enum CardStatus {
@@ -84,6 +86,8 @@ message Card {
   string holder_name = 9;
   Controls controls = 10;
   google.protobuf.Timestamp created_at = 11;
+  // Temporary cards: when they stop working.
+  google.protobuf.Timestamp valid_until = 12;
 }
 
 message IssueCardRequest {

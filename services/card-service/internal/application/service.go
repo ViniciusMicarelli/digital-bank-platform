@@ -94,6 +94,21 @@ func (s *Service) Issue(ctx context.Context, key string, account uuid.UUID, kind
 	if err != nil {
 		return domain.Card{}, err
 	}
+	if kind == domain.Temporary {
+		cards, err := s.store.CardsByAccount(ctx, account)
+		if err != nil {
+			return domain.Card{}, err
+		}
+		active := 0
+		for _, other := range cards {
+			if other.Kind == domain.Temporary && other.Status == domain.Active && !other.TemporaryExpired(s.now()) && other.IdempotencyKey != key {
+				active++
+			}
+		}
+		if active >= domain.MaxTemporaryCards {
+			return domain.Card{}, domain.Refuse("TOO_MANY_TEMPORARY_CARDS", "at most 3 temporary cards at a time")
+		}
+	}
 	ev, err := s.event(ctx, "card.issued", c.ID.String(), cardPayload(c))
 	if err != nil {
 		return domain.Card{}, err
@@ -241,6 +256,17 @@ func (s *Service) Authorize(ctx context.Context, pan string, p domain.Purchase) 
 	if !d.Approve {
 		return s.decide(ctx, a, domain.Declined, d.Code, d.Reason)
 	}
+	// A temporary card is spent by its first purchase: claim it atomically.
+	temporary := card.Kind == domain.Temporary && token == nil
+	if temporary {
+		ok, err := s.store.UseTemporary(ctx, card.ID)
+		if err != nil {
+			return a, nil // stays PENDING_REVERSAL: the network gets a 91
+		}
+		if !ok {
+			return s.decide(ctx, a, domain.Declined, domain.CodeRestrictedCard, "temporary card already used")
+		}
+	}
 
 	res, err := s.funds(a).Reserve(ctx, a.TransactionKey(), card.AccountID, p.Amount, max(p.Installments, 1), p.MerchantName, s.metadata(a, card))
 	if err != nil {
@@ -250,6 +276,11 @@ func (s *Service) Authorize(ctx context.Context, pan string, p domain.Purchase) 
 	}
 	a.TransactionID = res.ID
 	if res.Status != "RESERVED" {
+		if temporary { // not spent: the customer can still use it
+			if err := s.store.ReleaseTemporary(ctx, card.ID); err != nil {
+				s.log.WarnContext(ctx, "temporary card not released", "card_id", card.ID, "error", err)
+			}
+		}
 		return s.decide(ctx, a, domain.Declined, domain.DeclineCodeFor(res.FailureReason), res.FailureReason)
 	}
 	return s.decide(ctx, a, domain.Approved, domain.CodeApproved, "")

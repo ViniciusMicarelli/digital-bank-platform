@@ -9,6 +9,7 @@ Debit cards: issuing, controls and real-time **purchase authorization**, then cl
 | Capability | Status |
 |---|---|
 | Issue physical (5 years) and virtual (1 year) debit cards for active accounts, idempotent | ✅ |
+| Temporary cards (single use): online only, valid for 24 hours, at most 3 live; the first approved purchase claims and cancels the card atomically (USED), so two concurrent purchases cannot both use it; a purchase declined after the claim gives the card back; never tokenized | ✅ |
 | Block / unblock; cards follow the account (blocked account → cards blocked, closed → cancelled) | ✅ |
 | Controls: online, international (off by default), contactless | ✅ |
 | Reveal card number, expiry and CVV to the holder, behind step-up authentication (`Cache-Control: no-store`) | ✅ |

@@ -27,7 +27,7 @@ func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 var _ ports.Store = (*Store)(nil)
 
 const cardCols = `id, idempotency_key, account_id, kind, status, status_reason, last4, expiry_month, expiry_year,
-	holder_name, online, international, contactless, created_at`
+	holder_name, online, international, contactless, created_at, valid_until`
 
 func scanCard(row pgx.Row) (domain.Card, error) {
 	var (
@@ -36,7 +36,7 @@ func scanCard(row pgx.Row) (domain.Card, error) {
 	)
 	err := row.Scan(&c.ID, &c.IdempotencyKey, &c.AccountID, &kind, &status, &c.StatusReason, &c.Last4,
 		&c.ExpiryMonth, &c.ExpiryYear, &c.HolderName, &c.Controls.Online, &c.Controls.International,
-		&c.Controls.Contactless, &c.CreatedAt)
+		&c.Controls.Contactless, &c.CreatedAt, &c.ValidUntil)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return c, fmt.Errorf("%w: card", domain.ErrNotFound)
 	}
@@ -48,10 +48,10 @@ func (s *Store) InsertCard(ctx context.Context, c domain.Card, panEnc, panIndex 
 	var existing *domain.Card
 	err := pg.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		tag, err := tx.Exec(ctx, `INSERT INTO cards (id, idempotency_key, account_id, kind, status, last4, expiry_month, expiry_year,
-			holder_name, online, international, contactless) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			holder_name, online, international, contactless, valid_until) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 			ON CONFLICT (idempotency_key) DO NOTHING`,
 			c.ID, c.IdempotencyKey, c.AccountID, c.Kind, c.Status, c.Last4, c.ExpiryMonth, c.ExpiryYear,
-			c.HolderName, c.Controls.Online, c.Controls.International, c.Controls.Contactless)
+			c.HolderName, c.Controls.Online, c.Controls.International, c.Controls.Contactless, c.ValidUntil)
 		if err != nil {
 			return err
 		}
@@ -487,4 +487,19 @@ func (s *Store) PendingRefunds(ctx context.Context, before time.Time, limit int)
 		out = append(out, r)
 	}
 	return out, rows.Err()
+}
+
+// UseTemporary claims a temporary card for its one purchase: it is cancelled
+// (USED) only if still active, so two concurrent purchases cannot both use it.
+func (s *Store) UseTemporary(ctx context.Context, id uuid.UUID) (bool, error) {
+	tag, err := s.pool.Exec(ctx, `UPDATE cards SET status = 'CANCELLED', status_reason = 'USED', updated_at = now()
+		WHERE id = $1 AND kind = 'TEMPORARY' AND status = 'ACTIVE'`, id)
+	return tag.RowsAffected() == 1, err
+}
+
+// ReleaseTemporary gives the card back when its purchase was declined after the claim.
+func (s *Store) ReleaseTemporary(ctx context.Context, id uuid.UUID) error {
+	_, err := s.pool.Exec(ctx, `UPDATE cards SET status = 'ACTIVE', status_reason = '', updated_at = now()
+		WHERE id = $1 AND kind = 'TEMPORARY' AND status = 'CANCELLED' AND status_reason = 'USED'`, id)
+	return err
 }

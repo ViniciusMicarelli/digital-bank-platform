@@ -1,13 +1,13 @@
 import { errorMessage, formatBRL, type Card as CardT, type CardDetails } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Eye, EyeOff, Lock, LockOpen, Plus, ShoppingCart, Wifi } from 'lucide-react-native'
+import { Eye, EyeOff, Lock, LockOpen, Plus, ShoppingCart, Timer, Wifi } from 'lucide-react-native'
 import { useState } from 'react'
-import { View } from 'react-native'
+import { ScrollView, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { BankCard } from '../../components/BankCard'
 import { Purchases } from '../../components/Purchases'
 import { useStepUp } from '../../components/StepUp'
-import { Button, Card, IconTile, Loading, MoneyField, Muted, Notice, Sandbox, Screen, Segmented, Toggle, Txt } from '../../components/ui'
+import { Button, Card, IconTile, Loading, MoneyField, Muted, Notice, Press, Sandbox, Screen, Segmented, Toggle, Txt } from '../../components/ui'
 import { api } from '../../lib/client'
 import { useAccount } from '../../lib/queries'
 
@@ -23,11 +23,16 @@ export default function Cards() {
   const [result, setResult] = useState('')
   const key = ['cards', account?.id]
   const cards = useQuery({ queryKey: key, enabled: !!account, queryFn: async () => (await api<{ cards: CardT[] }>('GET', `/v1/accounts/${account!.id}/cards`)).cards })
-  const card = cards.data?.[0]
+  const [selected, setSelected] = useState<string | null>(null)
+  const card = cards.data?.find((x) => x.id === selected) ?? cards.data?.[0]
   const base = `/v1/accounts/${account?.id}/cards/${card?.id}`
   const refresh = () => qc.invalidateQueries({ queryKey: key })
   const cancelled = (e: unknown) => e instanceof Error && e.message === 'cancelled'
-  const issue = useMutation({ mutationFn: () => api('POST', `/v1/accounts/${account!.id}/cards`, { body: { kind: 'VIRTUAL' }, idempotent: true }), onSuccess: refresh })
+  const issue = useMutation({
+    mutationFn: (kind: CardT['kind'] = 'VIRTUAL') => api<CardT>('POST', `/v1/accounts/${account!.id}/cards`, { body: { kind }, idempotent: true }),
+    onSuccess: (c) => { setSelected(c.id); setDetails(null); setError(''); refresh() },
+    onError: (e) => setError(errorMessage(e)),
+  })
   const reveal = async () => {
     if (details) return details
     const d = await api<CardDetails>('POST', `${base}/reveal`, { stepUp: await confirm() })
@@ -64,29 +69,51 @@ export default function Cards() {
             <IconTile icon={Wifi} size={56} />
             <Muted>Você ainda não tem cartão. O virtual fica pronto na hora.</Muted>
           </View>
-          <Button title="Criar cartão virtual" icon={Plus} loading={issue.isPending} onPress={() => issue.mutate()} />
+          <Button title="Criar cartão virtual" icon={Plus} loading={issue.isPending} onPress={() => issue.mutate('VIRTUAL')} />
         </Card>
       </Screen>
     )
   }
   const set = (k: keyof CardT['controls']) => (v: boolean) => controls.mutate({ ...card.controls, [k]: v })
+  const temporary = card.kind === 'TEMPORARY'
+  const spent = temporary && card.status !== 'ACTIVE'
   const compromised = card.status_reason === 'FRAUD_SUSPECTED'
   return (
     <Screen title="Cartões" subtitle="Débito na conta e, com o crédito ativo, também no crédito.">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+        {cards.data!.map((x) => (
+          <Press key={x.id} accessibilityLabel={`Cartão final ${x.last4}`} onPress={() => { setSelected(x.id); setDetails(null) }}>
+            <Txt variant="label" tone={x.id === card.id ? 'fg' : 'muted'} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, overflow: 'hidden', fontWeight: '600' }}>
+              {x.kind === 'TEMPORARY' ? 'Temporário' : x.kind === 'VIRTUAL' ? 'Virtual' : 'Físico'} •••• {x.last4}{x.status === 'CANCELLED' ? ' · usado' : ''}
+            </Txt>
+          </Press>
+        ))}
+        <Press accessibilityLabel="Novo cartão temporário" onPress={() => issue.mutate('TEMPORARY')}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8 }}>
+            <Timer size={16} color="#b45309" /><Txt variant="label" style={{ color: '#b45309', fontWeight: '600' }}>Temporário</Txt>
+          </View>
+        </Press>
+      </ScrollView>
       <Animated.View entering={FadeInDown.delay(60).duration(500)}>
         <BankCard holder={card.holder_name} last4={card.last4}
           expiry={`${String(card.expiry_month).padStart(2, '0')}/${String(card.expiry_year).slice(2)}`}
-          skin={card.status === 'BLOCKED' ? 'blocked' : 'debit'} label={card.kind === 'VIRTUAL' ? 'Virtual' : 'Físico'} revealed={details} />
+          skin={card.status !== 'ACTIVE' ? 'blocked' : temporary ? 'temporary' : 'debit'}
+          label={temporary ? 'Temporário' : card.kind === 'VIRTUAL' ? 'Virtual' : 'Físico'} revealed={details} />
       </Animated.View>
+      {temporary && (spent
+        ? <Notice tone="amber">Este cartão temporário já foi usado ou expirou.</Notice>
+        : <Notice tone="brand">Uso único: cancelado depois da primeira compra. Válido por 24 horas.</Notice>)}
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <View style={{ flex: 1 }}>
           {details ? <Button title="Ocultar dados" icon={EyeOff} variant="secondary" onPress={() => setDetails(null)} />
             : <Button title="Ver dados" icon={Eye} variant="secondary" disabled={card.status !== 'ACTIVE'} loading={show.isPending} onPress={() => show.mutate()} />}
         </View>
+{card.status !== 'CANCELLED' && (
         <View style={{ flex: 1 }}>
           <Button title={card.status === 'ACTIVE' ? 'Bloquear' : 'Desbloquear'} icon={card.status === 'ACTIVE' ? Lock : LockOpen}
-            variant={card.status === 'ACTIVE' ? 'danger' : 'primary'} loading={block.isPending} disabled={compromised} onPress={() => block.mutate()} />
+            variant={card.status === 'ACTIVE' ? 'danger' : 'primary'} loading={block.isPending} disabled={compromised || spent} onPress={() => block.mutate()} />
         </View>
+        )}
       </View>
       {compromised
         ? <Notice tone="amber">Bloqueamos este cartão por segurança depois da sua contestação. Peça um novo cartão virtual.</Notice>

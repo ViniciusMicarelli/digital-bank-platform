@@ -25,7 +25,8 @@ type Server struct {
 
 func NewServer(app *application.Service) *Server { return &Server{app: app} }
 
-var kinds = map[cardv1.CardKind]domain.Kind{cardv1.CardKind_CARD_KIND_PHYSICAL: domain.Physical, cardv1.CardKind_CARD_KIND_VIRTUAL: domain.Virtual}
+var kinds = map[cardv1.CardKind]domain.Kind{cardv1.CardKind_CARD_KIND_PHYSICAL: domain.Physical, cardv1.CardKind_CARD_KIND_VIRTUAL: domain.Virtual,
+	cardv1.CardKind_CARD_KIND_TEMPORARY: domain.Temporary}
 
 var channels = map[cardv1.Channel]domain.Channel{
 	cardv1.Channel_CHANNEL_ONLINE: domain.Online, cardv1.Channel_CHANNEL_CHIP: domain.Chip, cardv1.Channel_CHANNEL_CONTACTLESS: domain.Contactless,
@@ -45,6 +46,12 @@ func cardPB(c domain.Card) *cardv1.Card {
 		ExpiryMonth: int32(c.ExpiryMonth), ExpiryYear: int32(c.ExpiryYear), HolderName: c.HolderName,
 		Controls:  &cardv1.Controls{Online: c.Controls.Online, International: c.Controls.International, Contactless: c.Controls.Contactless},
 		CreatedAt: timestamppb.New(c.CreatedAt),
+		ValidUntil: func() *timestamppb.Timestamp {
+			if c.ValidUntil == nil {
+				return nil
+			}
+			return timestamppb.New(*c.ValidUntil)
+		}(),
 		Status: map[domain.Status]cardv1.CardStatus{
 			domain.Active: cardv1.CardStatus_CARD_STATUS_ACTIVE, domain.Blocked: cardv1.CardStatus_CARD_STATUS_BLOCKED,
 			domain.Cancelled: cardv1.CardStatus_CARD_STATUS_CANCELLED,

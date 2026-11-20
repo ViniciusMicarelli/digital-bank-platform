@@ -36,6 +36,10 @@ type Store interface {
 	// transaction id, only if the stored status is still from.
 	SaveAuthorization(ctx context.Context, a domain.Authorization, from domain.AuthStatus, events ...outbox.Message) error
 	PendingReversals(ctx context.Context, before time.Time, limit int) ([]uuid.UUID, error)
+	// UseTemporary cancels an active temporary card for its one purchase
+	// (false: already used); ReleaseTemporary undoes it after a decline.
+	UseTemporary(ctx context.Context, id uuid.UUID) (bool, error)
+	ReleaseTemporary(ctx context.Context, id uuid.UUID) error
 	// AuthorizationsByCard lists a card's purchases, newest first.
 	AuthorizationsByCard(ctx context.Context, card uuid.UUID, limit int) ([]domain.Authorization, error)
 

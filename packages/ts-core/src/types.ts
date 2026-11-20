@@ -72,9 +72,11 @@ export interface PixTransfer {
 
 export interface Card {
   id: string
-  kind: 'PHYSICAL' | 'VIRTUAL'
+  kind: 'PHYSICAL' | 'VIRTUAL' | 'TEMPORARY'
   status: 'ACTIVE' | 'BLOCKED' | 'CANCELLED'
   status_reason: string
+  /** Temporary cards: when they stop working. */
+  valid_until?: string
   last4: string
   holder_name: string
   expiry_month: number

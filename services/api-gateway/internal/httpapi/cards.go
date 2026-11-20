@@ -11,12 +11,16 @@ import (
 )
 
 func cardJSON(c *cardv1.Card) map[string]any {
-	return map[string]any{
+	out := map[string]any{
 		"id": c.GetId(), "kind": c.GetKind().String()[len("CARD_KIND_"):], "status": c.GetStatus().String()[len("CARD_STATUS_"):],
 		"status_reason": c.GetStatusReason(), "last4": c.GetLast4(), "holder_name": c.GetHolderName(),
 		"expiry_month": c.GetExpiryMonth(), "expiry_year": c.GetExpiryYear(),
 		"controls": map[string]bool{"online": c.GetControls().GetOnline(), "international": c.GetControls().GetInternational(), "contactless": c.GetControls().GetContactless()},
 	}
+	if c.GetValidUntil() != nil {
+		out["valid_until"] = ts(c.GetValidUntil())
+	}
+	return out
 }
 
 func (a *API) issueCard(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
@@ -30,7 +34,8 @@ func (a *API) issueCard(w http.ResponseWriter, r *http.Request, acc *accountv1.A
 	if !decode(w, r, &req) {
 		return
 	}
-	kind := map[string]cardv1.CardKind{"PHYSICAL": cardv1.CardKind_CARD_KIND_PHYSICAL, "VIRTUAL": cardv1.CardKind_CARD_KIND_VIRTUAL}[req.Kind]
+	kind := map[string]cardv1.CardKind{"PHYSICAL": cardv1.CardKind_CARD_KIND_PHYSICAL, "VIRTUAL": cardv1.CardKind_CARD_KIND_VIRTUAL,
+		"TEMPORARY": cardv1.CardKind_CARD_KIND_TEMPORARY}[req.Kind]
 	resp, err := a.c.Cards.IssueCard(r.Context(), &cardv1.IssueCardRequest{IdempotencyKey: key, AccountId: acc.GetId(), Kind: kind})
 	if err != nil {
 		writeGRPCError(w, r.Context(), err)

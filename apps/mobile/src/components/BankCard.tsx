@@ -6,12 +6,13 @@ import Animated, { interpolate, useAnimatedStyle, useSharedValue, withTiming, Ea
 import { font } from '../lib/theme'
 import { Txt } from './ui'
 
-export type CardSkin = 'debit' | 'credit' | 'blocked'
+export type CardSkin = 'debit' | 'credit' | 'blocked' | 'temporary'
 
 const skins: Record<CardSkin, [string, string, string]> = {
   debit: ['#0e7a5f', '#0a4d3c', '#07362a'],
   credit: ['#4a37a8', '#2d2075', '#1c1450'],
   blocked: ['#667085', '#475467', '#1d2939'],
+  temporary: ['#b45309', '#92400e', '#78350f'],
 }
 
 function Chip() {

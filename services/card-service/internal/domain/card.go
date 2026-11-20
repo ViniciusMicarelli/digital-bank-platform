@@ -90,6 +90,16 @@ type Kind string
 const (
 	Physical Kind = "PHYSICAL"
 	Virtual  Kind = "VIRTUAL"
+	// Temporary is a single-use virtual card for one online purchase.
+	Temporary Kind = "TEMPORARY"
+)
+
+// Temporary cards.
+const (
+	TemporaryLifetime = 24 * time.Hour
+	MaxTemporaryCards = 3
+	// ReasonUsed cancels a temporary card after its purchase.
+	ReasonUsed = "USED"
 )
 
 type Status string
@@ -125,6 +135,13 @@ type Card struct {
 	HolderName     string
 	Controls       Controls
 	CreatedAt      time.Time
+	// ValidUntil is set for temporary cards.
+	ValidUntil *time.Time
+}
+
+// TemporaryExpired reports whether a temporary card ran out of time.
+func (c Card) TemporaryExpired(now time.Time) bool {
+	return c.Kind == Temporary && c.ValidUntil != nil && !now.Before(*c.ValidUntil)
 }
 
 // NewCard issues a card for an account: physical cards last 5 years,
@@ -133,19 +150,25 @@ func NewCard(key string, account uuid.UUID, kind Kind, holder string, now time.T
 	switch {
 	case key == "":
 		return Card{}, "", fmt.Errorf("%w: idempotency key is required", ErrInvalidArgument)
-	case kind != Physical && kind != Virtual:
-		return Card{}, "", fmt.Errorf("%w: kind must be PHYSICAL or VIRTUAL", ErrInvalidArgument)
+	case kind != Physical && kind != Virtual && kind != Temporary:
+		return Card{}, "", fmt.Errorf("%w: kind must be PHYSICAL, VIRTUAL or TEMPORARY", ErrInvalidArgument)
 	}
-	years := 5
-	if kind == Virtual {
-		years = 1
+	exp, controls := now.AddDate(5, 0, 0), DefaultControls
+	var validUntil *time.Time
+	switch kind {
+	case Virtual:
+		exp = now.AddDate(1, 0, 0)
+	case Temporary: // online only, for one purchase within a day
+		exp = now.AddDate(0, 1, 0)
+		until := now.Add(TemporaryLifetime)
+		validUntil = &until
+		controls = Controls{Online: true}
 	}
-	exp := now.AddDate(years, 0, 0)
 	pan := NewPAN()
 	return Card{
 		ID: uuid.Must(uuid.NewV7()), IdempotencyKey: key, AccountID: account, Kind: kind, Status: Active,
 		Last4: pan[len(pan)-4:], ExpiryMonth: int(exp.Month()), ExpiryYear: exp.Year(),
-		HolderName: holder, Controls: DefaultControls,
+		HolderName: holder, Controls: controls, ValidUntil: validUntil,
 	}, pan, nil
 }
 
@@ -293,6 +316,8 @@ func (c Card) decide(p Purchase, expectedCVV string, now time.Time, tok *Token) 
 		return decline(CodeExpiredCard, "expiry date does not match")
 	case c.Expired(now):
 		return decline(CodeExpiredCard, "card expired")
+	case c.TemporaryExpired(now):
+		return decline(CodeExpiredCard, "temporary card expired")
 	case tok == nil && p.Channel == Online && p.CVV == "":
 		return decline(CodeWrongCVV, "CVV required for card-not-present purchases")
 	case tok == nil && p.CVV != "" && !hmac.Equal([]byte(p.CVV), []byte(expectedCVV)):
@@ -392,6 +417,9 @@ type Token struct {
 
 // NewToken provisions a token for an active card; it shares the card's expiry.
 func NewToken(c Card, wallet Wallet, device string) (Token, string, error) {
+	if c.Kind == Temporary {
+		return Token{}, "", Refuse("TEMPORARY_CARD", "a temporary card cannot go into a wallet")
+	}
 	switch {
 	case c.Status != Active:
 		return Token{}, "", fmt.Errorf("%w: card is %s", ErrInvalidTransition, c.Status)

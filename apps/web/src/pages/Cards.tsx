@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useAccount } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
 import { useStepUp } from '../components/StepUp'
-import { Eye, EyeOff, Globe, Lock, LockOpen, Nfc, Pause, Play, Plus, Receipt, ShieldAlert, ShoppingCart, Smartphone, Trash2, Wifi } from 'lucide-react'
+import { Eye, EyeOff, Globe, Lock, LockOpen, Nfc, Pause, Play, Plus, Receipt, ShieldAlert, ShoppingCart, Smartphone, Timer, Trash2, Wifi } from 'lucide-react'
 import { BankCard } from '../components/BankCard'
 import { Alert, Badge, Button, Empty, Field, IconButton, IconTile, Loading, Modal, PageTitle, Panel, Sandbox, Select, Toggle } from '../components/ui'
 import { cx, dateTimeBR } from '../lib/format'
@@ -97,7 +97,8 @@ function SimulatePurchase({ card, reveal }: { card: Card; reveal: () => Promise<
     },
     onError: (e) => setResult(e instanceof Error && e.message === 'cancelled' ? '' : errorMessage(e)),
   })
-  if (card.status !== 'ACTIVE') return null
+  // A temporary card is cancelled by its purchase: keep the outcome on screen.
+  if (card.status !== 'ACTIVE' && !result) return null
   return (
     <Sandbox>
       <form onSubmit={(e) => { e.preventDefault(); buy.mutate() }} className="grid gap-3 sm:grid-cols-2">
@@ -217,23 +218,33 @@ function CardView({ accountId, card }: { accountId: string; card: Card }) {
   })
   const setControl = (k: keyof Card['controls']) => (v: boolean) => controls.mutate({ ...card.controls, [k]: v })
   const compromised = card.status_reason === 'FRAUD_SUSPECTED'
+  const temporary = card.kind === 'TEMPORARY'
+  const [now] = useState(Date.now) // when the screen opened
+  const expired = temporary && !!card.valid_until && Date.parse(card.valid_until) <= now
+  const spent = temporary && (card.status_reason === 'USED' || expired)
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="space-y-5">
         <div data-reveal className="mx-auto max-w-md">
           <BankCard holder={card.holder_name} last4={card.last4}
             expiry={`${String(card.expiry_month).padStart(2, '0')}/${String(card.expiry_year).slice(2)}`}
-            skin={card.status === 'BLOCKED' ? 'blocked' : 'debit'} label={card.kind === 'VIRTUAL' ? 'Virtual' : 'Físico'}
+            skin={card.status !== 'ACTIVE' ? 'blocked' : temporary ? 'temporary' : 'debit'}
+            label={temporary ? 'Temporário' : card.kind === 'VIRTUAL' ? 'Virtual' : 'Físico'}
             revealed={details} />
         </div>
         <div data-reveal className="grid grid-cols-2 gap-3">
           {details ? <Button variant="secondary" icon={EyeOff} onClick={() => setDetails(null)}>Ocultar dados</Button>
             : <Button variant="secondary" icon={Eye} loading={show.isPending} onClick={() => show.mutate()} disabled={card.status !== 'ACTIVE'}>Ver dados</Button>}
-          <Button variant={card.status === 'ACTIVE' ? 'danger' : 'primary'} icon={card.status === 'ACTIVE' ? Lock : LockOpen} loading={block.isPending}
-            disabled={compromised} onClick={() => block.mutate()}>
-            {card.status === 'ACTIVE' ? 'Bloquear' : 'Desbloquear'}
-          </Button>
+          {card.status !== 'CANCELLED' && (
+            <Button variant={card.status === 'ACTIVE' ? 'danger' : 'primary'} icon={card.status === 'ACTIVE' ? Lock : LockOpen} loading={block.isPending}
+              disabled={compromised || spent} onClick={() => block.mutate()}>
+              {card.status === 'ACTIVE' ? 'Bloquear' : 'Desbloquear'}
+            </Button>
+          )}
         </div>
+        {temporary && (spent
+          ? <Alert tone="amber">{card.status_reason === 'USED' ? 'Este cartão temporário já foi usado na compra para a qual foi criado.' : 'Este cartão temporário expirou sem ser usado.'}</Alert>
+          : <Alert tone="brand">Uso único: será cancelado depois da primeira compra aprovada. Válido até {new Date(card.valid_until!).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}.</Alert>)}
         {compromised
           ? <Alert tone="amber">Bloqueamos este cartão por segurança depois da sua contestação. Peça um novo cartão virtual.</Alert>
           : card.status === 'BLOCKED' && <Alert tone="amber">Cartão bloqueado: compras são recusadas até você desbloquear.</Alert>}
@@ -249,7 +260,7 @@ function CardView({ accountId, card }: { accountId: string; card: Card }) {
           </div>
         </Panel>
         <Purchases accountId={accountId} card={card} />
-        <Wallets accountId={accountId} card={card} confirm={confirm} />
+        {!temporary && <Wallets accountId={accountId} card={card} confirm={confirm} />}
       </div>
       {modal}
     </div>
@@ -260,14 +271,16 @@ export function CardsPage() {
   const account = useAccount()
   const qc = useQueryClient()
   const [selected, setSelected] = useState<string | null>(null)
+  const [error, setError] = useState('')
   const cards = useQuery({
     queryKey: ['cards', account?.id],
     enabled: !!account,
     queryFn: async () => (await api<{ cards: Card[] }>('GET', `/v1/accounts/${account!.id}/cards`)).cards,
   })
   const issue = useMutation({
-    mutationFn: (kind: 'VIRTUAL' | 'PHYSICAL') => api<Card>('POST', `/v1/accounts/${account!.id}/cards`, { body: { kind }, idempotent: true }),
-    onSuccess: (c) => { setSelected(c.id); qc.invalidateQueries({ queryKey: ['cards', account?.id] }) },
+    mutationFn: (kind: Card['kind']) => api<Card>('POST', `/v1/accounts/${account!.id}/cards`, { body: { kind }, idempotent: true }),
+    onSuccess: (c) => { setSelected(c.id); setError(''); qc.invalidateQueries({ queryKey: ['cards', account?.id] }) },
+    onError: (e) => setError(errorMessage(e)),
   })
   if (!account || cards.isLoading) return <Loading />
   const list = cards.data ?? []
@@ -290,12 +303,15 @@ export function CardsPage() {
               <button key={c.id} onClick={() => setSelected(c.id)}
                 className={cx('flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold ring-1 transition',
                   c.id === card.id ? 'bg-fg text-bg ring-fg' : 'bg-surface text-fg-2 ring-line hover:ring-line-strong')}>
-                {c.kind === 'VIRTUAL' ? <Globe className="size-4" /> : <Nfc className="size-4" />}
-                {c.kind === 'VIRTUAL' ? 'Virtual' : 'Físico'} •••• {c.last4}
+                {c.kind === 'TEMPORARY' ? <Timer className="size-4" /> : c.kind === 'VIRTUAL' ? <Globe className="size-4" /> : <Nfc className="size-4" />}
+                {c.kind === 'TEMPORARY' ? 'Temporário' : c.kind === 'VIRTUAL' ? 'Virtual' : 'Físico'} •••• {c.last4}
+                {c.status === 'CANCELLED' && <span className="text-xs font-normal opacity-70">· {c.status_reason === 'USED' ? 'usado' : 'cancelado'}</span>}
               </button>
             ))}
             <Button variant="ghost" size="sm" icon={Plus} loading={issue.isPending} onClick={() => issue.mutate('VIRTUAL')}>Novo virtual</Button>
+            <Button variant="ghost" size="sm" icon={Timer} loading={issue.isPending} onClick={() => issue.mutate('TEMPORARY')}>Cartão temporário</Button>
           </div>
+          <Alert>{error}</Alert>
           <CardView key={card.id} accountId={account.id} card={card} />
         </>
       )}

@@ -3,12 +3,13 @@ import { useId, useRef } from 'react'
 import { cx } from '../lib/format'
 import { gsap, reducedMotion, useGSAP } from '../lib/motion'
 
-export type CardSkin = 'debit' | 'credit' | 'blocked'
+export type CardSkin = 'debit' | 'credit' | 'blocked' | 'temporary'
 
 const skins: Record<CardSkin, string> = {
   debit: 'bg-[linear-gradient(135deg,#0e7a5f_0%,#0a4d3c_55%,#07362a_100%)]',
   credit: 'bg-[linear-gradient(135deg,#4a37a8_0%,#2d2075_55%,#1c1450_100%)]',
   blocked: 'bg-[linear-gradient(135deg,#475467,#1d2939)] grayscale',
+  temporary: 'bg-[linear-gradient(135deg,#b45309_0%,#92400e_55%,#78350f_100%)]',
 }
 
 function Chip() {

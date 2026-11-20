@@ -150,3 +150,35 @@ func TestCardTokens(t *testing.T) {
 		t.Fatalf("another customer listing tokens: %d", status)
 	}
 }
+
+func TestTemporaryCard(t *testing.T) {
+	ana := login(t, "ana-temporario-"+uuid.NewString()[:8])
+	_, acc := ana.call("POST", "/v1/accounts", map[string]string{"holder_name": "Ana Souza"}, idem())
+	base := "/v1/accounts/" + acc["id"].(string)
+	key := "ana." + uuid.NewString()[:8] + "@example.com"
+	ana.call("POST", base+"/pix/keys", map[string]string{"type": "EMAIL", "value": key}, nil)
+	ana.call("POST", "/v1/sandbox/pix-in", map[string]string{"key": key, "amount": "100.00"}, nil)
+	status, card := ana.call("POST", base+"/cards", map[string]string{"kind": "TEMPORARY"}, idem())
+	if status != 201 || card["kind"] != "TEMPORARY" || card["valid_until"] == nil {
+		t.Fatalf("issue: %d %v", status, card)
+	}
+	_, d := ana.call("POST", base+"/cards/"+card["id"].(string)+"/reveal", nil, ana.stepUp())
+	buy := func(amount string) map[string]any {
+		_, a := ana.call("POST", "/v1/sandbox/card-network/authorizations", map[string]any{
+			"pan": d["pan"], "expiry_month": d["expiry_month"], "expiry_year": d["expiry_year"], "cvv": d["cvv"],
+			"amount": amount, "merchant_name": "LOJA ONLINE", "mcc": "5999", "country": "BR", "channel": "ONLINE",
+		}, nil)
+		return a
+	}
+	if a := buy("25.00"); a["status"] != "APPROVED" {
+		t.Fatalf("first purchase: %v", a)
+	}
+	if a := buy("1.00"); a["status"] != "DECLINED" {
+		t.Fatalf("second purchase: %v", a)
+	}
+	_, cards := ana.call("GET", base+"/cards", nil, nil)
+	c := cards["cards"].([]any)[0].(map[string]any)
+	if c["status"] != "CANCELLED" || c["status_reason"] != "USED" {
+		t.Fatalf("card after use = %v", c)
+	}
+}

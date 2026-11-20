@@ -29,6 +29,8 @@ const (
 	CardKind_CARD_KIND_UNSPECIFIED CardKind = 0
 	CardKind_CARD_KIND_PHYSICAL    CardKind = 1
 	CardKind_CARD_KIND_VIRTUAL     CardKind = 2
+	// Single use: cancelled by its first approved purchase, expires in 24 h.
+	CardKind_CARD_KIND_TEMPORARY CardKind = 3
 )
 
 // Enum value maps for CardKind.
@@ -37,11 +39,13 @@ var (
 		0: "CARD_KIND_UNSPECIFIED",
 		1: "CARD_KIND_PHYSICAL",
 		2: "CARD_KIND_VIRTUAL",
+		3: "CARD_KIND_TEMPORARY",
 	}
 	CardKind_value = map[string]int32{
 		"CARD_KIND_UNSPECIFIED": 0,
 		"CARD_KIND_PHYSICAL":    1,
 		"CARD_KIND_VIRTUAL":     2,
+		"CARD_KIND_TEMPORARY":   3,
 	}
 )
 
@@ -457,18 +461,20 @@ func (x *Controls) GetContactless() bool {
 }
 
 type Card struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	Kind          CardKind               `protobuf:"varint,3,opt,name=kind,proto3,enum=bank.card.v1.CardKind" json:"kind,omitempty"`
-	Status        CardStatus             `protobuf:"varint,4,opt,name=status,proto3,enum=bank.card.v1.CardStatus" json:"status,omitempty"`
-	StatusReason  string                 `protobuf:"bytes,5,opt,name=status_reason,json=statusReason,proto3" json:"status_reason,omitempty"`
-	Last4         string                 `protobuf:"bytes,6,opt,name=last4,proto3" json:"last4,omitempty"`
-	ExpiryMonth   int32                  `protobuf:"varint,7,opt,name=expiry_month,json=expiryMonth,proto3" json:"expiry_month,omitempty"`
-	ExpiryYear    int32                  `protobuf:"varint,8,opt,name=expiry_year,json=expiryYear,proto3" json:"expiry_year,omitempty"`
-	HolderName    string                 `protobuf:"bytes,9,opt,name=holder_name,json=holderName,proto3" json:"holder_name,omitempty"`
-	Controls      *Controls              `protobuf:"bytes,10,opt,name=controls,proto3" json:"controls,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Id           string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AccountId    string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Kind         CardKind               `protobuf:"varint,3,opt,name=kind,proto3,enum=bank.card.v1.CardKind" json:"kind,omitempty"`
+	Status       CardStatus             `protobuf:"varint,4,opt,name=status,proto3,enum=bank.card.v1.CardStatus" json:"status,omitempty"`
+	StatusReason string                 `protobuf:"bytes,5,opt,name=status_reason,json=statusReason,proto3" json:"status_reason,omitempty"`
+	Last4        string                 `protobuf:"bytes,6,opt,name=last4,proto3" json:"last4,omitempty"`
+	ExpiryMonth  int32                  `protobuf:"varint,7,opt,name=expiry_month,json=expiryMonth,proto3" json:"expiry_month,omitempty"`
+	ExpiryYear   int32                  `protobuf:"varint,8,opt,name=expiry_year,json=expiryYear,proto3" json:"expiry_year,omitempty"`
+	HolderName   string                 `protobuf:"bytes,9,opt,name=holder_name,json=holderName,proto3" json:"holder_name,omitempty"`
+	Controls     *Controls              `protobuf:"bytes,10,opt,name=controls,proto3" json:"controls,omitempty"`
+	CreatedAt    *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	// Temporary cards: when they stop working.
+	ValidUntil    *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=valid_until,json=validUntil,proto3" json:"valid_until,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -576,6 +582,13 @@ func (x *Card) GetControls() *Controls {
 func (x *Card) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Card) GetValidUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ValidUntil
 	}
 	return nil
 }
@@ -3079,7 +3092,7 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\bControls\x12\x16\n" +
 	"\x06online\x18\x01 \x01(\bR\x06online\x12$\n" +
 	"\rinternational\x18\x02 \x01(\bR\rinternational\x12 \n" +
-	"\vcontactless\x18\x03 \x01(\bR\vcontactless\"\xa2\x03\n" +
+	"\vcontactless\x18\x03 \x01(\bR\vcontactless\"\xdf\x03\n" +
 	"\x04Card\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -3096,7 +3109,9 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\bcontrols\x18\n" +
 	" \x01(\v2\x16.bank.card.v1.ControlsR\bcontrols\x129\n" +
 	"\n" +
-	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"\x86\x01\n" +
+	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12;\n" +
+	"\vvalid_until\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"validUntil\"\x86\x01\n" +
 	"\x10IssueCardRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
@@ -3276,11 +3291,12 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\x03won\x18\x03 \x01(\bR\x03won\x12\x16\n" +
 	"\x06reason\x18\x04 \x01(\tR\x06reason\"H\n" +
 	"\x15DecideDisputeResponse\x12/\n" +
-	"\adispute\x18\x01 \x01(\v2\x15.bank.card.v1.DisputeR\adispute*T\n" +
+	"\adispute\x18\x01 \x01(\v2\x15.bank.card.v1.DisputeR\adispute*m\n" +
 	"\bCardKind\x12\x19\n" +
 	"\x15CARD_KIND_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12CARD_KIND_PHYSICAL\x10\x01\x12\x15\n" +
-	"\x11CARD_KIND_VIRTUAL\x10\x02*u\n" +
+	"\x11CARD_KIND_VIRTUAL\x10\x02\x12\x17\n" +
+	"\x13CARD_KIND_TEMPORARY\x10\x03*u\n" +
 	"\n" +
 	"CardStatus\x12\x1b\n" +
 	"\x17CARD_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
@@ -3412,94 +3428,95 @@ var file_bank_card_v1_card_proto_depIdxs = []int32{
 	1,  // 1: bank.card.v1.Card.status:type_name -> bank.card.v1.CardStatus
 	7,  // 2: bank.card.v1.Card.controls:type_name -> bank.card.v1.Controls
 	51, // 3: bank.card.v1.Card.created_at:type_name -> google.protobuf.Timestamp
-	0,  // 4: bank.card.v1.IssueCardRequest.kind:type_name -> bank.card.v1.CardKind
-	8,  // 5: bank.card.v1.IssueCardResponse.card:type_name -> bank.card.v1.Card
-	8,  // 6: bank.card.v1.GetCardResponse.card:type_name -> bank.card.v1.Card
-	8,  // 7: bank.card.v1.ListCardsResponse.cards:type_name -> bank.card.v1.Card
-	8,  // 8: bank.card.v1.BlockCardResponse.card:type_name -> bank.card.v1.Card
-	8,  // 9: bank.card.v1.UnblockCardResponse.card:type_name -> bank.card.v1.Card
-	7,  // 10: bank.card.v1.UpdateControlsRequest.controls:type_name -> bank.card.v1.Controls
-	8,  // 11: bank.card.v1.UpdateControlsResponse.card:type_name -> bank.card.v1.Card
-	4,  // 12: bank.card.v1.Authorization.status:type_name -> bank.card.v1.AuthorizationStatus
-	52, // 13: bank.card.v1.Authorization.amount:type_name -> bank.common.v1.Money
-	52, // 14: bank.card.v1.Authorization.cleared_amount:type_name -> bank.common.v1.Money
-	2,  // 15: bank.card.v1.Authorization.channel:type_name -> bank.card.v1.Channel
-	51, // 16: bank.card.v1.Authorization.created_at:type_name -> google.protobuf.Timestamp
-	3,  // 17: bank.card.v1.Authorization.function:type_name -> bank.card.v1.Function
-	52, // 18: bank.card.v1.Authorization.refunded_amount:type_name -> bank.common.v1.Money
-	42, // 19: bank.card.v1.Authorization.dispute:type_name -> bank.card.v1.Dispute
-	52, // 20: bank.card.v1.AuthorizeRequest.amount:type_name -> bank.common.v1.Money
-	2,  // 21: bank.card.v1.AuthorizeRequest.channel:type_name -> bank.card.v1.Channel
-	3,  // 22: bank.card.v1.AuthorizeRequest.function:type_name -> bank.card.v1.Function
-	23, // 23: bank.card.v1.AuthorizeResponse.authorization:type_name -> bank.card.v1.Authorization
-	52, // 24: bank.card.v1.ClearRequest.amount:type_name -> bank.common.v1.Money
-	23, // 25: bank.card.v1.ClearResponse.authorization:type_name -> bank.card.v1.Authorization
-	23, // 26: bank.card.v1.ReverseResponse.authorization:type_name -> bank.card.v1.Authorization
-	51, // 27: bank.card.v1.CardToken.created_at:type_name -> google.protobuf.Timestamp
-	30, // 28: bank.card.v1.TokenizeCardResponse.token:type_name -> bank.card.v1.CardToken
-	30, // 29: bank.card.v1.ListTokensResponse.tokens:type_name -> bank.card.v1.CardToken
-	30, // 30: bank.card.v1.UpdateTokenResponse.token:type_name -> bank.card.v1.CardToken
-	52, // 31: bank.card.v1.RefundRequest.amount:type_name -> bank.common.v1.Money
-	52, // 32: bank.card.v1.Refund.amount:type_name -> bank.common.v1.Money
-	51, // 33: bank.card.v1.Refund.created_at:type_name -> google.protobuf.Timestamp
-	38, // 34: bank.card.v1.RefundResponse.refund:type_name -> bank.card.v1.Refund
-	23, // 35: bank.card.v1.ListAuthorizationsResponse.authorizations:type_name -> bank.card.v1.Authorization
-	5,  // 36: bank.card.v1.Dispute.reason:type_name -> bank.card.v1.DisputeReason
-	52, // 37: bank.card.v1.Dispute.amount:type_name -> bank.common.v1.Money
-	6,  // 38: bank.card.v1.Dispute.status:type_name -> bank.card.v1.DisputeStatus
-	51, // 39: bank.card.v1.Dispute.created_at:type_name -> google.protobuf.Timestamp
-	51, // 40: bank.card.v1.Dispute.decided_at:type_name -> google.protobuf.Timestamp
-	51, // 41: bank.card.v1.Dispute.purchased_at:type_name -> google.protobuf.Timestamp
-	5,  // 42: bank.card.v1.OpenDisputeRequest.reason:type_name -> bank.card.v1.DisputeReason
-	52, // 43: bank.card.v1.OpenDisputeRequest.amount:type_name -> bank.common.v1.Money
-	42, // 44: bank.card.v1.OpenDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
-	42, // 45: bank.card.v1.GetDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
-	6,  // 46: bank.card.v1.ListDisputesRequest.status:type_name -> bank.card.v1.DisputeStatus
-	42, // 47: bank.card.v1.ListDisputesResponse.disputes:type_name -> bank.card.v1.Dispute
-	42, // 48: bank.card.v1.DecideDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
-	9,  // 49: bank.card.v1.CardService.IssueCard:input_type -> bank.card.v1.IssueCardRequest
-	11, // 50: bank.card.v1.CardService.GetCard:input_type -> bank.card.v1.GetCardRequest
-	13, // 51: bank.card.v1.CardService.ListCards:input_type -> bank.card.v1.ListCardsRequest
-	15, // 52: bank.card.v1.CardService.BlockCard:input_type -> bank.card.v1.BlockCardRequest
-	17, // 53: bank.card.v1.CardService.UnblockCard:input_type -> bank.card.v1.UnblockCardRequest
-	19, // 54: bank.card.v1.CardService.UpdateControls:input_type -> bank.card.v1.UpdateControlsRequest
-	21, // 55: bank.card.v1.CardService.RevealCardDetails:input_type -> bank.card.v1.RevealCardDetailsRequest
-	31, // 56: bank.card.v1.CardService.TokenizeCard:input_type -> bank.card.v1.TokenizeCardRequest
-	33, // 57: bank.card.v1.CardService.ListTokens:input_type -> bank.card.v1.ListTokensRequest
-	35, // 58: bank.card.v1.CardService.UpdateToken:input_type -> bank.card.v1.UpdateTokenRequest
-	24, // 59: bank.card.v1.CardService.Authorize:input_type -> bank.card.v1.AuthorizeRequest
-	26, // 60: bank.card.v1.CardService.Clear:input_type -> bank.card.v1.ClearRequest
-	28, // 61: bank.card.v1.CardService.Reverse:input_type -> bank.card.v1.ReverseRequest
-	37, // 62: bank.card.v1.CardService.Refund:input_type -> bank.card.v1.RefundRequest
-	40, // 63: bank.card.v1.CardService.ListAuthorizations:input_type -> bank.card.v1.ListAuthorizationsRequest
-	43, // 64: bank.card.v1.CardService.OpenDispute:input_type -> bank.card.v1.OpenDisputeRequest
-	45, // 65: bank.card.v1.CardService.GetDispute:input_type -> bank.card.v1.GetDisputeRequest
-	47, // 66: bank.card.v1.CardService.ListDisputes:input_type -> bank.card.v1.ListDisputesRequest
-	49, // 67: bank.card.v1.CardService.DecideDispute:input_type -> bank.card.v1.DecideDisputeRequest
-	10, // 68: bank.card.v1.CardService.IssueCard:output_type -> bank.card.v1.IssueCardResponse
-	12, // 69: bank.card.v1.CardService.GetCard:output_type -> bank.card.v1.GetCardResponse
-	14, // 70: bank.card.v1.CardService.ListCards:output_type -> bank.card.v1.ListCardsResponse
-	16, // 71: bank.card.v1.CardService.BlockCard:output_type -> bank.card.v1.BlockCardResponse
-	18, // 72: bank.card.v1.CardService.UnblockCard:output_type -> bank.card.v1.UnblockCardResponse
-	20, // 73: bank.card.v1.CardService.UpdateControls:output_type -> bank.card.v1.UpdateControlsResponse
-	22, // 74: bank.card.v1.CardService.RevealCardDetails:output_type -> bank.card.v1.RevealCardDetailsResponse
-	32, // 75: bank.card.v1.CardService.TokenizeCard:output_type -> bank.card.v1.TokenizeCardResponse
-	34, // 76: bank.card.v1.CardService.ListTokens:output_type -> bank.card.v1.ListTokensResponse
-	36, // 77: bank.card.v1.CardService.UpdateToken:output_type -> bank.card.v1.UpdateTokenResponse
-	25, // 78: bank.card.v1.CardService.Authorize:output_type -> bank.card.v1.AuthorizeResponse
-	27, // 79: bank.card.v1.CardService.Clear:output_type -> bank.card.v1.ClearResponse
-	29, // 80: bank.card.v1.CardService.Reverse:output_type -> bank.card.v1.ReverseResponse
-	39, // 81: bank.card.v1.CardService.Refund:output_type -> bank.card.v1.RefundResponse
-	41, // 82: bank.card.v1.CardService.ListAuthorizations:output_type -> bank.card.v1.ListAuthorizationsResponse
-	44, // 83: bank.card.v1.CardService.OpenDispute:output_type -> bank.card.v1.OpenDisputeResponse
-	46, // 84: bank.card.v1.CardService.GetDispute:output_type -> bank.card.v1.GetDisputeResponse
-	48, // 85: bank.card.v1.CardService.ListDisputes:output_type -> bank.card.v1.ListDisputesResponse
-	50, // 86: bank.card.v1.CardService.DecideDispute:output_type -> bank.card.v1.DecideDisputeResponse
-	68, // [68:87] is the sub-list for method output_type
-	49, // [49:68] is the sub-list for method input_type
-	49, // [49:49] is the sub-list for extension type_name
-	49, // [49:49] is the sub-list for extension extendee
-	0,  // [0:49] is the sub-list for field type_name
+	51, // 4: bank.card.v1.Card.valid_until:type_name -> google.protobuf.Timestamp
+	0,  // 5: bank.card.v1.IssueCardRequest.kind:type_name -> bank.card.v1.CardKind
+	8,  // 6: bank.card.v1.IssueCardResponse.card:type_name -> bank.card.v1.Card
+	8,  // 7: bank.card.v1.GetCardResponse.card:type_name -> bank.card.v1.Card
+	8,  // 8: bank.card.v1.ListCardsResponse.cards:type_name -> bank.card.v1.Card
+	8,  // 9: bank.card.v1.BlockCardResponse.card:type_name -> bank.card.v1.Card
+	8,  // 10: bank.card.v1.UnblockCardResponse.card:type_name -> bank.card.v1.Card
+	7,  // 11: bank.card.v1.UpdateControlsRequest.controls:type_name -> bank.card.v1.Controls
+	8,  // 12: bank.card.v1.UpdateControlsResponse.card:type_name -> bank.card.v1.Card
+	4,  // 13: bank.card.v1.Authorization.status:type_name -> bank.card.v1.AuthorizationStatus
+	52, // 14: bank.card.v1.Authorization.amount:type_name -> bank.common.v1.Money
+	52, // 15: bank.card.v1.Authorization.cleared_amount:type_name -> bank.common.v1.Money
+	2,  // 16: bank.card.v1.Authorization.channel:type_name -> bank.card.v1.Channel
+	51, // 17: bank.card.v1.Authorization.created_at:type_name -> google.protobuf.Timestamp
+	3,  // 18: bank.card.v1.Authorization.function:type_name -> bank.card.v1.Function
+	52, // 19: bank.card.v1.Authorization.refunded_amount:type_name -> bank.common.v1.Money
+	42, // 20: bank.card.v1.Authorization.dispute:type_name -> bank.card.v1.Dispute
+	52, // 21: bank.card.v1.AuthorizeRequest.amount:type_name -> bank.common.v1.Money
+	2,  // 22: bank.card.v1.AuthorizeRequest.channel:type_name -> bank.card.v1.Channel
+	3,  // 23: bank.card.v1.AuthorizeRequest.function:type_name -> bank.card.v1.Function
+	23, // 24: bank.card.v1.AuthorizeResponse.authorization:type_name -> bank.card.v1.Authorization
+	52, // 25: bank.card.v1.ClearRequest.amount:type_name -> bank.common.v1.Money
+	23, // 26: bank.card.v1.ClearResponse.authorization:type_name -> bank.card.v1.Authorization
+	23, // 27: bank.card.v1.ReverseResponse.authorization:type_name -> bank.card.v1.Authorization
+	51, // 28: bank.card.v1.CardToken.created_at:type_name -> google.protobuf.Timestamp
+	30, // 29: bank.card.v1.TokenizeCardResponse.token:type_name -> bank.card.v1.CardToken
+	30, // 30: bank.card.v1.ListTokensResponse.tokens:type_name -> bank.card.v1.CardToken
+	30, // 31: bank.card.v1.UpdateTokenResponse.token:type_name -> bank.card.v1.CardToken
+	52, // 32: bank.card.v1.RefundRequest.amount:type_name -> bank.common.v1.Money
+	52, // 33: bank.card.v1.Refund.amount:type_name -> bank.common.v1.Money
+	51, // 34: bank.card.v1.Refund.created_at:type_name -> google.protobuf.Timestamp
+	38, // 35: bank.card.v1.RefundResponse.refund:type_name -> bank.card.v1.Refund
+	23, // 36: bank.card.v1.ListAuthorizationsResponse.authorizations:type_name -> bank.card.v1.Authorization
+	5,  // 37: bank.card.v1.Dispute.reason:type_name -> bank.card.v1.DisputeReason
+	52, // 38: bank.card.v1.Dispute.amount:type_name -> bank.common.v1.Money
+	6,  // 39: bank.card.v1.Dispute.status:type_name -> bank.card.v1.DisputeStatus
+	51, // 40: bank.card.v1.Dispute.created_at:type_name -> google.protobuf.Timestamp
+	51, // 41: bank.card.v1.Dispute.decided_at:type_name -> google.protobuf.Timestamp
+	51, // 42: bank.card.v1.Dispute.purchased_at:type_name -> google.protobuf.Timestamp
+	5,  // 43: bank.card.v1.OpenDisputeRequest.reason:type_name -> bank.card.v1.DisputeReason
+	52, // 44: bank.card.v1.OpenDisputeRequest.amount:type_name -> bank.common.v1.Money
+	42, // 45: bank.card.v1.OpenDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
+	42, // 46: bank.card.v1.GetDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
+	6,  // 47: bank.card.v1.ListDisputesRequest.status:type_name -> bank.card.v1.DisputeStatus
+	42, // 48: bank.card.v1.ListDisputesResponse.disputes:type_name -> bank.card.v1.Dispute
+	42, // 49: bank.card.v1.DecideDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
+	9,  // 50: bank.card.v1.CardService.IssueCard:input_type -> bank.card.v1.IssueCardRequest
+	11, // 51: bank.card.v1.CardService.GetCard:input_type -> bank.card.v1.GetCardRequest
+	13, // 52: bank.card.v1.CardService.ListCards:input_type -> bank.card.v1.ListCardsRequest
+	15, // 53: bank.card.v1.CardService.BlockCard:input_type -> bank.card.v1.BlockCardRequest
+	17, // 54: bank.card.v1.CardService.UnblockCard:input_type -> bank.card.v1.UnblockCardRequest
+	19, // 55: bank.card.v1.CardService.UpdateControls:input_type -> bank.card.v1.UpdateControlsRequest
+	21, // 56: bank.card.v1.CardService.RevealCardDetails:input_type -> bank.card.v1.RevealCardDetailsRequest
+	31, // 57: bank.card.v1.CardService.TokenizeCard:input_type -> bank.card.v1.TokenizeCardRequest
+	33, // 58: bank.card.v1.CardService.ListTokens:input_type -> bank.card.v1.ListTokensRequest
+	35, // 59: bank.card.v1.CardService.UpdateToken:input_type -> bank.card.v1.UpdateTokenRequest
+	24, // 60: bank.card.v1.CardService.Authorize:input_type -> bank.card.v1.AuthorizeRequest
+	26, // 61: bank.card.v1.CardService.Clear:input_type -> bank.card.v1.ClearRequest
+	28, // 62: bank.card.v1.CardService.Reverse:input_type -> bank.card.v1.ReverseRequest
+	37, // 63: bank.card.v1.CardService.Refund:input_type -> bank.card.v1.RefundRequest
+	40, // 64: bank.card.v1.CardService.ListAuthorizations:input_type -> bank.card.v1.ListAuthorizationsRequest
+	43, // 65: bank.card.v1.CardService.OpenDispute:input_type -> bank.card.v1.OpenDisputeRequest
+	45, // 66: bank.card.v1.CardService.GetDispute:input_type -> bank.card.v1.GetDisputeRequest
+	47, // 67: bank.card.v1.CardService.ListDisputes:input_type -> bank.card.v1.ListDisputesRequest
+	49, // 68: bank.card.v1.CardService.DecideDispute:input_type -> bank.card.v1.DecideDisputeRequest
+	10, // 69: bank.card.v1.CardService.IssueCard:output_type -> bank.card.v1.IssueCardResponse
+	12, // 70: bank.card.v1.CardService.GetCard:output_type -> bank.card.v1.GetCardResponse
+	14, // 71: bank.card.v1.CardService.ListCards:output_type -> bank.card.v1.ListCardsResponse
+	16, // 72: bank.card.v1.CardService.BlockCard:output_type -> bank.card.v1.BlockCardResponse
+	18, // 73: bank.card.v1.CardService.UnblockCard:output_type -> bank.card.v1.UnblockCardResponse
+	20, // 74: bank.card.v1.CardService.UpdateControls:output_type -> bank.card.v1.UpdateControlsResponse
+	22, // 75: bank.card.v1.CardService.RevealCardDetails:output_type -> bank.card.v1.RevealCardDetailsResponse
+	32, // 76: bank.card.v1.CardService.TokenizeCard:output_type -> bank.card.v1.TokenizeCardResponse
+	34, // 77: bank.card.v1.CardService.ListTokens:output_type -> bank.card.v1.ListTokensResponse
+	36, // 78: bank.card.v1.CardService.UpdateToken:output_type -> bank.card.v1.UpdateTokenResponse
+	25, // 79: bank.card.v1.CardService.Authorize:output_type -> bank.card.v1.AuthorizeResponse
+	27, // 80: bank.card.v1.CardService.Clear:output_type -> bank.card.v1.ClearResponse
+	29, // 81: bank.card.v1.CardService.Reverse:output_type -> bank.card.v1.ReverseResponse
+	39, // 82: bank.card.v1.CardService.Refund:output_type -> bank.card.v1.RefundResponse
+	41, // 83: bank.card.v1.CardService.ListAuthorizations:output_type -> bank.card.v1.ListAuthorizationsResponse
+	44, // 84: bank.card.v1.CardService.OpenDispute:output_type -> bank.card.v1.OpenDisputeResponse
+	46, // 85: bank.card.v1.CardService.GetDispute:output_type -> bank.card.v1.GetDisputeResponse
+	48, // 86: bank.card.v1.CardService.ListDisputes:output_type -> bank.card.v1.ListDisputesResponse
+	50, // 87: bank.card.v1.CardService.DecideDispute:output_type -> bank.card.v1.DecideDisputeResponse
+	69, // [69:88] is the sub-list for method output_type
+	50, // [50:69] is the sub-list for method input_type
+	50, // [50:50] is the sub-list for extension type_name
+	50, // [50:50] is the sub-list for extension extendee
+	0,  // [0:50] is the sub-list for field type_name
 }
 
 func init() { file_bank_card_v1_card_proto_init() }

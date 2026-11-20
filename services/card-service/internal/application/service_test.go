@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"strings"
@@ -498,5 +499,54 @@ func TestCreditDisputeRefundsTheInvoice(t *testing.T) {
 	}
 	if e.credit.refunds != 1 || e.txs.refunds != 0 {
 		t.Fatalf("credit refunds %d, debit refunds %d", e.credit.refunds, e.txs.refunds)
+	}
+}
+
+func TestTemporaryCard(t *testing.T) {
+	e := setup(t)
+	now := time.Now()
+	e.svc.SetClock(func() time.Time { return now })
+	c, err := e.svc.Issue(e.ctx, "tmp-1", account, domain.Temporary)
+	if err != nil || c.ValidUntil == nil || c.Controls.Contactless || !c.Controls.Online {
+		t.Fatalf("issue = %+v %v", c, err)
+	}
+	d, _ := e.svc.Reveal(e.ctx, c.ID)
+	if _, _, err := e.svc.Tokenize(e.ctx, c.ID, domain.ApplePay, "iPhone"); reasonOf(err) != "TEMPORARY_CARD" {
+		t.Fatalf("wallet: %v", err)
+	}
+
+	// Declined for lack of money: still usable.
+	if a, _ := e.svc.Authorize(e.ctx, d.PAN, purchase(d, "500")); a.Status != domain.Declined {
+		t.Fatalf("too expensive = %+v", a)
+	}
+	if card, _ := e.store.Card(e.ctx, c.ID); card.Status != domain.Active {
+		t.Fatalf("after a decline = %+v", card)
+	}
+	// The first approved purchase spends it.
+	if a, _ := e.svc.Authorize(e.ctx, d.PAN, purchase(d, "30")); a.Status != domain.Approved {
+		t.Fatalf("purchase = %+v", a)
+	}
+	if card, _ := e.store.Card(e.ctx, c.ID); card.Status != domain.Cancelled || card.StatusReason != domain.ReasonUsed {
+		t.Fatalf("after the purchase = %+v", card)
+	}
+	if a, _ := e.svc.Authorize(e.ctx, d.PAN, purchase(d, "1")); a.Status != domain.Declined {
+		t.Fatalf("second purchase = %+v", a)
+	}
+
+	// Unused for a day: expired.
+	c2, _ := e.svc.Issue(e.ctx, "tmp-2", account, domain.Temporary)
+	d2, _ := e.svc.Reveal(e.ctx, c2.ID)
+	now = now.Add(domain.TemporaryLifetime + time.Minute)
+	if a, _ := e.svc.Authorize(e.ctx, d2.PAN, purchase(d2, "1")); a.Code != domain.CodeExpiredCard {
+		t.Fatalf("expired temporary = %+v", a)
+	}
+	// At most three live ones.
+	for i := range 3 {
+		if _, err := e.svc.Issue(e.ctx, fmt.Sprintf("tmp-%d", 10+i), account, domain.Temporary); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := e.svc.Issue(e.ctx, "tmp-20", account, domain.Temporary); reasonOf(err) != "TOO_MANY_TEMPORARY_CARDS" {
+		t.Fatalf("fourth: %v", err)
 	}
 }
