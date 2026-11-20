@@ -70,7 +70,7 @@
 | `POST` | `/v1/pix/qr-codes/decode` | `{payload}` → receiver, amount, txid |
 | `POST` | `/v1/accounts/{id}/pix/qr-payments` | Pay a BR Code `{payload, amount?}` · Idempotency-Key |
 | `POST` | `/v1/accounts/{id}/pix/transfers/{transferID}/refunds` | Refund a received Pix `{amount, reason}` · Idempotency-Key |
-| `POST` / `GET` | `/v1/accounts/{id}/cards` | Issue a debit card `{kind: PHYSICAL\|VIRTUAL}` (Idempotency-Key) / list cards |
+| `POST` / `GET` | `/v1/accounts/{id}/cards` | Issue a debit card `{kind: PHYSICAL\|VIRTUAL\|TEMPORARY}` (Idempotency-Key; `TEMPORARY`: single use, 24 h, `TOO_MANY_TEMPORARY_CARDS`) / list cards (`valid_until` on temporary ones) |
 | `POST` | `/v1/accounts/{id}/cards/{cardID}/block` · `/unblock` | Block (`{reason}`) / unblock |
 | `PUT` | `/v1/accounts/{id}/cards/{cardID}/controls` | `{online, international, contactless}` |
 | `POST` | `/v1/accounts/{id}/cards/{cardID}/reveal` | 🔐 Card number, expiry, CVV |

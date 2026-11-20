@@ -227,6 +227,11 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Recent receivers come from the account's completed Pix (nothing copied); favorites with a nickname on top; one tap fills the key and looks it up.
 - Web and mobile: contacts row on *Enviar Pix* and a star to favorite the receiver.
 
+## Phase 33 — Temporary cards ✅
+
+- Single-use virtual cards for online purchases: valid for 24 hours, cancelled by their first approved purchase (claimed atomically), given back when that purchase is declined, never put in a wallet; at most three live.
+- Web and mobile: create one from the cards screen, its own look, and what state it is in; mobile now switches between cards.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.
