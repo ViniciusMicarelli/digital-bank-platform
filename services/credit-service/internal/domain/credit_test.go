@@ -92,3 +92,55 @@ func TestCharges(t *testing.T) {
 		t.Fatalf("rounding: %d", fine)
 	}
 }
+
+func TestComputeScore(t *testing.T) {
+	now := time.Date(2026, 11, 20, 12, 0, 0, 0, time.UTC)
+	line := Line{Limit: 1_000_00, CreatedAt: now}
+	if s := ComputeScore(ScoreInputs{Line: line}, now); s.Value != 580 || s.Band != BandGood || len(s.Factors) != 6 {
+		t.Fatalf("a new line = %+v", s)
+	}
+	// Two years, eight invoices on time, 20% used.
+	good := ScoreInputs{Line: Line{Limit: 1_000_00, Used: 200_00, CreatedAt: now.AddDate(-2, 0, 0)}, OnTime: 8}
+	if s := ComputeScore(good, now); s.Value != 500+240+80+120 || s.Band != BandExcellent ||
+		s.Factor(FactorRelationship).Value != 24 || s.Factor(FactorUtilization).Value != 20 {
+		t.Fatalf("a good customer = %+v", s)
+	}
+	// Late twice, overdue now, maxed out, one plan: clamped at 0.
+	bad := ScoreInputs{Line: Line{Limit: 1_000_00, Used: 1_000_00, CreatedAt: now}, Late: 2, OverdueNow: true, Plans: 1}
+	if s := ComputeScore(bad, now); s.Value != 0 || s.Band != BandLow || s.Factor(FactorLatePayments).Points != -240 {
+		t.Fatalf("a bad customer = %+v", s)
+	}
+	if MonthsBetween(time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC), time.Date(2026, 3, 30, 0, 0, 0, 0, time.UTC)) != 1 {
+		t.Fatal("full months only")
+	}
+}
+
+func TestAutoIncreaseBy(t *testing.T) {
+	for score, want := range map[int]int{800: 10_000, 600: 5_000, 300: 0} {
+		if got := AutoIncreaseBy(score); got != want {
+			t.Errorf("AutoIncreaseBy(%d) = %d, want %d", score, got, want)
+		}
+	}
+}
+
+func TestAnalyzeLimitByScore(t *testing.T) {
+	l := Line{Status: LineActive, Limit: 1_000_00}
+	for _, c := range []struct {
+		requested int64
+		score     int
+		status    LimitStatus
+		reason    string
+	}{
+		{1_500_00, 600, LimitApproved, ""},
+		{1_600_00, 600, LimitInReview, ""},
+		{2_000_00, 800, LimitApproved, ""}, // +100% from 750
+		{1_100_00, 400, LimitInReview, ""}, // no automatic increase under 450
+		{1_100_00, 200, LimitRejected, "LOW_SCORE"},
+		{500_00, 0, LimitApproved, ""}, // a decrease never depends on the score
+	} {
+		status, reason, err := AnalyzeLimit(l, c.requested, false, c.score)
+		if err != nil || status != c.status || reason != c.reason {
+			t.Errorf("AnalyzeLimit(%d, score %d) = %s %q %v, want %s %q", c.requested, c.score, status, reason, err, c.status, c.reason)
+		}
+	}
+}

@@ -144,6 +144,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/accounts/{id}/credit/installments", a.authenticated(a.owned(a.installmentPlans)))
 	mux.HandleFunc("POST /v1/accounts/{id}/credit/limit", a.authenticated(a.owned(a.requestLimit)))
 	mux.HandleFunc("GET /v1/accounts/{id}/credit/limit-requests", a.authenticated(a.owned(a.limitRequests)))
+	mux.HandleFunc("GET /v1/accounts/{id}/credit/score", a.authenticated(a.owned(a.creditScore)))
 	mux.HandleFunc("GET /v1/accounts/{id}/credit/invoices/{invoiceID}", a.authenticated(a.owned(a.ownedInvoice(a.getInvoice))))
 	mux.HandleFunc("POST /v1/accounts/{id}/credit/invoices/{invoiceID}/payments", a.authenticated(a.owned(a.ownedInvoice(a.payInvoice))))
 	mux.HandleFunc("GET /v1/accounts/{id}/credit/invoices/{invoiceID}/plans", a.authenticated(a.owned(a.ownedInvoice(a.planQuotes))))

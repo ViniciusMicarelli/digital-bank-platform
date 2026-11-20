@@ -282,7 +282,7 @@ function LimitItem({ item, onOpen }: { item: LimitRequest; onOpen: () => void })
         <IconTile icon={Gauge} tone="credit" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-fg">{item.holder_name ?? 'Cliente'} · {formatBRL(item.current_limit)} → {formatBRL(item.requested)}</p>
-          <p className="text-xs text-muted">Usado {formatBRL(item.used)} · pedido em {dateTimeBR(item.created_at)}</p>
+          <p className="text-xs text-muted">Usado {formatBRL(item.used)}{item.score ? ` · score ${item.score}` : ''} · pedido em {dateTimeBR(item.created_at)}</p>
         </div>
       </div>
       {mode === 'idle' && (

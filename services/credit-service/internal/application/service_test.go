@@ -517,3 +517,39 @@ func TestLimitRequests(t *testing.T) {
 		t.Fatal("whole reais only")
 	}
 }
+
+func TestCreditScore(t *testing.T) {
+	e := setup(t)                                    // Nov 17
+	_, _ = e.svc.OpenLine(e.ctx, "k", e.account, 10) // R$ 1.000
+	if s, err := e.svc.Score(e.ctx, e.account); err != nil || s.Value != 580 {
+		t.Fatalf("a new line = %+v %v", s, err)
+	}
+	if _, err := e.svc.Score(e.ctx, uuid.New()); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("no line: %v", err)
+	}
+
+	// An invoice paid on time, after the relationship turns a few months old.
+	e.ledger.balance[e.account] = 1_000_00
+	h, _ := e.svc.Reserve(e.ctx, "h1", e.account, 700_00, 1, "TV", nil)
+	_, _ = e.svc.Capture(e.ctx, h.ID, nil)
+	if s, _ := e.svc.Score(e.ctx, e.account); s.Factor(domain.FactorUtilization).Points != -40 {
+		t.Fatalf("70%% used = %+v", s.Factors)
+	}
+	e.now = time.Date(2026, 12, 10, 12, 0, 0, 0, time.UTC)
+	e.svc.RunOnce(e.ctx)
+	closed := e.invoices(t)[1]
+	if p, err := e.svc.Pay(e.ctx, "p1", closed.ID, 700_00); err != nil || p.Status != domain.PaymentCompleted {
+		t.Fatalf("pay = %+v %v", p, err)
+	}
+	e.now = time.Date(2027, 3, 18, 12, 0, 0, 0, time.UTC)
+	s, _ := e.svc.Score(e.ctx, e.account)
+	if s.Factor(domain.FactorPaymentHistory).Value != 1 || s.Factor(domain.FactorRelationship).Value != 4 || s.Value != 500+30+80+20 {
+		t.Fatalf("after paying on time = %+v", s)
+	}
+
+	// The score is kept on each limit request.
+	r, _ := e.svc.RequestLimit(e.ctx, "r1", e.account, 1_500_00)
+	if r.Score != s.Value || r.Status != domain.LimitApproved {
+		t.Fatalf("request = %+v", r)
+	}
+}

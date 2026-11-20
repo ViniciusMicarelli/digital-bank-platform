@@ -309,6 +309,8 @@ export interface LimitRequest {
   decided_by: string
   created_at: string
   decided_at?: string
+  /** The customer's score when the request was analyzed. */
+  score?: number
   // Back office only.
   holder_name?: string
   customer_id?: string
@@ -323,4 +325,47 @@ export interface PixContact {
   favorite: boolean
   last_sent_at?: string
   times_sent: number
+}
+
+export type ScoreBand = 'LOW' | 'FAIR' | 'GOOD' | 'EXCELLENT'
+export type ScoreFactorCode = 'PAYMENT_HISTORY' | 'LATE_PAYMENTS' | 'OVERDUE_NOW' | 'UTILIZATION' | 'RELATIONSHIP' | 'INVOICE_PLANS'
+
+export interface ScoreFactor {
+  code: ScoreFactorCode
+  /** Points added (negative: taken) to the base of 500. */
+  points: number
+  /** A count, the % of the limit used, or months. */
+  value: number
+}
+
+/** The bank's behaviour score for the card, 0..1000. */
+export interface CreditScore {
+  score: number
+  band: ScoreBand
+  factors: ScoreFactor[]
+  /** How much more the automatic analysis grants at once (basis points; 0: an analyst decides). */
+  auto_increase_bp: number
+}
+
+/** Band names; each app colors them with its theme's status tokens (danger, warning, positive, credit). */
+export const scoreBands: Record<ScoreBand, string> = { LOW: 'Baixo', FAIR: 'Regular', GOOD: 'Bom', EXCELLENT: 'Excelente' }
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+/** What a factor means to the customer, in pt-BR: a title and the detail behind it. */
+export function scoreFactorText(f: ScoreFactor): { title: string; detail: string } {
+  switch (f.code) {
+    case 'PAYMENT_HISTORY':
+      return { title: 'Faturas pagas em dia', detail: f.value ? `${plural(f.value, 'fatura paga', 'faturas pagas')} em dia nos últimos 12 meses.` : 'Pague as faturas até o vencimento para subir o score.' }
+    case 'LATE_PAYMENTS':
+      return { title: 'Atrasos', detail: f.value ? `${plural(f.value, 'fatura paga', 'faturas pagas')} com atraso nos últimos 12 meses.` : 'Nenhum atraso nos últimos 12 meses.' }
+    case 'OVERDUE_NOW':
+      return { title: 'Fatura em atraso', detail: f.value ? 'Há uma fatura vencida e não paga agora.' : 'Nenhuma fatura vencida agora.' }
+    case 'UTILIZATION':
+      return { title: 'Uso do limite', detail: `Você está usando ${f.value}% do limite. Até 30% é o ideal.` }
+    case 'RELATIONSHIP':
+      return { title: 'Tempo de cartão', detail: f.value ? `${plural(f.value, 'mês', 'meses')} de relacionamento.` : 'Começa a contar no primeiro mês.' }
+    case 'INVOICE_PLANS':
+      return { title: 'Parcelamento de fatura', detail: f.value ? `${plural(f.value, 'fatura parcelada', 'faturas parceladas')} nos últimos 12 meses.` : 'Nenhuma fatura parcelada nos últimos 12 meses.' }
+  }
 }

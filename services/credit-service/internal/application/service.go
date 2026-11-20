@@ -84,6 +84,7 @@ func (s *Service) OpenLine(ctx context.Context, key string, account uuid.UUID, c
 	if err != nil {
 		return domain.Line{}, err
 	}
+	l.CreatedAt = s.now()
 	if existing, err := s.store.LineByAccount(ctx, account); err == nil {
 		return sameLine(existing, key)
 	} else if !errors.Is(err, domain.ErrNotFound) {
@@ -584,6 +585,24 @@ func (s *Service) postAllCharges(ctx context.Context) error {
 // RequestLimit asks for a new limit (idempotent on key): decreases and
 // increases the automatic analysis can grant apply at once; refusals and
 // requests in review are recorded too.
+// Score is the account's behaviour score, explained factor by factor.
+func (s *Service) Score(ctx context.Context, account uuid.UUID) (domain.Score, error) {
+	line, err := s.store.LineByAccount(ctx, account)
+	if err != nil {
+		return domain.Score{}, err
+	}
+	return s.scoreLine(ctx, line)
+}
+
+func (s *Service) scoreLine(ctx context.Context, line domain.Line) (domain.Score, error) {
+	now := s.now()
+	in, err := s.store.ScoreInputs(ctx, line, now.AddDate(0, -domain.ScoreWindow, 0))
+	if err != nil {
+		return domain.Score{}, err
+	}
+	return domain.ComputeScore(in, now), nil
+}
+
 func (s *Service) RequestLimit(ctx context.Context, key string, account uuid.UUID, amount int64) (domain.LimitRequest, error) {
 	if key == "" {
 		return domain.LimitRequest{}, fmt.Errorf("%w: idempotency key is required", domain.ErrInvalidArgument)
@@ -601,23 +620,24 @@ func (s *Service) RequestLimit(ctx context.Context, key string, account uuid.UUI
 	if err != nil {
 		return domain.LimitRequest{}, err
 	}
-	overdue, err := s.store.HasOverdue(ctx, line.ID)
+	score, err := s.scoreLine(ctx, line)
 	if err != nil {
 		return domain.LimitRequest{}, err
 	}
+	overdue := score.Factor(domain.FactorOverdueNow).Value > 0
 	var r domain.LimitRequest
 	err = s.store.InTx(ctx, func(tx ports.Tx) error {
 		l, err := tx.LockLine(line.ID)
 		if err != nil {
 			return err
 		}
-		status, reason, err := domain.AnalyzeLimit(l, amount, overdue)
+		status, reason, err := domain.AnalyzeLimit(l, amount, overdue, score.Value)
 		if err != nil {
 			return err
 		}
 		now := s.now()
 		r = domain.LimitRequest{ID: uuid.Must(uuid.NewV7()), IdempotencyKey: key, LineID: l.ID, AccountID: l.AccountID,
-			CurrentLimit: l.Limit, Requested: amount, Status: status, Reason: reason, CreatedAt: now}
+			CurrentLimit: l.Limit, Requested: amount, Status: status, Reason: reason, Score: score.Value, CreatedAt: now}
 		if status != domain.LimitInReview {
 			r.DecidedBy, r.DecidedAt = "automatic", &now
 		}

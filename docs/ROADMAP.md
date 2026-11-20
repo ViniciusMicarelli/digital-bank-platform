@@ -237,6 +237,12 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Savings boxes can take a monthly deposit from the checking account on a chosen day (1–28): exactly once per month, kept due through an outage, skipped (and shown) when the money is not there.
 - Web and mobile: set, change and remove it on the box; the box card shows it; the sandbox runs the next one now.
 
+## Phase 35 — Credit score ✅
+
+- The bank's own behaviour score (0–1000) for the card, explained factor by factor: invoices paid on time or late, an overdue invoice, how much of the limit is used, time as a customer, invoice plans.
+- It drives the automatic limit analysis (+50%, +100% from 750, refused under 250) and is kept on each request for the analyst.
+- Web and mobile: the score, its band and what helps or hurts it on the credit screen; back office shows it on limit requests.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

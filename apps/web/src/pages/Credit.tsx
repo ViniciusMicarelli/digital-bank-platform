@@ -1,14 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, Gauge, Layers, Receipt, Wallet } from 'lucide-react'
+import { CalendarClock, Gauge, Layers, Receipt, ShieldCheck, Wallet } from 'lucide-react'
 import { useState } from 'react'
 import { BankCard } from '../components/BankCard'
 import { useCountUp } from '../lib/motion'
 import { useAccount } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
 import { Alert, Amount, Badge, Button, Empty, Loading, Modal, PageTitle, Panel, Sandbox, Select } from '../components/ui'
-import { dateBR, dateTimeBR } from '../lib/format'
+import { cx, dateBR, dateTimeBR } from '../lib/format'
 import { api, ApiError } from '../lib/api'
-import { errorMessage, compareBRL, formatBRL, type CreditLine, type InstallmentPlan, type Invoice, type LimitRequest, type PlanQuote } from '@bank/core'
+import { errorMessage, compareBRL, formatBRL, scoreBands, scoreFactorText, type CreditLine, type CreditScore, type InstallmentPlan, type Invoice, type LimitRequest, type PlanQuote } from '@bank/core'
 
 const invoiceStatus: Record<Invoice['status'], [string, 'credit' | 'amber' | 'green' | 'red']> = {
   OPEN: ['Aberta', 'credit'], CLOSED: ['Fechada', 'amber'], PAID: ['Paga', 'green'], OVERDUE: ['Vencida', 'red'],
@@ -76,7 +76,7 @@ function InvoiceModal({ base, invoice, onClose }: { base: string; invoice: Invoi
   })
   const pay = useMutation({
     mutationFn: () => api('POST', `${base}/invoices/${invoice!.id}/payments`, { body: { amount }, idempotent: true }),
-    onSuccess: () => { setError(''); for (const k of ['invoices', 'credit', 'balance']) qc.invalidateQueries({ queryKey: [k] }) },
+    onSuccess: () => { setError(''); for (const k of ['invoices', 'credit', 'balance', 'credit-score']) qc.invalidateQueries({ queryKey: [k] }) },
     onError: (e) => setError(errorMessage(e)),
   })
   const inv = detail.data ?? invoice
@@ -101,7 +101,7 @@ function InvoiceModal({ base, invoice, onClose }: { base: string; invoice: Invoi
               ))}
             </ul>
           )}
-          {payable && planning && <PlanPicker base={base} invoice={inv} onDone={() => { setPlanning(false); for (const k of ['invoices', 'credit', 'installments']) qc.invalidateQueries({ queryKey: [k] }); onClose() }} />}
+          {payable && planning && <PlanPicker base={base} invoice={inv} onDone={() => { setPlanning(false); for (const k of ['invoices', 'credit', 'installments', 'credit-score']) qc.invalidateQueries({ queryKey: [k] }); onClose() }} />}
           {payable && !planning && (
             <form onSubmit={(e) => { e.preventDefault(); pay.mutate() }} className="space-y-3 border-t border-line pt-4">
               {inv.minimum_payment && compareBRL(inv.minimum_payment.amount, inv.remaining.amount) < 0 && (
@@ -124,9 +124,54 @@ function InvoiceModal({ base, invoice, onClose }: { base: string; invoice: Invoi
 }
 
 const limitStatus = { APPROVED: ['green', 'Aprovado'], REJECTED: ['red', 'Recusado'], IN_REVIEW: ['amber', 'Em análise'] } as const
-const limitReasons: Record<string, string> = { HAS_OVERDUE_INVOICE: 'há uma fatura em atraso', CREDIT_LINE_BLOCKED: 'o crédito está bloqueado' }
+const limitReasons: Record<string, string> = {
+  HAS_OVERDUE_INVOICE: 'há uma fatura em atraso', CREDIT_LINE_BLOCKED: 'o crédito está bloqueado', LOW_SCORE: 'seu score ainda está baixo',
+}
 
-function LimitPanel({ base, line }: { base: string; line: CreditLine }) {
+/** What the automatic analysis grants at once, for the score's allowance (bp of the limit). */
+function limitRules(bp: number) {
+  return bp ? `Para diminuir é na hora; aumentos de até ${bp / 100}% também, pelo seu score. Acima disso, um analista avalia.`
+    : 'Para diminuir é na hora; aumentos passam por um analista.'
+}
+
+const bandFill = { LOW: 'bg-danger', FAIR: 'bg-warning', GOOD: 'bg-positive', EXCELLENT: 'bg-credit' } as const
+
+function ScorePanel({ score }: { score: CreditScore }) {
+  const fill = bandFill[score.band]
+  return (
+    <Panel title="Seu score" icon={ShieldCheck}>
+      <div className="flex items-end gap-3">
+        <p className="tabular text-4xl font-bold tracking-tight text-fg" aria-label={`Score ${score.score} de 1000`}>{score.score}</p>
+        <p className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-fg-2">
+          <span className={cx('size-2 rounded-full', fill)} aria-hidden /> {scoreBands[score.band]}
+        </p>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-2" role="meter" aria-valuemin={0} aria-valuemax={1000} aria-valuenow={score.score} aria-label="Score">
+        <div className={cx('h-full rounded-full transition-all duration-700', fill)} style={{ width: `${score.score / 10}%` }} />
+      </div>
+      <div className="mt-1 flex justify-between text-[11px] text-muted"><span>0</span><span>1000</span></div>
+      <p className="mt-3 text-xs text-muted">Calculado com o seu uso do cartão aqui no banco. Começa em 500 e muda conforme estes fatores:</p>
+      <ul className="mt-2 divide-y divide-line">
+        {score.factors.map((f) => {
+          const t = scoreFactorText(f)
+          return (
+            <li key={f.code} className="flex items-start justify-between gap-3 py-2.5 text-sm">
+              <div className="min-w-0">
+                <p className="font-medium text-fg">{t.title}</p>
+                <p className="text-xs text-muted">{t.detail}</p>
+              </div>
+              <span className={cx('tabular shrink-0 font-semibold', f.points > 0 ? 'text-positive' : f.points < 0 ? 'text-danger' : 'text-muted')}>
+                {f.points > 0 ? '+' : f.points < 0 ? '−' : ''}{Math.abs(f.points)}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+    </Panel>
+  )
+}
+
+function LimitPanel({ base, line, score }: { base: string; line: CreditLine; score?: CreditScore }) {
   const qc = useQueryClient()
   const [amount, setAmount] = useState<string | null>(null)
   const [message, setMessage] = useState<{ tone: 'green' | 'red' | 'amber'; text: string } | null>(null)
@@ -140,7 +185,7 @@ function LimitPanel({ base, line }: { base: string; line: CreditLine }) {
       setMessage(r.status === 'APPROVED' ? { tone: 'green', text: `Pronto: seu limite agora é ${formatBRL(r.granted)}.` }
         : r.status === 'IN_REVIEW' ? { tone: 'amber', text: 'Pedido enviado para análise. Avisamos quando terminar.' }
           : { tone: 'red', text: `Não foi possível agora: ${limitReasons[r.reason] ?? r.reason}.` })
-      for (const k of ['credit', 'limit-requests']) qc.invalidateQueries({ queryKey: [k] })
+      for (const k of ['credit', 'limit-requests', 'credit-score']) qc.invalidateQueries({ queryKey: [k] })
     },
     onError: (e) => setMessage({ tone: 'red', text: errorMessage(e) }),
   })
@@ -151,7 +196,7 @@ function LimitPanel({ base, line }: { base: string; line: CreditLine }) {
         <Alert tone="amber">Pedido de {formatBRL(inReview.requested)} em análise desde {dateTimeBR(inReview.created_at)}.</Alert>
       ) : (
         <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); setMessage(null); ask.mutate() }}>
-          <p className="text-sm text-fg-2">Limite atual de {formatBRL(line.limit)}. Para diminuir é na hora; aumentos de até 50% também. Acima disso, um analista avalia.</p>
+          <p className="text-sm text-fg-2">Limite atual de {formatBRL(line.limit)}. {limitRules(score?.auto_increase_bp ?? 5000)}</p>
           <MoneyField label="Novo limite" onValue={setAmount} />
           <Button type="submit" variant="credit" loading={ask.isPending} disabled={!amount}>Pedir novo limite</Button>
         </form>
@@ -212,6 +257,11 @@ export function CreditPage() {
     enabled: !!line.data,
     queryFn: async () => (await api<{ invoices: Invoice[] }>('GET', `${base}/invoices`)).invoices,
   })
+  const score = useQuery({
+    queryKey: ['credit-score', account?.id],
+    enabled: !!line.data,
+    queryFn: () => api<CreditScore>('GET', `${base}/score`),
+  })
   const plans = useQuery({
     queryKey: ['installments', account?.id],
     enabled: !!line.data,
@@ -224,7 +274,7 @@ export function CreditPage() {
   })
   const cycle = useMutation({
     mutationFn: (action: 'CLOSE' | 'EXPIRE') => api('POST', `/v1/sandbox/accounts/${account!.id}/credit/cycle`, { body: { action } }),
-    onSuccess: () => { for (const k of ['invoices', 'credit', 'installments']) qc.invalidateQueries({ queryKey: [k] }) },
+    onSuccess: () => { for (const k of ['invoices', 'credit', 'installments', 'credit-score']) qc.invalidateQueries({ queryKey: [k] }) },
   })
 
   if (!account || line.isLoading) return <Loading />
@@ -277,7 +327,10 @@ export function CreditPage() {
           </Panel>
         )}
       </div>
-      <LimitPanel base={base} line={l} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <LimitPanel base={base} line={l} score={score.data} />
+        {score.data && <ScorePanel score={score.data} />}
+      </div>
       {!!plans.data?.length && (
         <Panel title="Compras parceladas" icon={Layers}
           action={l.upcoming_installments && <span className="text-sm text-muted">a vencer {formatBRL(l.upcoming_installments)}</span>}>

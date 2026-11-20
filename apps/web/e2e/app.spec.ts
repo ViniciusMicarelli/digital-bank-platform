@@ -74,7 +74,11 @@ test('credit invoice and boleto', async ({ page }) => {
   await page.getByRole('button', { name: 'Ativar crédito' }).click()
   await expect(page.getByText('R$ 1.000,00').first()).toBeVisible()
   await page.getByRole('button', { name: 'Fechar a fatura agora' }).click()
-  await expect(page.getByText('Faturas')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Faturas' })).toBeVisible()
+  // The score of a new card, explained.
+  await expect(page.getByRole('meter', { name: 'Score' })).toHaveAttribute('aria-valuenow', '580')
+  await expect(page.getByText('Faturas pagas em dia')).toBeVisible()
+  await expect(page.getByText(/aumentos de até 50% também, pelo seu score/)).toBeVisible()
   await shot(page, '06-credit')
 
   await page.goto('/boletos')

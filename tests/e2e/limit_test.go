@@ -18,13 +18,22 @@ func TestCreditLimitRequests(t *testing.T) {
 		return amountOf(l["limit"])
 	}
 
+	var review map[string]any
+	// A new card: the base score, no usage, explained factor by factor.
+	status, sc := ana.call("GET", base+"/credit/score", nil, nil)
+	if factors, _ := sc["factors"].([]any); status != 200 || sc["score"] != float64(580) || sc["band"] != "GOOD" || len(factors) != 6 ||
+		sc["auto_increase_bp"] != float64(5000) {
+		t.Fatalf("score: %d %v", status, sc)
+	}
+
 	if status, r := ana.call("POST", base+"/credit/limit", map[string]string{"amount": "700.00"}, idem()); status != 200 || r["status"] != "APPROVED" || limit() != "700.00" {
 		t.Fatalf("decrease: %d %v", status, r)
 	}
-	if status, r := ana.call("POST", base+"/credit/limit", map[string]string{"amount": "1000.00"}, idem()); status != 200 || r["decided_by"] != "automatic" || limit() != "1000.00" {
+	if status, r := ana.call("POST", base+"/credit/limit", map[string]string{"amount": "1000.00"}, idem()); status != 200 || r["decided_by"] != "automatic" ||
+		r["score"] != float64(580) || limit() != "1000.00" {
 		t.Fatalf("automatic increase: %d %v", status, r)
 	}
-	status, review := ana.call("POST", base+"/credit/limit", map[string]string{"amount": "5000.00"}, idem())
+	status, review = ana.call("POST", base+"/credit/limit", map[string]string{"amount": "5000.00"}, idem())
 	if status != 202 || review["status"] != "IN_REVIEW" || limit() != "1000.00" {
 		t.Fatalf("large increase: %d %v", status, review)
 	}

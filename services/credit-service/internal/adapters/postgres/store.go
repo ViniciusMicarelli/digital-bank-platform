@@ -216,8 +216,8 @@ func (u *unit) exec(sql string, args ...any) error {
 
 func (u *unit) InsertLine(l domain.Line) (bool, error) {
 	tag, err := u.tx.Exec(u.ctx, `INSERT INTO credit_lines (id, account_id, idempotency_key, status, credit_limit, used,
-		closing_day, interest_rate_bp) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING`,
-		l.ID, l.AccountID, l.IdempotencyKey, l.Status, l.Limit, l.Used, l.ClosingDay, l.InterestRateBP)
+		closing_day, interest_rate_bp, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, now())) ON CONFLICT DO NOTHING`,
+		l.ID, l.AccountID, l.IdempotencyKey, l.Status, l.Limit, l.Used, l.ClosingDay, l.InterestRateBP, nullTime(l.CreatedAt))
 	return tag.RowsAffected() == 1, err
 }
 
@@ -443,7 +443,7 @@ func (s *Store) MarkPlanInterestPosted(ctx context.Context, id uuid.UUID) error 
 
 // ---- limit requests ----
 
-const limitCols = `id, idempotency_key, line_id, account_id, current_limit, requested, status, granted, reason, decided_by, created_at, decided_at`
+const limitCols = `id, idempotency_key, line_id, account_id, current_limit, requested, status, granted, reason, decided_by, created_at, decided_at, score`
 
 func scanLimit(row pgx.Row) (domain.LimitRequest, error) {
 	var (
@@ -451,7 +451,7 @@ func scanLimit(row pgx.Row) (domain.LimitRequest, error) {
 		status string
 	)
 	err := row.Scan(&r.ID, &r.IdempotencyKey, &r.LineID, &r.AccountID, &r.CurrentLimit, &r.Requested, &status, &r.Granted,
-		&r.Reason, &r.DecidedBy, &r.CreatedAt, &r.DecidedAt)
+		&r.Reason, &r.DecidedBy, &r.CreatedAt, &r.DecidedAt, &r.Score)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return r, fmt.Errorf("%w: limit request", domain.ErrNotFound)
 	}
@@ -460,9 +460,9 @@ func scanLimit(row pgx.Row) (domain.LimitRequest, error) {
 }
 
 func (u *unit) InsertLimitRequest(r domain.LimitRequest) error {
-	err := u.exec(`INSERT INTO limit_requests (`+limitCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+	err := u.exec(`INSERT INTO limit_requests (`+limitCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		r.ID, r.IdempotencyKey, r.LineID, r.AccountID, r.CurrentLimit, r.Requested, r.Status, r.Granted, r.Reason, r.DecidedBy,
-		r.CreatedAt, r.DecidedAt)
+		r.CreatedAt, r.DecidedAt, r.Score)
 	if pg.IsUniqueViolation(err, "limit_requests_one_open") {
 		return domain.Refuse("LIMIT_REQUEST_IN_REVIEW", "a request is already being analyzed")
 	}
@@ -515,8 +515,25 @@ func (s *Store) LimitRequests(ctx context.Context, line uuid.UUID, status domain
 	return out, rows.Err()
 }
 
-func (s *Store) HasOverdue(ctx context.Context, line uuid.UUID) (bool, error) {
-	var overdue bool
-	err := s.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM invoices WHERE line_id = $1 AND status = 'OVERDUE')`, line).Scan(&overdue)
-	return overdue, err
+// ScoreInputs counts, over invoices closed since `since`, those paid on time
+// (something to pay, no charges, not split into a plan) and those that were
+// late (charges applied); plus whether one is overdue now and the plans made.
+func (s *Store) ScoreInputs(ctx context.Context, line domain.Line, since time.Time) (domain.ScoreInputs, error) {
+	in := domain.ScoreInputs{Line: line}
+	err := s.pool.QueryRow(ctx, `SELECT
+			count(*) FILTER (WHERE i.closing_date >= $2 AND i.status = 'PAID' AND i.charges = 0 AND i.total > 0 AND p.id IS NULL),
+			count(*) FILTER (WHERE i.closing_date >= $2 AND i.charges > 0),
+			COALESCE(bool_or(i.status = 'OVERDUE'), false),
+			(SELECT count(*) FROM invoice_plans WHERE line_id = $1 AND created_at >= $2)
+		FROM invoices i LEFT JOIN invoice_plans p ON p.invoice_id = i.id
+		WHERE i.line_id = $1`, line.ID, since).
+		Scan(&in.OnTime, &in.Late, &in.OverdueNow, &in.Plans)
+	return in, err
+}
+
+func nullTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
 }

@@ -199,7 +199,25 @@ func limitRequestJSON(r *creditv1.LimitRequest) map[string]any {
 	if r.GetDecidedAt() != nil {
 		out["decided_at"] = ts(r.GetDecidedAt())
 	}
+	if r.GetScore() > 0 {
+		out["score"] = r.GetScore()
+	}
 	return out
+}
+
+// creditScore answers the card's behaviour score and what is behind it.
+func (a *API) creditScore(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	resp, err := a.c.Credit.GetCreditScore(r.Context(), &creditv1.GetCreditScoreRequest{AccountId: acc.GetId()})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	factors := []map[string]any{}
+	for _, f := range resp.GetFactors() {
+		factors = append(factors, map[string]any{"code": f.GetCode(), "points": f.GetPoints(), "value": f.GetValue()})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"score": resp.GetScore(), "band": resp.GetBand(), "factors": factors,
+		"auto_increase_bp": resp.GetAutoIncreaseBp()})
 }
 
 // requestLimit asks for a new credit limit {amount} (Idempotency-Key):

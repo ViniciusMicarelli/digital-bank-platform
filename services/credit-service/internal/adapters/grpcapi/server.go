@@ -127,7 +127,7 @@ func (s *Server) PlanInvoice(ctx context.Context, req *creditv1.PlanInvoiceReque
 func limitPB(r domain.LimitRequest) *creditv1.LimitRequest {
 	out := &creditv1.LimitRequest{Id: r.ID.String(), AccountId: r.AccountID.String(), CurrentLimit: brl(r.CurrentLimit),
 		Requested: brl(r.Requested), Status: string(r.Status), Granted: brl(r.Granted), Reason: r.Reason, DecidedBy: r.DecidedBy,
-		CreatedAt: timestamppb.New(r.CreatedAt)}
+		CreatedAt: timestamppb.New(r.CreatedAt), Score: int32(r.Score)} //nolint:gosec // 0..1000
 	if r.DecidedAt != nil {
 		out.DecidedAt = timestamppb.New(*r.DecidedAt)
 	}
@@ -350,4 +350,21 @@ func toStatus(err error) error {
 		return grpcserver.Error(codes.Unavailable, "RETRY_LATER", "downstream unavailable: "+st.Message())
 	}
 	return grpcserver.Error(codes.Unavailable, "RETRY_LATER", "try again with the same idempotency key")
+}
+
+func (s *Server) GetCreditScore(ctx context.Context, req *creditv1.GetCreditScoreRequest) (*creditv1.GetCreditScoreResponse, error) {
+	account, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	sc, err := s.app.Score(ctx, account)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	out := &creditv1.GetCreditScoreResponse{Score: int32(sc.Value), Band: string(sc.Band), //nolint:gosec // 0..1000
+		AutoIncreaseBp: int32(domain.AutoIncreaseBy(sc.Value))} //nolint:gosec // basis points
+	for _, f := range sc.Factors {
+		out.Factors = append(out.Factors, &creditv1.ScoreFactor{Code: string(f.Code), Points: int32(f.Points), Value: int32(f.Value)}) //nolint:gosec // small
+	}
+	return out, nil
 }

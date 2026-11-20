@@ -37,13 +37,18 @@ service CreditService {
   rpc PlanInvoice(PlanInvoiceRequest) returns (PlanInvoiceResponse);
 
   // Asks for a new limit (idempotent on the key): decreases (never below
-  // what is used) and increases up to +50% apply at once, an overdue invoice
-  // refuses an increase, larger ones go to an analyst (IN_REVIEW).
+  // what is used) apply at once; increases up to what the score allows
+  // (+50%, +100% from 750) apply at once, an overdue invoice or a score
+  // under 250 refuses them, larger ones go to an analyst (IN_REVIEW).
   rpc RequestLimit(RequestLimitRequest) returns (RequestLimitResponse);
   // By account, or every account (back office) by status.
   rpc ListLimitRequests(ListLimitRequestsRequest) returns (ListLimitRequestsResponse);
   // An analyst's decision on a request in review (may grant less).
   rpc DecideLimitRequest(DecideLimitRequestRequest) returns (DecideLimitRequestResponse);
+
+  // The bank's behaviour score (0..1000) for the account's card, with the
+  // factors behind it.
+  rpc GetCreditScore(GetCreditScoreRequest) returns (GetCreditScoreResponse);
 
   // Installment purchases and invoice plans with installments still to come.
   rpc ListInstallmentPlans(ListInstallmentPlansRequest) returns (ListInstallmentPlansResponse);
@@ -294,13 +299,15 @@ message LimitRequest {
   // APPROVED, REJECTED, IN_REVIEW.
   string status = 5;
   bank.common.v1.Money granted = 6;
-  // Why it was rejected (HAS_OVERDUE_INVOICE, CREDIT_LINE_BLOCKED or the
+  // Why it was rejected (HAS_OVERDUE_INVOICE, CREDIT_LINE_BLOCKED, LOW_SCORE or the
   // analyst's words), or the analyst's note.
   string reason = 7;
   // "automatic" or the analyst.
   string decided_by = 8;
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp decided_at = 10;
+  // The customer's score when the request was analyzed.
+  int32 score = 11;
 }
 
 message RequestLimitRequest {
@@ -333,4 +340,30 @@ message DecideLimitRequestRequest {
 
 message DecideLimitRequestResponse {
   LimitRequest request = 1;
+}
+
+message GetCreditScoreRequest {
+  string account_id = 1;
+}
+
+message ScoreFactor {
+  // PAYMENT_HISTORY, LATE_PAYMENTS, OVERDUE_NOW, UTILIZATION, RELATIONSHIP,
+  // INVOICE_PLANS.
+  string code = 1;
+  // Points added (negative: taken) to the base of 500.
+  int32 points = 2;
+  // What is behind them: a count of invoices or plans, the share of the
+  // limit used (%), or the months of relationship.
+  int32 value = 3;
+}
+
+message GetCreditScoreResponse {
+  // 0..1000.
+  int32 score = 1;
+  // LOW, FAIR, GOOD, EXCELLENT.
+  string band = 2;
+  repeated ScoreFactor factors = 3;
+  // How much more the automatic analysis grants at once, in basis points of
+  // the limit (0: an analyst decides any increase).
+  int32 auto_increase_bp = 4;
 }

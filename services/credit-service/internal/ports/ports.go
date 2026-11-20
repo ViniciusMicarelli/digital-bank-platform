@@ -33,8 +33,8 @@ type Store interface {
 	LimitRequest(ctx context.Context, id uuid.UUID) (domain.LimitRequest, error)
 	// LimitRequests by line (zero for all) and/or status, newest first.
 	LimitRequests(ctx context.Context, line uuid.UUID, status domain.LimitStatus, limit int) ([]domain.LimitRequest, error)
-	// HasOverdue reports whether the line has an invoice that went overdue.
-	HasOverdue(ctx context.Context, line uuid.UUID) (bool, error)
+	// ScoreInputs gathers what the line's score is computed from.
+	ScoreInputs(ctx context.Context, line domain.Line, since time.Time) (domain.ScoreInputs, error)
 	RefundByKey(ctx context.Context, key string) (*domain.Refund, error)
 
 	// LinesDue lists lines with an invoice to close or to make overdue.

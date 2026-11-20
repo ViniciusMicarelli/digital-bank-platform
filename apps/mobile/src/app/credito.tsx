@@ -1,8 +1,8 @@
-import { ApiError, compareBRL, errorMessage, formatBRL, type CreditLine, type InstallmentPlan, type Invoice, type LimitRequest, type PlanQuote } from '@bank/core'
+import { ApiError, compareBRL, errorMessage, formatBRL, scoreBands, scoreFactorText, type CreditLine, type CreditScore, type InstallmentPlan, type Invoice, type LimitRequest, type PlanQuote } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { View } from 'react-native'
-import { CalendarClock, Gauge, Layers, Receipt, Wallet } from 'lucide-react-native'
+import { CalendarClock, Gauge, Layers, Receipt, ShieldCheck, Wallet } from 'lucide-react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Button, Card, Loading, MoneyField, Muted, Notice, Press, Row, Sandbox, Screen, Txt } from '../components/ui'
 import { useCountUp } from '../lib/motion'
@@ -55,7 +55,39 @@ function PlanPicker({ base, invoice, onDone }: { base: string; invoice: Invoice;
   )
 }
 
-function LimitCard({ base, line }: { base: string; line: CreditLine }) {
+const bandTone = { LOW: 'danger', FAIR: 'warning', GOOD: 'positive', EXCELLENT: 'credit' } as const
+
+function ScoreCard({ score }: { score: CreditScore }) {
+  const { c } = useTheme()
+  const tone = bandTone[score.band]
+  return (
+    <Card title="Seu score" icon={ShieldCheck} index={4}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
+        <Txt variant="title" accessibilityLabel={`Score ${score.score} de 1000`}>{score.score}</Txt>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c[tone] }} />
+          <Txt variant="label" tone="fg2">{scoreBands[score.band]}</Txt>
+        </View>
+      </View>
+      <View style={{ height: 8, borderRadius: 4, backgroundColor: c.surface2, overflow: 'hidden' }}
+        accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 1000, now: score.score }}>
+        <View style={{ height: 8, width: `${score.score / 10}%`, backgroundColor: c[tone], borderRadius: 4 }} />
+      </View>
+      <Muted>Calculado com o seu uso do cartão aqui no banco. Começa em 500 e muda conforme estes fatores:</Muted>
+      {score.factors.map((f) => {
+        const t = scoreFactorText(f)
+        return (
+          <Row key={f.code} title={t.title} subtitle={t.detail}
+            right={<Txt variant="label" tone={f.points > 0 ? 'positive' : f.points < 0 ? 'danger' : 'muted'} style={{ fontFamily: font.semibold }}>
+              {f.points > 0 ? '+' : f.points < 0 ? '−' : ''}{Math.abs(f.points)}
+            </Txt>} />
+        )
+      })}
+    </Card>
+  )
+}
+
+function LimitCard({ base, line, score }: { base: string; line: CreditLine; score?: CreditScore }) {
   const qc = useQueryClient()
   const [amount, setAmount] = useState<string | null>(null)
   const [message, setMessage] = useState<{ tone: 'green' | 'red' | 'amber'; text: string } | null>(null)
@@ -65,8 +97,8 @@ function LimitCard({ base, line }: { base: string; line: CreditLine }) {
     onSuccess: (r) => {
       setMessage(r.status === 'APPROVED' ? { tone: 'green', text: `Seu limite agora é ${formatBRL(r.granted)}.` }
         : r.status === 'IN_REVIEW' ? { tone: 'amber', text: 'Pedido em análise. Avisamos quando terminar.' }
-          : { tone: 'red', text: 'Não foi possível aumentar o limite agora.' })
-      for (const k of ['credit', 'limit-requests']) qc.invalidateQueries({ queryKey: [k] })
+          : { tone: 'red', text: r.reason === 'LOW_SCORE' ? 'Seu score ainda está baixo para aumentar o limite.' : 'Não foi possível aumentar o limite agora.' })
+      for (const k of ['credit', 'limit-requests', 'credit-score']) qc.invalidateQueries({ queryKey: [k] })
     },
     onError: (e) => setMessage({ tone: 'red', text: errorMessage(e) }),
   })
@@ -75,7 +107,11 @@ function LimitCard({ base, line }: { base: string; line: CreditLine }) {
     <Card title="Ajustar limite" icon={Gauge} index={3}>
       {inReview ? <Notice tone="amber">Pedido de {formatBRL(inReview.requested)} em análise.</Notice> : (
         <>
-          <Muted>Limite atual de {formatBRL(line.limit)}. Diminuir e aumentar até 50% é na hora; acima disso, um analista avalia.</Muted>
+          <Muted>
+            Limite atual de {formatBRL(line.limit)}. {(score?.auto_increase_bp ?? 5000) > 0
+              ? `Diminuir e aumentar até ${(score?.auto_increase_bp ?? 5000) / 100}% é na hora (pelo seu score); acima disso, um analista avalia.`
+              : 'Diminuir é na hora; aumentos passam por um analista.'}
+          </Muted>
           <MoneyField label="Novo limite" onValue={setAmount} />
           <Button title="Pedir novo limite" variant="credit" disabled={!amount} loading={ask.isPending} onPress={() => ask.mutate()} />
         </>
@@ -97,8 +133,9 @@ export default function Credit() {
     queryFn: async () => { try { return await api<CreditLine>('GET', base) } catch (e) { if (e instanceof ApiError && e.status === 404) return null; throw e } },
   })
   const invoices = useQuery({ queryKey: ['invoices', account?.id], enabled: !!line.data, queryFn: async () => (await api<{ invoices: Invoice[] }>('GET', `${base}/invoices`)).invoices })
+  const score = useQuery({ queryKey: ['credit-score', account?.id], enabled: !!line.data, queryFn: () => api<CreditScore>('GET', `${base}/score`) })
   const plans = useQuery({ queryKey: ['installments', account?.id], enabled: !!line.data, queryFn: async () => (await api<{ plans: InstallmentPlan[] }>('GET', `${base}/installments`)).plans })
-  const refresh = () => { for (const k of ['credit', 'invoices', 'balance', 'installments', 'plan-quotes']) qc.invalidateQueries({ queryKey: [k] }) }
+  const refresh = () => { for (const k of ['credit', 'invoices', 'balance', 'installments', 'plan-quotes', 'credit-score']) qc.invalidateQueries({ queryKey: [k] }) }
   const activate = useMutation({ mutationFn: () => api('POST', base, { body: { closing_day: 10 }, idempotent: true }), onSuccess: refresh, onError: (e) => setError(errorMessage(e)) })
   const toPay = invoices.data?.find((i) => i.status === 'CLOSED')
   const pay = useMutation({ mutationFn: () => api('POST', `${base}/invoices/${toPay!.id}/payments`, { body: { amount }, idempotent: true }), onSuccess: () => { setError(''); refresh() }, onError: (e) => setError(errorMessage(e)) })
@@ -140,7 +177,8 @@ export default function Credit() {
           ))}
         </Card>
       )}
-      <LimitCard base={base} line={l} />
+      <LimitCard base={base} line={l} score={score.data} />
+      {score.data && <ScoreCard score={score.data} />}
       <Card title="Faturas" icon={Receipt} index={2}>
         {invoices.data?.map((i) => <Row key={i.id} icon={Receipt} tone={i.status === 'PAID' ? 'green' : i.status === 'OVERDUE' ? 'red' : i.status === 'CLOSED' ? 'amber' : 'credit'} title={`Fechamento ${date(i.closing_date)}`} subtitle={label[i.status]} right={<Txt variant="label" style={{ fontFamily: font.semibold }}>{formatBRL(i.total)}</Txt>} />)}
       </Card>

@@ -455,7 +455,8 @@ func (p InvoicePlan) InterestKey() string { return "invoice-plan-interest:" + p.
 const (
 	// MaxLimit is the highest limit a line can have.
 	MaxLimit = 20_000_00
-	// AutoIncreaseBP is how much more the automatic analysis may grant (+50%).
+	// AutoIncreaseBP is how much more the automatic analysis may grant
+	// (+50%) for a fair-to-good score (see AutoIncreaseFor).
 	AutoIncreaseBP = 15_000
 )
 
@@ -479,14 +480,17 @@ type LimitRequest struct {
 	Granted        int64
 	Reason         string
 	DecidedBy      string
-	CreatedAt      time.Time
-	DecidedAt      *time.Time
+	// Score is the customer's score when the request was analyzed.
+	Score     int
+	CreatedAt time.Time
+	DecidedAt *time.Time
 }
 
 // AnalyzeLimit decides a request at once when it can: a decrease (never
-// below what is used), a refusal (an overdue invoice), or an increase up to
-// +50%; anything larger goes to an analyst.
-func AnalyzeLimit(l Line, requested int64, overdue bool) (LimitStatus, string, error) {
+// below what is used), a refusal (an overdue invoice, a very low score), or
+// an increase up to what the score allows (+50%, or +100% from 750);
+// anything larger goes to an analyst.
+func AnalyzeLimit(l Line, requested int64, overdue bool, score int) (LimitStatus, string, error) {
 	switch {
 	case requested <= 0 || requested%100 != 0:
 		return "", "", fmt.Errorf("%w: the limit is a positive amount in whole reais", ErrInvalidArgument)
@@ -502,7 +506,9 @@ func AnalyzeLimit(l Line, requested int64, overdue bool) (LimitStatus, string, e
 		return LimitRejected, "CREDIT_LINE_BLOCKED", nil
 	case overdue:
 		return LimitRejected, "HAS_OVERDUE_INVOICE", nil
-	case requested <= percent(l.Limit, AutoIncreaseBP):
+	case score < MinScore:
+		return LimitRejected, "LOW_SCORE", nil
+	case AutoIncreaseFor(score) > 0 && requested <= percent(l.Limit, AutoIncreaseFor(score)):
 		return LimitApproved, "", nil
 	}
 	return LimitInReview, "", nil
