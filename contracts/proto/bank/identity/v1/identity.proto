@@ -27,6 +27,17 @@ service IdentityService {
   rpc GetJwks(GetJwksRequest) returns (GetJwksResponse);
   // Starts signing with a new key. Operator only: never exposed at the edge.
   rpc RotateSigningKey(RotateSigningKeyRequest) returns (RotateSigningKeyResponse);
+
+  // Where the customer is signed in (one session per login), most recently
+  // used first. A login from a device never used before publishes
+  // identity.session.new_device.
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  // Ends a session of the customer: its refresh token stops working; access
+  // tokens already issued expire within 15 minutes. NOT_FOUND for a session
+  // of someone else or already ended.
+  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
+  // Ends every session of the customer except keep_session_id.
+  rpc RevokeOtherSessions(RevokeOtherSessionsRequest) returns (RevokeOtherSessionsResponse);
 }
 
 message TokenPair {
@@ -51,6 +62,9 @@ message LoginRequest {
   string password = 2;
   // Required when TOTP is enabled.
   string totp_code = 3;
+  // Where the login comes from, as the edge saw it.
+  string user_agent = 4;
+  string ip = 5;
 }
 
 message LoginResponse {
@@ -60,6 +74,8 @@ message LoginResponse {
 
 message RefreshRequest {
   string refresh_token = 1;
+  // The client's address, kept as the session's last one.
+  string ip = 2;
 }
 
 message RefreshResponse {
@@ -121,4 +137,38 @@ message StepUpRequest {
 message StepUpResponse {
   string step_up_token = 1;
   google.protobuf.Timestamp expires_at = 2;
+}
+
+message Session {
+  // The session id; access tokens carry it as "sid".
+  string id = 1;
+  // Readable, e.g. "Chrome no macOS", "App no iPhone".
+  string device = 2;
+  string ip = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp last_used_at = 5;
+}
+
+message ListSessionsRequest {
+  string customer_id = 1;
+}
+
+message ListSessionsResponse {
+  repeated Session sessions = 1;
+}
+
+message RevokeSessionRequest {
+  string customer_id = 1;
+  string session_id = 2;
+}
+
+message RevokeSessionResponse {}
+
+message RevokeOtherSessionsRequest {
+  string customer_id = 1;
+  string keep_session_id = 2;
+}
+
+message RevokeOtherSessionsResponse {
+  int32 revoked = 1;
 }

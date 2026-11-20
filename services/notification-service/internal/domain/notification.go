@@ -146,6 +146,7 @@ type payload struct {
 	Threshold       int               `json:"threshold"`
 	Budget          int64             `json:"budget"`
 	Spent           int64             `json:"spent"`
+	Device          string            `json:"device"`
 }
 
 // budgetCategories names the spending categories of a budget alert.
@@ -246,6 +247,14 @@ func FromEvent(ev Event, now time.Time) ([]Draft, error) {
 		d.Category, d.Title, d.Important = CategoryCredit, "Fatura em atraso", true
 		d.Body = fmt.Sprintf("%s não foram pagos e foram para a próxima fatura, com multa de %s e juros de %s.",
 			BRL(p.Unpaid), BRL(p.Fine), BRL(p.Interest))
+	case "identity.session.new_device":
+		d.Category, d.Important, d.CustomerID = CategoryProfile, true, p.CustomerID
+		d.Title = "Novo acesso à sua conta"
+		d.Body = fmt.Sprintf("Sua conta foi acessada de um dispositivo novo: %s. Se não foi você, encerre esse acesso em Ajustes › Dispositivos e troque sua senha.", p.Device)
+		if d.CustomerID == "" {
+			return nil, nil
+		}
+		return []Draft{d}, nil
 	case "statement.budget.threshold":
 		name := budgetCategories[p.Category]
 		if name == "" {

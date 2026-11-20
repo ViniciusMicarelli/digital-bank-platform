@@ -70,7 +70,7 @@ func TestVerifyTOTP(t *testing.T) {
 func TestAccessToken(t *testing.T) {
 	k := NewSigningKey()
 	id := uuid.New()
-	tok, exp, err := SignAccessToken(k, id, RoleCustomer, []string{"pwd"}, time.Now())
+	tok, exp, err := SignAccessToken(k, id, RoleCustomer, []string{"pwd"}, uuid.New(), time.Now())
 	if err != nil || time.Until(exp) > AccessTokenTTL {
 		t.Fatal(err)
 	}
@@ -119,6 +119,24 @@ func TestNormalizeEmail(t *testing.T) {
 	for _, bad := range []string{"", "ana", "ana@x", "Ana <ana@x.com>"} {
 		if _, err := NormalizeEmail(bad); err == nil {
 			t.Errorf("%q accepted", bad)
+		}
+	}
+}
+
+func TestDeviceLabel(t *testing.T) {
+	for ua, want := range map[string]string{
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36":                   "Chrome no macOS",
+		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36 Edg/131.0":            "Edge no Windows",
+		"Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile Safari/604.1": "Safari no iPhone",
+		"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Mobile Safari/537.36":                "Chrome no Android",
+		"Mozilla/5.0 (X11; Linux x86_64; rv:132.0) Gecko/20100101 Firefox/132.0":                                                           "Firefox no Linux",
+		"DigitalBank/1 CFNetwork/1568.100.1 Darwin/24.0.0":                                                                                 "App no iPhone",
+		"okhttp/4.12.0":      "App no Android",
+		"Go-http-client/1.1": "Dispositivo desconhecido",
+		"":                   "Dispositivo desconhecido",
+	} {
+		if got := DeviceLabel(ua); got != want {
+			t.Errorf("DeviceLabel(%q) = %q, want %q", ua, got, want)
 		}
 	}
 }

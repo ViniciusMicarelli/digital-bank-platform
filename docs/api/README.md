@@ -42,6 +42,9 @@
 | `POST` | `/v1/auth/mfa/totp` | Start TOTP enrollment → `{secret, otpauth_uri}` |
 | `POST` | `/v1/auth/mfa/totp/confirm` | `{code}` → enables TOTP |
 | `GET` | `/v1/me` | Who is signed in: `{customer_id, role, mfa}` (`CUSTOMER` or `ANALYST`; `mfa` when the session has a second factor) |
+| `GET` | `/v1/me/sessions` | Where the customer is signed in: `[{id, device, ip, created_at, last_used_at, current}]`, most recently used first |
+| `DELETE` | `/v1/me/sessions/{id}` | End one session → 204 (404 for someone else's or one already ended) |
+| `POST` | `/v1/me/sessions/end-others` | End every session but the one asking → `{ended}` (409 `SESSION_UNKNOWN` for a token from before sessions existed) |
 | `GET` · `PUT` | `/v1/me/profile` | Profile `{full_name, cpf, birth_date, phone, address{postal_code, street, number, complement, district, city, state}}` (CPF masked in answers) |
 | `POST` | `/v1/me/kyc` | Start identity verification → `kyc_status` (`APPROVED`, `REJECTED`, `MANUAL_REVIEW`, `PENDING`) |
 | `POST` | `/v1/sandbox/kyc/review` | *(sandbox)* `{approve, reason?}` decide a manual review |

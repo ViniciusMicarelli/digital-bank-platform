@@ -199,7 +199,10 @@ type LoginRequest struct {
 	Email    string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
 	Password string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
 	// Required when TOTP is enabled.
-	TotpCode      string `protobuf:"bytes,3,opt,name=totp_code,json=totpCode,proto3" json:"totp_code,omitempty"`
+	TotpCode string `protobuf:"bytes,3,opt,name=totp_code,json=totpCode,proto3" json:"totp_code,omitempty"`
+	// Where the login comes from, as the edge saw it.
+	UserAgent     string `protobuf:"bytes,4,opt,name=user_agent,json=userAgent,proto3" json:"user_agent,omitempty"`
+	Ip            string `protobuf:"bytes,5,opt,name=ip,proto3" json:"ip,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -251,6 +254,20 @@ func (x *LoginRequest) GetPassword() string {
 func (x *LoginRequest) GetTotpCode() string {
 	if x != nil {
 		return x.TotpCode
+	}
+	return ""
+}
+
+func (x *LoginRequest) GetUserAgent() string {
+	if x != nil {
+		return x.UserAgent
+	}
+	return ""
+}
+
+func (x *LoginRequest) GetIp() string {
+	if x != nil {
+		return x.Ip
 	}
 	return ""
 }
@@ -308,8 +325,10 @@ func (x *LoginResponse) GetTokens() *TokenPair {
 }
 
 type RefreshRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RefreshToken  string                 `protobuf:"bytes,1,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	RefreshToken string                 `protobuf:"bytes,1,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
+	// The client's address, kept as the session's last one.
+	Ip            string `protobuf:"bytes,2,opt,name=ip,proto3" json:"ip,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -347,6 +366,13 @@ func (*RefreshRequest) Descriptor() ([]byte, []int) {
 func (x *RefreshRequest) GetRefreshToken() string {
 	if x != nil {
 		return x.RefreshToken
+	}
+	return ""
+}
+
+func (x *RefreshRequest) GetIp() string {
+	if x != nil {
+		return x.Ip
 	}
 	return ""
 }
@@ -1018,6 +1044,356 @@ func (x *StepUpResponse) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type Session struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The session id; access tokens carry it as "sid".
+	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Readable, e.g. "Chrome no macOS", "App no iPhone".
+	Device        string                 `protobuf:"bytes,2,opt,name=device,proto3" json:"device,omitempty"`
+	Ip            string                 `protobuf:"bytes,3,opt,name=ip,proto3" json:"ip,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	LastUsedAt    *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=last_used_at,json=lastUsedAt,proto3" json:"last_used_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Session) Reset() {
+	*x = Session{}
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Session) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Session) ProtoMessage() {}
+
+func (x *Session) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Session.ProtoReflect.Descriptor instead.
+func (*Session) Descriptor() ([]byte, []int) {
+	return file_bank_identity_v1_identity_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *Session) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Session) GetDevice() string {
+	if x != nil {
+		return x.Device
+	}
+	return ""
+}
+
+func (x *Session) GetIp() string {
+	if x != nil {
+		return x.Ip
+	}
+	return ""
+}
+
+func (x *Session) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Session) GetLastUsedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastUsedAt
+	}
+	return nil
+}
+
+type ListSessionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CustomerId    string                 `protobuf:"bytes,1,opt,name=customer_id,json=customerId,proto3" json:"customer_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionsRequest) Reset() {
+	*x = ListSessionsRequest{}
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionsRequest) ProtoMessage() {}
+
+func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
+func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
+	return file_bank_identity_v1_identity_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ListSessionsRequest) GetCustomerId() string {
+	if x != nil {
+		return x.CustomerId
+	}
+	return ""
+}
+
+type ListSessionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sessions      []*Session             `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionsResponse) Reset() {
+	*x = ListSessionsResponse{}
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionsResponse) ProtoMessage() {}
+
+func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionsResponse.ProtoReflect.Descriptor instead.
+func (*ListSessionsResponse) Descriptor() ([]byte, []int) {
+	return file_bank_identity_v1_identity_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *ListSessionsResponse) GetSessions() []*Session {
+	if x != nil {
+		return x.Sessions
+	}
+	return nil
+}
+
+type RevokeSessionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CustomerId    string                 `protobuf:"bytes,1,opt,name=customer_id,json=customerId,proto3" json:"customer_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeSessionRequest) Reset() {
+	*x = RevokeSessionRequest{}
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeSessionRequest) ProtoMessage() {}
+
+func (x *RevokeSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeSessionRequest.ProtoReflect.Descriptor instead.
+func (*RevokeSessionRequest) Descriptor() ([]byte, []int) {
+	return file_bank_identity_v1_identity_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RevokeSessionRequest) GetCustomerId() string {
+	if x != nil {
+		return x.CustomerId
+	}
+	return ""
+}
+
+func (x *RevokeSessionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+type RevokeSessionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeSessionResponse) Reset() {
+	*x = RevokeSessionResponse{}
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeSessionResponse) ProtoMessage() {}
+
+func (x *RevokeSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeSessionResponse.ProtoReflect.Descriptor instead.
+func (*RevokeSessionResponse) Descriptor() ([]byte, []int) {
+	return file_bank_identity_v1_identity_proto_rawDescGZIP(), []int{24}
+}
+
+type RevokeOtherSessionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CustomerId    string                 `protobuf:"bytes,1,opt,name=customer_id,json=customerId,proto3" json:"customer_id,omitempty"`
+	KeepSessionId string                 `protobuf:"bytes,2,opt,name=keep_session_id,json=keepSessionId,proto3" json:"keep_session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeOtherSessionsRequest) Reset() {
+	*x = RevokeOtherSessionsRequest{}
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeOtherSessionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeOtherSessionsRequest) ProtoMessage() {}
+
+func (x *RevokeOtherSessionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeOtherSessionsRequest.ProtoReflect.Descriptor instead.
+func (*RevokeOtherSessionsRequest) Descriptor() ([]byte, []int) {
+	return file_bank_identity_v1_identity_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *RevokeOtherSessionsRequest) GetCustomerId() string {
+	if x != nil {
+		return x.CustomerId
+	}
+	return ""
+}
+
+func (x *RevokeOtherSessionsRequest) GetKeepSessionId() string {
+	if x != nil {
+		return x.KeepSessionId
+	}
+	return ""
+}
+
+type RevokeOtherSessionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Revoked       int32                  `protobuf:"varint,1,opt,name=revoked,proto3" json:"revoked,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeOtherSessionsResponse) Reset() {
+	*x = RevokeOtherSessionsResponse{}
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeOtherSessionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeOtherSessionsResponse) ProtoMessage() {}
+
+func (x *RevokeOtherSessionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_identity_v1_identity_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeOtherSessionsResponse.ProtoReflect.Descriptor instead.
+func (*RevokeOtherSessionsResponse) Descriptor() ([]byte, []int) {
+	return file_bank_identity_v1_identity_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *RevokeOtherSessionsResponse) GetRevoked() int32 {
+	if x != nil {
+		return x.Revoked
+	}
+	return 0
+}
+
 var File_bank_identity_v1_identity_proto protoreflect.FileDescriptor
 
 const file_bank_identity_v1_identity_proto_rawDesc = "" +
@@ -1034,17 +1410,21 @@ const file_bank_identity_v1_identity_proto_rawDesc = "" +
 	"\tfull_name\x18\x03 \x01(\tR\bfullName\"3\n" +
 	"\x10RegisterResponse\x12\x1f\n" +
 	"\vcustomer_id\x18\x01 \x01(\tR\n" +
-	"customerId\"]\n" +
+	"customerId\"\x8c\x01\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\x12\x1b\n" +
-	"\ttotp_code\x18\x03 \x01(\tR\btotpCode\"e\n" +
+	"\ttotp_code\x18\x03 \x01(\tR\btotpCode\x12\x1d\n" +
+	"\n" +
+	"user_agent\x18\x04 \x01(\tR\tuserAgent\x12\x0e\n" +
+	"\x02ip\x18\x05 \x01(\tR\x02ip\"e\n" +
 	"\rLoginResponse\x12\x1f\n" +
 	"\vcustomer_id\x18\x01 \x01(\tR\n" +
 	"customerId\x123\n" +
-	"\x06tokens\x18\x02 \x01(\v2\x1b.bank.identity.v1.TokenPairR\x06tokens\"5\n" +
+	"\x06tokens\x18\x02 \x01(\v2\x1b.bank.identity.v1.TokenPairR\x06tokens\"E\n" +
 	"\x0eRefreshRequest\x12#\n" +
-	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"F\n" +
+	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\x12\x0e\n" +
+	"\x02ip\x18\x02 \x01(\tR\x02ip\"F\n" +
 	"\x0fRefreshResponse\x123\n" +
 	"\x06tokens\x18\x01 \x01(\v2\x1b.bank.identity.v1.TokenPairR\x06tokens\"4\n" +
 	"\rLogoutRequest\x12#\n" +
@@ -1083,7 +1463,32 @@ const file_bank_identity_v1_identity_proto_rawDesc = "" +
 	"\x0eStepUpResponse\x12\"\n" +
 	"\rstep_up_token\x18\x01 \x01(\tR\vstepUpToken\x129\n" +
 	"\n" +
-	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt2\x88\x06\n" +
+	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xba\x01\n" +
+	"\aSession\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06device\x18\x02 \x01(\tR\x06device\x12\x0e\n" +
+	"\x02ip\x18\x03 \x01(\tR\x02ip\x129\n" +
+	"\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
+	"\flast_used_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastUsedAt\"6\n" +
+	"\x13ListSessionsRequest\x12\x1f\n" +
+	"\vcustomer_id\x18\x01 \x01(\tR\n" +
+	"customerId\"M\n" +
+	"\x14ListSessionsResponse\x125\n" +
+	"\bsessions\x18\x01 \x03(\v2\x19.bank.identity.v1.SessionR\bsessions\"V\n" +
+	"\x14RevokeSessionRequest\x12\x1f\n" +
+	"\vcustomer_id\x18\x01 \x01(\tR\n" +
+	"customerId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\"\x17\n" +
+	"\x15RevokeSessionResponse\"e\n" +
+	"\x1aRevokeOtherSessionsRequest\x12\x1f\n" +
+	"\vcustomer_id\x18\x01 \x01(\tR\n" +
+	"customerId\x12&\n" +
+	"\x0fkeep_session_id\x18\x02 \x01(\tR\rkeepSessionId\"7\n" +
+	"\x1bRevokeOtherSessionsResponse\x12\x18\n" +
+	"\arevoked\x18\x01 \x01(\x05R\arevoked2\xbd\b\n" +
 	"\x0fIdentityService\x12Q\n" +
 	"\bRegister\x12!.bank.identity.v1.RegisterRequest\x1a\".bank.identity.v1.RegisterResponse\x12H\n" +
 	"\x05Login\x12\x1e.bank.identity.v1.LoginRequest\x1a\x1f.bank.identity.v1.LoginResponse\x12N\n" +
@@ -1094,7 +1499,10 @@ const file_bank_identity_v1_identity_proto_rawDesc = "" +
 	"EnrollTotp\x12#.bank.identity.v1.EnrollTotpRequest\x1a$.bank.identity.v1.EnrollTotpResponse\x12Z\n" +
 	"\vConfirmTotp\x12$.bank.identity.v1.ConfirmTotpRequest\x1a%.bank.identity.v1.ConfirmTotpResponse\x12N\n" +
 	"\aGetJwks\x12 .bank.identity.v1.GetJwksRequest\x1a!.bank.identity.v1.GetJwksResponse\x12i\n" +
-	"\x10RotateSigningKey\x12).bank.identity.v1.RotateSigningKeyRequest\x1a*.bank.identity.v1.RotateSigningKeyResponseB\xe8\x01\n" +
+	"\x10RotateSigningKey\x12).bank.identity.v1.RotateSigningKeyRequest\x1a*.bank.identity.v1.RotateSigningKeyResponse\x12]\n" +
+	"\fListSessions\x12%.bank.identity.v1.ListSessionsRequest\x1a&.bank.identity.v1.ListSessionsResponse\x12`\n" +
+	"\rRevokeSession\x12&.bank.identity.v1.RevokeSessionRequest\x1a'.bank.identity.v1.RevokeSessionResponse\x12r\n" +
+	"\x13RevokeOtherSessions\x12,.bank.identity.v1.RevokeOtherSessionsRequest\x1a-.bank.identity.v1.RevokeOtherSessionsResponseB\xe8\x01\n" +
 	"\x14com.bank.identity.v1B\rIdentityProtoP\x01Z_github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/identity/v1;identityv1\xa2\x02\x03BIX\xaa\x02\x10Bank.Identity.V1\xca\x02\x10Bank\\Identity\\V1\xe2\x02\x1cBank\\Identity\\V1\\GPBMetadata\xea\x02\x12Bank::Identity::V1b\x06proto3"
 
 var (
@@ -1109,60 +1517,76 @@ func file_bank_identity_v1_identity_proto_rawDescGZIP() []byte {
 	return file_bank_identity_v1_identity_proto_rawDescData
 }
 
-var file_bank_identity_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_bank_identity_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 27)
 var file_bank_identity_v1_identity_proto_goTypes = []any{
-	(*TokenPair)(nil),                // 0: bank.identity.v1.TokenPair
-	(*RegisterRequest)(nil),          // 1: bank.identity.v1.RegisterRequest
-	(*RegisterResponse)(nil),         // 2: bank.identity.v1.RegisterResponse
-	(*LoginRequest)(nil),             // 3: bank.identity.v1.LoginRequest
-	(*LoginResponse)(nil),            // 4: bank.identity.v1.LoginResponse
-	(*RefreshRequest)(nil),           // 5: bank.identity.v1.RefreshRequest
-	(*RefreshResponse)(nil),          // 6: bank.identity.v1.RefreshResponse
-	(*LogoutRequest)(nil),            // 7: bank.identity.v1.LogoutRequest
-	(*LogoutResponse)(nil),           // 8: bank.identity.v1.LogoutResponse
-	(*EnrollTotpRequest)(nil),        // 9: bank.identity.v1.EnrollTotpRequest
-	(*EnrollTotpResponse)(nil),       // 10: bank.identity.v1.EnrollTotpResponse
-	(*ConfirmTotpRequest)(nil),       // 11: bank.identity.v1.ConfirmTotpRequest
-	(*ConfirmTotpResponse)(nil),      // 12: bank.identity.v1.ConfirmTotpResponse
-	(*Jwk)(nil),                      // 13: bank.identity.v1.Jwk
-	(*GetJwksRequest)(nil),           // 14: bank.identity.v1.GetJwksRequest
-	(*GetJwksResponse)(nil),          // 15: bank.identity.v1.GetJwksResponse
-	(*RotateSigningKeyRequest)(nil),  // 16: bank.identity.v1.RotateSigningKeyRequest
-	(*RotateSigningKeyResponse)(nil), // 17: bank.identity.v1.RotateSigningKeyResponse
-	(*StepUpRequest)(nil),            // 18: bank.identity.v1.StepUpRequest
-	(*StepUpResponse)(nil),           // 19: bank.identity.v1.StepUpResponse
-	(*timestamppb.Timestamp)(nil),    // 20: google.protobuf.Timestamp
+	(*TokenPair)(nil),                   // 0: bank.identity.v1.TokenPair
+	(*RegisterRequest)(nil),             // 1: bank.identity.v1.RegisterRequest
+	(*RegisterResponse)(nil),            // 2: bank.identity.v1.RegisterResponse
+	(*LoginRequest)(nil),                // 3: bank.identity.v1.LoginRequest
+	(*LoginResponse)(nil),               // 4: bank.identity.v1.LoginResponse
+	(*RefreshRequest)(nil),              // 5: bank.identity.v1.RefreshRequest
+	(*RefreshResponse)(nil),             // 6: bank.identity.v1.RefreshResponse
+	(*LogoutRequest)(nil),               // 7: bank.identity.v1.LogoutRequest
+	(*LogoutResponse)(nil),              // 8: bank.identity.v1.LogoutResponse
+	(*EnrollTotpRequest)(nil),           // 9: bank.identity.v1.EnrollTotpRequest
+	(*EnrollTotpResponse)(nil),          // 10: bank.identity.v1.EnrollTotpResponse
+	(*ConfirmTotpRequest)(nil),          // 11: bank.identity.v1.ConfirmTotpRequest
+	(*ConfirmTotpResponse)(nil),         // 12: bank.identity.v1.ConfirmTotpResponse
+	(*Jwk)(nil),                         // 13: bank.identity.v1.Jwk
+	(*GetJwksRequest)(nil),              // 14: bank.identity.v1.GetJwksRequest
+	(*GetJwksResponse)(nil),             // 15: bank.identity.v1.GetJwksResponse
+	(*RotateSigningKeyRequest)(nil),     // 16: bank.identity.v1.RotateSigningKeyRequest
+	(*RotateSigningKeyResponse)(nil),    // 17: bank.identity.v1.RotateSigningKeyResponse
+	(*StepUpRequest)(nil),               // 18: bank.identity.v1.StepUpRequest
+	(*StepUpResponse)(nil),              // 19: bank.identity.v1.StepUpResponse
+	(*Session)(nil),                     // 20: bank.identity.v1.Session
+	(*ListSessionsRequest)(nil),         // 21: bank.identity.v1.ListSessionsRequest
+	(*ListSessionsResponse)(nil),        // 22: bank.identity.v1.ListSessionsResponse
+	(*RevokeSessionRequest)(nil),        // 23: bank.identity.v1.RevokeSessionRequest
+	(*RevokeSessionResponse)(nil),       // 24: bank.identity.v1.RevokeSessionResponse
+	(*RevokeOtherSessionsRequest)(nil),  // 25: bank.identity.v1.RevokeOtherSessionsRequest
+	(*RevokeOtherSessionsResponse)(nil), // 26: bank.identity.v1.RevokeOtherSessionsResponse
+	(*timestamppb.Timestamp)(nil),       // 27: google.protobuf.Timestamp
 }
 var file_bank_identity_v1_identity_proto_depIdxs = []int32{
-	20, // 0: bank.identity.v1.TokenPair.access_expires_at:type_name -> google.protobuf.Timestamp
-	20, // 1: bank.identity.v1.TokenPair.refresh_expires_at:type_name -> google.protobuf.Timestamp
+	27, // 0: bank.identity.v1.TokenPair.access_expires_at:type_name -> google.protobuf.Timestamp
+	27, // 1: bank.identity.v1.TokenPair.refresh_expires_at:type_name -> google.protobuf.Timestamp
 	0,  // 2: bank.identity.v1.LoginResponse.tokens:type_name -> bank.identity.v1.TokenPair
 	0,  // 3: bank.identity.v1.RefreshResponse.tokens:type_name -> bank.identity.v1.TokenPair
 	13, // 4: bank.identity.v1.GetJwksResponse.keys:type_name -> bank.identity.v1.Jwk
-	20, // 5: bank.identity.v1.StepUpResponse.expires_at:type_name -> google.protobuf.Timestamp
-	1,  // 6: bank.identity.v1.IdentityService.Register:input_type -> bank.identity.v1.RegisterRequest
-	3,  // 7: bank.identity.v1.IdentityService.Login:input_type -> bank.identity.v1.LoginRequest
-	5,  // 8: bank.identity.v1.IdentityService.Refresh:input_type -> bank.identity.v1.RefreshRequest
-	7,  // 9: bank.identity.v1.IdentityService.Logout:input_type -> bank.identity.v1.LogoutRequest
-	18, // 10: bank.identity.v1.IdentityService.StepUp:input_type -> bank.identity.v1.StepUpRequest
-	9,  // 11: bank.identity.v1.IdentityService.EnrollTotp:input_type -> bank.identity.v1.EnrollTotpRequest
-	11, // 12: bank.identity.v1.IdentityService.ConfirmTotp:input_type -> bank.identity.v1.ConfirmTotpRequest
-	14, // 13: bank.identity.v1.IdentityService.GetJwks:input_type -> bank.identity.v1.GetJwksRequest
-	16, // 14: bank.identity.v1.IdentityService.RotateSigningKey:input_type -> bank.identity.v1.RotateSigningKeyRequest
-	2,  // 15: bank.identity.v1.IdentityService.Register:output_type -> bank.identity.v1.RegisterResponse
-	4,  // 16: bank.identity.v1.IdentityService.Login:output_type -> bank.identity.v1.LoginResponse
-	6,  // 17: bank.identity.v1.IdentityService.Refresh:output_type -> bank.identity.v1.RefreshResponse
-	8,  // 18: bank.identity.v1.IdentityService.Logout:output_type -> bank.identity.v1.LogoutResponse
-	19, // 19: bank.identity.v1.IdentityService.StepUp:output_type -> bank.identity.v1.StepUpResponse
-	10, // 20: bank.identity.v1.IdentityService.EnrollTotp:output_type -> bank.identity.v1.EnrollTotpResponse
-	12, // 21: bank.identity.v1.IdentityService.ConfirmTotp:output_type -> bank.identity.v1.ConfirmTotpResponse
-	15, // 22: bank.identity.v1.IdentityService.GetJwks:output_type -> bank.identity.v1.GetJwksResponse
-	17, // 23: bank.identity.v1.IdentityService.RotateSigningKey:output_type -> bank.identity.v1.RotateSigningKeyResponse
-	15, // [15:24] is the sub-list for method output_type
-	6,  // [6:15] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	27, // 5: bank.identity.v1.StepUpResponse.expires_at:type_name -> google.protobuf.Timestamp
+	27, // 6: bank.identity.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	27, // 7: bank.identity.v1.Session.last_used_at:type_name -> google.protobuf.Timestamp
+	20, // 8: bank.identity.v1.ListSessionsResponse.sessions:type_name -> bank.identity.v1.Session
+	1,  // 9: bank.identity.v1.IdentityService.Register:input_type -> bank.identity.v1.RegisterRequest
+	3,  // 10: bank.identity.v1.IdentityService.Login:input_type -> bank.identity.v1.LoginRequest
+	5,  // 11: bank.identity.v1.IdentityService.Refresh:input_type -> bank.identity.v1.RefreshRequest
+	7,  // 12: bank.identity.v1.IdentityService.Logout:input_type -> bank.identity.v1.LogoutRequest
+	18, // 13: bank.identity.v1.IdentityService.StepUp:input_type -> bank.identity.v1.StepUpRequest
+	9,  // 14: bank.identity.v1.IdentityService.EnrollTotp:input_type -> bank.identity.v1.EnrollTotpRequest
+	11, // 15: bank.identity.v1.IdentityService.ConfirmTotp:input_type -> bank.identity.v1.ConfirmTotpRequest
+	14, // 16: bank.identity.v1.IdentityService.GetJwks:input_type -> bank.identity.v1.GetJwksRequest
+	16, // 17: bank.identity.v1.IdentityService.RotateSigningKey:input_type -> bank.identity.v1.RotateSigningKeyRequest
+	21, // 18: bank.identity.v1.IdentityService.ListSessions:input_type -> bank.identity.v1.ListSessionsRequest
+	23, // 19: bank.identity.v1.IdentityService.RevokeSession:input_type -> bank.identity.v1.RevokeSessionRequest
+	25, // 20: bank.identity.v1.IdentityService.RevokeOtherSessions:input_type -> bank.identity.v1.RevokeOtherSessionsRequest
+	2,  // 21: bank.identity.v1.IdentityService.Register:output_type -> bank.identity.v1.RegisterResponse
+	4,  // 22: bank.identity.v1.IdentityService.Login:output_type -> bank.identity.v1.LoginResponse
+	6,  // 23: bank.identity.v1.IdentityService.Refresh:output_type -> bank.identity.v1.RefreshResponse
+	8,  // 24: bank.identity.v1.IdentityService.Logout:output_type -> bank.identity.v1.LogoutResponse
+	19, // 25: bank.identity.v1.IdentityService.StepUp:output_type -> bank.identity.v1.StepUpResponse
+	10, // 26: bank.identity.v1.IdentityService.EnrollTotp:output_type -> bank.identity.v1.EnrollTotpResponse
+	12, // 27: bank.identity.v1.IdentityService.ConfirmTotp:output_type -> bank.identity.v1.ConfirmTotpResponse
+	15, // 28: bank.identity.v1.IdentityService.GetJwks:output_type -> bank.identity.v1.GetJwksResponse
+	17, // 29: bank.identity.v1.IdentityService.RotateSigningKey:output_type -> bank.identity.v1.RotateSigningKeyResponse
+	22, // 30: bank.identity.v1.IdentityService.ListSessions:output_type -> bank.identity.v1.ListSessionsResponse
+	24, // 31: bank.identity.v1.IdentityService.RevokeSession:output_type -> bank.identity.v1.RevokeSessionResponse
+	26, // 32: bank.identity.v1.IdentityService.RevokeOtherSessions:output_type -> bank.identity.v1.RevokeOtherSessionsResponse
+	21, // [21:33] is the sub-list for method output_type
+	9,  // [9:21] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_bank_identity_v1_identity_proto_init() }
@@ -1176,7 +1600,7 @@ func file_bank_identity_v1_identity_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_identity_v1_identity_proto_rawDesc), len(file_bank_identity_v1_identity_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   27,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

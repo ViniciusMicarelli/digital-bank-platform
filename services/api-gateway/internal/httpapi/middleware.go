@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"regexp"
 	"runtime/debug"
 	"strconv"
@@ -155,14 +156,50 @@ func (a *API) authenticated(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// clientIP is the address the request came from. X-Forwarded-For is only
+// believed when the direct peer is a trusted proxy, and then read from the
+// right: each trusted hop appended the address it saw, so the first entry
+// not from a trusted proxy is the client (anything left of it may be forged).
+func (a *API) clientIP(r *http.Request) string {
+	peer, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		peer = r.RemoteAddr
+	}
+	if !a.trusted(peer) {
+		return peer
+	}
+	hops := strings.Split(strings.Join(r.Header.Values("X-Forwarded-For"), ","), ",")
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop := strings.TrimSpace(hops[i])
+		if _, err := netip.ParseAddr(hop); err != nil {
+			break // malformed: stop believing the header
+		}
+		if !a.trusted(hop) {
+			return hop
+		}
+		peer = hop
+	}
+	return peer
+}
+
+func (a *API) trusted(ip string) bool {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil {
+		return false
+	}
+	addr = addr.Unmap()
+	for _, p := range a.opts.TrustedProxies {
+		if p.Contains(addr) {
+			return true
+		}
+	}
+	return false
+}
+
 // perIP rate-limits unauthenticated routes by client address.
 func (a *API) perIP(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ip, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err != nil {
-			ip = r.RemoteAddr
-		}
-		if !a.authLimiter.Allow(r.Context(), "ip:"+ip) {
+		if !a.authLimiter.Allow(r.Context(), "ip:"+a.clientIP(r)) {
 			w.Header().Set("Retry-After", "1")
 			writeError(w, r.Context(), http.StatusTooManyRequests, "RATE_LIMITED", "too many requests")
 			return

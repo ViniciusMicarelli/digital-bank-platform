@@ -3,11 +3,50 @@ import QRCode from 'qrcode'
 import { useState } from 'react'
 import { useAccount, useProfile } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
-import { KeyRound, LogOut, Palette, ShieldCheck, SlidersHorizontal, UserRound } from 'lucide-react'
+import { KeyRound, LogOut, MonitorSmartphone, Palette, SlidersHorizontal, UserRound } from 'lucide-react'
 import { ThemeSwitch } from '../components/ThemeSwitch'
 import { Alert, Badge, Button, Field, PageTitle, Panel } from '../components/ui'
 import { api, logout } from '../lib/api'
-import { errorMessage, formatBRL } from '@bank/core'
+import { errorMessage, formatBRL, lastSeen, type Session } from '@bank/core'
+
+/** Where the customer is signed in; ends any other session, or all of them. */
+function SessionsPanel() {
+  const qc = useQueryClient()
+  const [error, setError] = useState('')
+  const sessions = useQuery({ queryKey: ['sessions'], queryFn: async () => (await api<{ sessions: Session[] }>('GET', '/v1/me/sessions')).sessions })
+  const done = { onSuccess: () => { setError(''); qc.invalidateQueries({ queryKey: ['sessions'] }) }, onError: (e: unknown) => setError(errorMessage(e)) }
+  const end = useMutation({ mutationFn: (id: string) => api('DELETE', `/v1/me/sessions/${id}`), ...done })
+  const endOthers = useMutation({ mutationFn: () => api('POST', '/v1/me/sessions/end-others'), ...done })
+  const list = sessions.data ?? []
+  const others = list.filter((s) => !s.current)
+  return (
+    <Panel title="Dispositivos conectados" icon={MonitorSmartphone}>
+      <p className="mb-3 text-sm text-fg-2">Onde sua conta está aberta. Não reconhece algum? Encerre o acesso e troque sua senha.</p>
+      <ul className="divide-y divide-line border-y border-line">
+        {list.map((s) => (
+          <li key={s.id} className="flex items-center gap-3 py-3 text-sm">
+            <div className="min-w-0 flex-1">
+              <p className="flex items-center gap-2 font-medium text-fg">{s.device}{s.current && <Badge tone="green">Este dispositivo</Badge>}</p>
+              <p className="text-xs text-muted">{s.current ? 'Em uso agora' : `Último acesso ${lastSeen(s.last_used_at)}`} · IP {s.ip || '—'}</p>
+            </div>
+            {s.current
+              ? <Button variant="ghost" size="sm" icon={LogOut} onClick={() => logout()}>Sair</Button>
+              : <Button variant="ghost" size="sm" loading={end.isPending && end.variables === s.id} onClick={() => end.mutate(s.id)}>Encerrar</Button>}
+          </li>
+        ))}
+      </ul>
+      {error && <div className="mt-3"><Alert>{error}</Alert></div>}
+      {others.length > 0 && (
+        <Button className="mt-4" variant="danger" loading={endOthers.isPending} onClick={() => endOthers.mutate()}>
+          Encerrar {others.length === 1 ? 'o outro acesso' : `os outros ${others.length} acessos`}
+        </Button>
+      )}
+      {list.length === 0 && !sessions.isLoading && (
+        <Button variant="danger" icon={LogOut} onClick={() => logout()}>Sair</Button>
+      )}
+    </Panel>
+  )
+}
 
 export function TOTP({ onEnabled }: { onEnabled?: () => void } = {}) {
   const [enroll, setEnroll] = useState<{ secret: string; image: string } | null>(null)
@@ -106,10 +145,7 @@ export function SettingsPage() {
           <p className="mb-4 text-sm text-fg-2">Siga o sistema ou escolha o tema claro ou escuro.</p>
           <ThemeSwitch />
         </Panel>
-        <Panel title="Sessão" icon={ShieldCheck}>
-          <p className="mb-4 text-sm text-fg-2">Encerra a sessão neste navegador e invalida o token de renovação.</p>
-          <Button variant="danger" icon={LogOut} onClick={() => logout()}>Sair</Button>
-        </Panel>
+        <SessionsPanel />
       </div>
     </div>
   )

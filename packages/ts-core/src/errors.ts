@@ -49,6 +49,7 @@ const messages: Record<string, string> = {
   TOO_MANY_BOXES: 'Você chegou ao máximo de 20 caixinhas.',
   BOX_CLOSED: 'Esta caixinha foi encerrada.',
   INVALID_BUDGET: 'Escolha uma categoria e um valor válido para o orçamento.',
+  SESSION_UNKNOWN: 'Entre de novo para gerenciar seus dispositivos.',
   NO_SCHEDULE: 'Esta caixinha não tem depósito programado.',
   NOTHING_TO_YIELD: 'Guarde algum valor na caixinha primeiro.',
   RECEIPT_NOT_FOUND: 'Este código não corresponde a um comprovante do Digital Bank.',

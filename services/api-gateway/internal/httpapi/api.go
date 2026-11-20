@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"regexp"
 	"time"
 
@@ -62,6 +63,10 @@ type Options struct {
 	// (CORS), e.g. the mobile app running on the web. Native apps and the
 	// web app (same origin) do not need it. Empty: none.
 	AllowedOrigins []string
+	// TrustedProxies are the reverse proxies in front of the gateway (e.g.
+	// the web app's nginx, a load balancer). Only when the direct peer is
+	// one of them is X-Forwarded-For believed. Empty: the peer is the client.
+	TrustedProxies []netip.Prefix
 }
 
 type API struct {
@@ -126,6 +131,9 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/backoffice/audit", a.staff(a.auditTrail))
 	mux.HandleFunc("GET /v1/backoffice/audit/verify", a.staff(a.verifyAudit))
 	mux.HandleFunc("GET /v1/me/profile", a.authenticated(a.getProfile))
+	mux.HandleFunc("GET /v1/me/sessions", a.authenticated(a.sessions))
+	mux.HandleFunc("DELETE /v1/me/sessions/{sessionID}", a.authenticated(a.endSession))
+	mux.HandleFunc("POST /v1/me/sessions/end-others", a.authenticated(a.endOtherSessions))
 	mux.HandleFunc("PUT /v1/me/profile", a.authenticated(a.putProfile))
 	mux.HandleFunc("POST /v1/me/kyc", a.authenticated(a.submitKYC))
 	mux.HandleFunc("GET /v1/notifications", a.authenticated(a.listNotifications))

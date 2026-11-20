@@ -45,6 +45,9 @@ type Store interface {
 	RotateKey(ctx context.Context, k StoredKey, grace time.Duration) error
 	// InsertFirstKey adds k only if no key signs yet; false if one already does.
 	InsertFirstKey(ctx context.Context, k StoredKey) (bool, error)
+
+	// Sessions lists the customer's sessions not revoked and used since since.
+	Sessions(ctx context.Context, customer uuid.UUID, since time.Time) ([]domain.Session, error)
 }
 
 // Tx is a unit of work; rows read "ForUpdate" stay locked until it ends.
@@ -57,5 +60,18 @@ type Tx interface {
 	InsertRefreshToken(ctx context.Context, t RefreshToken) error
 	RefreshTokenForUpdate(ctx context.Context, hash []byte) (RefreshToken, error)
 	RevokeRefreshToken(ctx context.Context, id uuid.UUID, replacedBy *uuid.UUID) error
+	// RevokeFamily ends a login: its refresh tokens and its session.
 	RevokeFamily(ctx context.Context, familyID uuid.UUID) error
+
+	InsertSession(ctx context.Context, s domain.Session) error
+	// TouchSession records a refresh: when, and from which address.
+	TouchSession(ctx context.Context, id uuid.UUID, ip string, now time.Time) error
+	// SeenDevice reports whether the customer logged in before at all, and
+	// from this User-Agent.
+	SeenDevice(ctx context.Context, customer uuid.UUID, userAgent string) (any, same bool, err error)
+	// SessionOwner is the customer of a session not revoked yet (ErrNotFound otherwise).
+	SessionOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
+	// OtherSessions lists the customer's sessions not revoked, except keep.
+	OtherSessions(ctx context.Context, customer, keep uuid.UUID) ([]uuid.UUID, error)
+	Publish(ctx context.Context, m outbox.Message) error
 }

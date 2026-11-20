@@ -54,7 +54,8 @@ func (a *API) login(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	resp, err := a.c.Identity.Login(r.Context(), &identityv1.LoginRequest{Email: req.Email, Password: req.Password, TotpCode: req.TOTPCode})
+	resp, err := a.c.Identity.Login(r.Context(), &identityv1.LoginRequest{Email: req.Email, Password: req.Password, TotpCode: req.TOTPCode,
+		UserAgent: r.UserAgent(), Ip: a.clientIP(r)})
 	if err != nil {
 		writeGRPCError(w, r.Context(), err)
 		return
@@ -71,7 +72,7 @@ func (a *API) refresh(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	resp, err := a.c.Identity.Refresh(r.Context(), &identityv1.RefreshRequest{RefreshToken: req.RefreshToken})
+	resp, err := a.c.Identity.Refresh(r.Context(), &identityv1.RefreshRequest{RefreshToken: req.RefreshToken, Ip: a.clientIP(r)})
 	if err != nil {
 		writeGRPCError(w, r.Context(), err)
 		return

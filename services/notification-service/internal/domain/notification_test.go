@@ -47,6 +47,8 @@ func TestFromEvent(t *testing.T) {
 			"Contestação recusada", "Sua contestação de R$ 80,00 em LOJA X foi recusada: comprovante de entrega."},
 		{"card.purchase.refunded", map[string]any{"account_id": acc, "amount_minor": 2500, "merchant_name": "LOJA X", "function": "CREDIT"},
 			"Estorno recebido", "R$ 25,00 de LOJA X voltaram na sua fatura."},
+		{"identity.session.new_device", map[string]any{"customer_id": "c-1", "device": "Safari no iPhone"}, "Novo acesso à sua conta",
+			"Sua conta foi acessada de um dispositivo novo: Safari no iPhone. Se não foi você, encerre esse acesso em Ajustes › Dispositivos e troque sua senha."},
 		{"statement.budget.threshold", map[string]any{"account_id": acc, "category": "FOOD", "threshold": 80, "budget": 50000, "spent": 41000},
 			"80% do orçamento: Alimentação", "Você já gastou R$ 410,00 dos R$ 500,00 planejados para o mês."},
 		{"statement.budget.threshold", map[string]any{"account_id": acc, "category": "TOTAL", "threshold": 100, "budget": 300000, "spent": 312050},
@@ -65,7 +67,7 @@ func TestFromEvent(t *testing.T) {
 	for _, c := range cases {
 		ds, err := FromEvent(ev(t, c.typ, c.payload), time.Now())
 		wantAccount := acc
-		if c.typ == "user.kyc.approved" {
+		if c.typ == "user.kyc.approved" || c.typ == "identity.session.new_device" {
 			wantAccount = uuid.Nil.String()
 		}
 		if err != nil || len(ds) != 1 || ds[0].Title != c.title || ds[0].Body != c.body || ds[0].AccountID.String() != wantAccount {

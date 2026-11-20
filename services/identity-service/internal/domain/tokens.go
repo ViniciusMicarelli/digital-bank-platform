@@ -47,8 +47,9 @@ func (k SigningKey) JWK() JWK {
 
 // SignAccessToken issues a short-lived token whose subject is the customer.
 // amr (RFC 8176) says how the session was authenticated: "pwd", plus "otp"
-// when the user has TOTP enabled (logins then require the code).
-func SignAccessToken(k SigningKey, customerID uuid.UUID, role Role, amr []string, now time.Time) (string, time.Time, error) {
+// when the user has TOTP enabled (logins then require the code); sid is the
+// session (the refresh token family), so a client can tell its own session.
+func SignAccessToken(k SigningKey, customerID uuid.UUID, role Role, amr []string, sid uuid.UUID, now time.Time) (string, time.Time, error) {
 	exp := now.Add(AccessTokenTTL)
 	if role == "" {
 		role = RoleCustomer
@@ -61,7 +62,7 @@ func SignAccessToken(k SigningKey, customerID uuid.UUID, role Role, amr []string
 		NotBefore: jwt.NewNumericDate(now),
 		ExpiresAt: jwt.NewNumericDate(exp),
 		ID:        uuid.NewString(),
-	}, Role: role, AMR: amr})
+	}, Role: role, AMR: amr, SID: sid.String()})
 	tok.Header["kid"] = k.Kid
 	s, err := tok.SignedString(k.Private)
 	return s, exp, err
@@ -145,6 +146,7 @@ type AccessClaims struct {
 	jwt.RegisteredClaims
 	Role Role     `json:"role,omitempty"`
 	AMR  []string `json:"amr,omitempty"`
+	SID  string   `json:"sid,omitempty"`
 }
 
 // SessionAMR is how a user with these credentials signs in: TOTP enabled

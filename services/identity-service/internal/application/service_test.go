@@ -71,17 +71,17 @@ func TestRegisterAndLogin(t *testing.T) {
 		t.Fatalf("weak password err = %v", err)
 	}
 
-	got, pair, err := svc.Login(ctx, "ANA@example.com ", password, "")
+	got, pair, err := svc.Login(ctx, "ANA@example.com ", password, "", laptop)
 	if err != nil || got != id {
 		t.Fatalf("login = %v, %v", got, err)
 	}
 	if sub, err := verify(t, svc, pair.AccessToken); err != nil || sub != id.String() {
 		t.Fatalf("access token: %q %v", sub, err)
 	}
-	if _, _, err := svc.Login(ctx, "ana@example.com", "wrong password!!", ""); !errors.Is(err, domain.ErrInvalidCredentials) {
+	if _, _, err := svc.Login(ctx, "ana@example.com", "wrong password!!", "", laptop); !errors.Is(err, domain.ErrInvalidCredentials) {
 		t.Fatalf("wrong password err = %v", err)
 	}
-	if _, _, err := svc.Login(ctx, "nobody@example.com", password, ""); !errors.Is(err, domain.ErrInvalidCredentials) {
+	if _, _, err := svc.Login(ctx, "nobody@example.com", password, "", laptop); !errors.Is(err, domain.ErrInvalidCredentials) {
 		t.Fatalf("unknown email err = %v", err)
 	}
 }
@@ -91,13 +91,13 @@ func TestLockout(t *testing.T) {
 	ctx := context.Background()
 	_, _ = svc.Register(ctx, "ana@example.com", password, "Ana Souza")
 	for range domain.MaxFailedAttempts {
-		_, _, _ = svc.Login(ctx, "ana@example.com", "wrong password!!", "")
+		_, _, _ = svc.Login(ctx, "ana@example.com", "wrong password!!", "", laptop)
 	}
-	if _, _, err := svc.Login(ctx, "ana@example.com", password, ""); !errors.Is(err, domain.ErrLocked) {
+	if _, _, err := svc.Login(ctx, "ana@example.com", password, "", laptop); !errors.Is(err, domain.ErrLocked) {
 		t.Fatalf("even the right password must be refused while locked: %v", err)
 	}
 	*now = now.Add(domain.LockDuration + time.Second)
-	if _, _, err := svc.Login(ctx, "ana@example.com", password, ""); err != nil {
+	if _, _, err := svc.Login(ctx, "ana@example.com", password, "", laptop); err != nil {
 		t.Fatalf("after the lock expires: %v", err)
 	}
 }
@@ -106,29 +106,29 @@ func TestRefreshRotationAndReuseDetection(t *testing.T) {
 	svc, _, _ := setup(t)
 	ctx := context.Background()
 	_, _ = svc.Register(ctx, "ana@example.com", password, "Ana Souza")
-	_, first, _ := svc.Login(ctx, "ana@example.com", password, "")
+	_, first, _ := svc.Login(ctx, "ana@example.com", password, "", laptop)
 
-	second, err := svc.Refresh(ctx, first.RefreshToken)
+	second, err := svc.Refresh(ctx, first.RefreshToken, "")
 	if err != nil || second.RefreshToken == first.RefreshToken {
 		t.Fatalf("refresh = %v", err)
 	}
 	// The first token was rotated: presenting it again means it was stolen.
-	if _, err := svc.Refresh(ctx, first.RefreshToken); !errors.Is(err, domain.ErrRefreshReused) {
+	if _, err := svc.Refresh(ctx, first.RefreshToken, ""); !errors.Is(err, domain.ErrRefreshReused) {
 		t.Fatalf("reuse err = %v", err)
 	}
 	// ...and the legitimate holder's newer token is revoked too.
-	if _, err := svc.Refresh(ctx, second.RefreshToken); !errors.Is(err, domain.ErrRefreshReused) {
+	if _, err := svc.Refresh(ctx, second.RefreshToken, ""); !errors.Is(err, domain.ErrRefreshReused) {
 		t.Fatalf("family must be revoked: %v", err)
 	}
 
-	_, other, _ := svc.Login(ctx, "ana@example.com", password, "")
+	_, other, _ := svc.Login(ctx, "ana@example.com", password, "", laptop)
 	if err := svc.Logout(ctx, other.RefreshToken); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.Refresh(ctx, other.RefreshToken); err == nil {
+	if _, err := svc.Refresh(ctx, other.RefreshToken, ""); err == nil {
 		t.Fatal("refresh after logout must fail")
 	}
-	if _, err := svc.Refresh(ctx, "garbage"); !errors.Is(err, domain.ErrInvalidRefresh) {
+	if _, err := svc.Refresh(ctx, "garbage", ""); !errors.Is(err, domain.ErrInvalidRefresh) {
 		t.Fatalf("unknown token err = %v", err)
 	}
 }
@@ -143,7 +143,7 @@ func TestTOTP(t *testing.T) {
 		t.Fatalf("enroll = %q, %v", uri, err)
 	}
 	// Not enabled until confirmed: login still works without a code.
-	if _, _, err := svc.Login(ctx, "ana@example.com", password, ""); err != nil {
+	if _, _, err := svc.Login(ctx, "ana@example.com", password, "", laptop); err != nil {
 		t.Fatal(err)
 	}
 	if err := svc.ConfirmTOTP(ctx, id, "000000"); !errors.Is(err, domain.ErrInvalidMFACode) {
@@ -154,16 +154,16 @@ func TestTOTP(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err := svc.Login(ctx, "ana@example.com", password, ""); !errors.Is(err, domain.ErrMFARequired) {
+	if _, _, err := svc.Login(ctx, "ana@example.com", password, "", laptop); !errors.Is(err, domain.ErrMFARequired) {
 		t.Fatalf("missing code err = %v", err)
 	}
 	// The confirmation code cannot be replayed to log in.
-	if _, _, err := svc.Login(ctx, "ana@example.com", password, code); !errors.Is(err, domain.ErrInvalidMFACode) {
+	if _, _, err := svc.Login(ctx, "ana@example.com", password, code, laptop); !errors.Is(err, domain.ErrInvalidMFACode) {
 		t.Fatalf("replayed code err = %v", err)
 	}
 	*now = now.Add(30 * time.Second)
 	next, _ := domain.TOTPCode(secret, domain.TOTPStep(*now))
-	if _, _, err := svc.Login(ctx, "ana@example.com", password, next); err != nil {
+	if _, _, err := svc.Login(ctx, "ana@example.com", password, next, laptop); err != nil {
 		t.Fatalf("login with code: %v", err)
 	}
 	if _, _, err := svc.EnrollTOTP(ctx, id); !errors.Is(err, ErrTOTPAlreadyEnabled) {
@@ -182,13 +182,13 @@ func TestKeyRotation(t *testing.T) {
 	svc, pool, _ := setup(t)
 	ctx := context.Background()
 	_, _ = svc.Register(ctx, "ana@example.com", password, "Ana Souza")
-	_, before, _ := svc.Login(ctx, "ana@example.com", password, "")
+	_, before, _ := svc.Login(ctx, "ana@example.com", password, "", laptop)
 
 	kid, err := svc.RotateSigningKey(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, after, _ := svc.Login(ctx, "ana@example.com", password, "")
+	_, after, _ := svc.Login(ctx, "ana@example.com", password, "", laptop)
 	tok, _, _ := jwt.NewParser().ParseUnverified(after.AccessToken, &jwt.RegisteredClaims{})
 	if tok.Header["kid"] != kid {
 		t.Fatalf("new tokens must use the new key, kid = %v", tok.Header["kid"])
@@ -263,7 +263,7 @@ func TestAnalystRole(t *testing.T) {
 	}
 	role := func(token string) domain.Role { return claimsOf(token).Role }
 	_, _ = svc.Register(ctx, "cliente@example.com", "correct horse battery staple", "Cliente Um")
-	_, pair, err := svc.Login(ctx, "cliente@example.com", "correct horse battery staple", "")
+	_, pair, err := svc.Login(ctx, "cliente@example.com", "correct horse battery staple", "", laptop)
 	if err != nil || role(pair.AccessToken) != domain.RoleCustomer {
 		t.Fatalf("customer token role = %q %v", role(pair.AccessToken), err)
 	}
@@ -275,11 +275,11 @@ func TestAnalystRole(t *testing.T) {
 	if err != nil || again != id {
 		t.Fatalf("bootstrap is idempotent: %v %v", again, err)
 	}
-	_, pair, err = svc.Login(ctx, "analista@bank.dev", "correct horse battery staple", "")
+	_, pair, err = svc.Login(ctx, "analista@bank.dev", "correct horse battery staple", "", laptop)
 	if err != nil || role(pair.AccessToken) != domain.RoleAnalyst {
 		t.Fatalf("analyst token role = %q %v", role(pair.AccessToken), err)
 	}
-	refreshed, err := svc.Refresh(ctx, pair.RefreshToken)
+	refreshed, err := svc.Refresh(ctx, pair.RefreshToken, "")
 	if err != nil || role(refreshed.AccessToken) != domain.RoleAnalyst {
 		t.Fatalf("the role survives a refresh: %q %v", role(refreshed.AccessToken), err)
 	}
@@ -292,11 +292,11 @@ func TestAnalystRole(t *testing.T) {
 	if _, err := svc.EnsureAnalyst(ctx, "analista@bank.dev", "correct horse battery staple", "Analista", secret); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := svc.Login(ctx, "analista@bank.dev", "correct horse battery staple", ""); !errors.Is(err, domain.ErrMFARequired) {
+	if _, _, err := svc.Login(ctx, "analista@bank.dev", "correct horse battery staple", "", laptop); !errors.Is(err, domain.ErrMFARequired) {
 		t.Fatalf("login without the code: %v", err)
 	}
 	code, _ := domain.TOTPCode(secret, domain.TOTPStep(*now))
-	_, pair, err = svc.Login(ctx, "analista@bank.dev", "correct horse battery staple", code)
+	_, pair, err = svc.Login(ctx, "analista@bank.dev", "correct horse battery staple", code, laptop)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,5 +305,73 @@ func TestAnalystRole(t *testing.T) {
 	}
 	if _, err := svc.EnsureAnalyst(ctx, "outra@bank.dev", "correct horse battery staple", "Outra", "not base32!"); err == nil {
 		t.Fatal("a bad TOTP secret must be refused")
+	}
+}
+
+var (
+	laptop = domain.Device{UserAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36", IP: "10.0.0.1"}
+	phone  = domain.Device{UserAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1", IP: "10.0.0.2"}
+)
+
+func TestSessions(t *testing.T) {
+	svc, pool, now := setup(t)
+	ctx := context.Background()
+	ana, _ := svc.Register(ctx, "ana@example.com", password, "Ana Souza")
+	bob, _ := svc.Register(ctx, "bob@example.com", password, "Bob Lima")
+	newDevice := func() (n int) {
+		_ = pool.QueryRow(ctx, `SELECT count(*) FROM outbox WHERE payload->>'type' = 'identity.session.new_device'`).Scan(&n)
+		return n
+	}
+
+	_, onLaptop, _ := svc.Login(ctx, "ana@example.com", password, "", laptop)
+	_, _, _ = svc.Login(ctx, "ana@example.com", password, "", laptop) // the same device again
+	if newDevice() != 0 {
+		t.Fatal("the first device and a known one are not news")
+	}
+	_, onPhone, _ := svc.Login(ctx, "ana@example.com", password, "", phone)
+	if newDevice() != 1 {
+		t.Fatal("a new device should be announced")
+	}
+	list, err := svc.Sessions(ctx, ana)
+	if err != nil || len(list) != 3 || list[0].Device != "Safari no iPhone" || list[2].Device != "Chrome no macOS" {
+		t.Fatalf("sessions = %+v %v", list, err)
+	}
+	phoneSession := list[0].ID
+
+	// A refresh keeps the session and moves its last use.
+	*now = now.Add(time.Hour)
+	if _, err := svc.Refresh(ctx, onLaptop.RefreshToken, "10.0.0.9"); err != nil {
+		t.Fatal(err)
+	}
+	list, _ = svc.Sessions(ctx, ana)
+	if list[0].Device != "Chrome no macOS" || list[0].IP != "10.0.0.9" {
+		t.Fatalf("after refresh = %+v", list[0])
+	}
+	laptopSession := list[0].ID
+
+	// Someone else's session is not found; ending one stops its refresh.
+	if err := svc.RevokeSession(ctx, bob, phoneSession); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("bob ending ana's session: %v", err)
+	}
+	if err := svc.RevokeSession(ctx, ana, phoneSession); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Refresh(ctx, onPhone.RefreshToken, ""); err == nil {
+		t.Fatal("an ended session must not refresh")
+	}
+	if err := svc.RevokeSession(ctx, ana, phoneSession); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("ending it twice: %v", err)
+	}
+	// Ending all the others keeps the one asking.
+	if n, err := svc.RevokeOtherSessions(ctx, ana, laptopSession); err != nil || n != 1 {
+		t.Fatalf("others = %d %v", n, err)
+	}
+	if list, _ := svc.Sessions(ctx, ana); len(list) != 1 || list[0].ID != laptopSession {
+		t.Fatalf("left = %+v", list)
+	}
+	// Sessions unused for longer than a refresh token lives are gone.
+	*now = now.Add(domain.RefreshTokenTTL + time.Minute)
+	if list, _ := svc.Sessions(ctx, ana); len(list) != 0 {
+		t.Fatalf("expired = %+v", list)
 	}
 }

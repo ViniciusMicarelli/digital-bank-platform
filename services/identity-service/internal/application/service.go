@@ -118,7 +118,7 @@ func (s *Service) EnsureAnalyst(ctx context.Context, email, password, name, totp
 // Login checks the password (and the TOTP code when enabled) and starts a
 // new session. Failures are counted even though an error is returned, so the
 // transaction commits and the authentication error is reported afterwards.
-func (s *Service) Login(ctx context.Context, email, password, code string) (uuid.UUID, TokenPair, error) {
+func (s *Service) Login(ctx context.Context, email, password, code string, device domain.Device) (uuid.UUID, TokenPair, error) {
 	email, _ = domain.NormalizeEmail(email) // an invalid email simply does not match
 	now := s.now()
 	var (
@@ -165,7 +165,11 @@ func (s *Service) Login(ctx context.Context, email, password, code string) (uuid
 			return err
 		}
 		customer = c.CustomerID
-		pair, _, err = s.issue(ctx, tx, c.CustomerID, uuid.Must(uuid.NewV7()), c, now)
+		session, err := s.openSession(ctx, tx, c.CustomerID, device, now)
+		if err != nil {
+			return err
+		}
+		pair, _, err = s.issue(ctx, tx, c.CustomerID, session, c, now)
 		return err
 	})
 	if err != nil {
@@ -234,7 +238,7 @@ func (s *Service) StepUp(ctx context.Context, customer uuid.UUID, password, code
 
 // Refresh rotates a refresh token. A token that was already rotated means it
 // leaked (or was replayed): the whole family is revoked.
-func (s *Service) Refresh(ctx context.Context, token string) (TokenPair, error) {
+func (s *Service) Refresh(ctx context.Context, token, ip string) (TokenPair, error) {
 	now := s.now()
 	var (
 		pair       TokenPair
@@ -267,6 +271,9 @@ func (s *Service) Refresh(ctx context.Context, token string) (TokenPair, error) 
 		if pair, nextID, err = s.issue(ctx, tx, rt.CustomerID, rt.FamilyID, c, now); err != nil {
 			return err
 		}
+		if err := tx.TouchSession(ctx, rt.FamilyID, ip, now); err != nil {
+			return err
+		}
 		return tx.RevokeRefreshToken(ctx, rt.ID, &nextID)
 	})
 	if err != nil {
@@ -289,13 +296,78 @@ func (s *Service) Logout(ctx context.Context, token string) error {
 	})
 }
 
+// openSession records a login's session and, when it comes from a device
+// the customer never used (and is not their first login), publishes
+// identity.session.new_device so they hear about it.
+func (s *Service) openSession(ctx context.Context, tx ports.Tx, customer uuid.UUID, device domain.Device, now time.Time) (uuid.UUID, error) {
+	session := domain.NewSession(customer, device, now)
+	before, known, err := tx.SeenDevice(ctx, customer, session.UserAgent)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if err := tx.InsertSession(ctx, session); err != nil {
+		return uuid.Nil, err
+	}
+	if before && !known {
+		ev, err := outbox.NewEvent(ctx, "identity-service", "identity.session.new_device", map[string]string{
+			"customer_id": customer.String(), "session_id": session.ID.String(), "device": session.Device, "ip": session.IP})
+		if err != nil {
+			return uuid.Nil, err
+		}
+		if err := tx.Publish(ctx, outbox.Message{Topic: "bank.identity.events", Key: customer.String(), Event: ev}); err != nil {
+			return uuid.Nil, err
+		}
+	}
+	return session.ID, nil
+}
+
+// Sessions lists where the customer is signed in, most recently used first.
+func (s *Service) Sessions(ctx context.Context, customer uuid.UUID) ([]domain.Session, error) {
+	return s.store.Sessions(ctx, customer, s.now().Add(-domain.RefreshTokenTTL))
+}
+
+// RevokeSession ends one of the customer's sessions: its refresh token stops
+// working (access tokens already issued expire within AccessTokenTTL).
+func (s *Service) RevokeSession(ctx context.Context, customer, session uuid.UUID) error {
+	return s.store.InTx(ctx, func(tx ports.Tx) error {
+		owner, err := tx.SessionOwner(ctx, session)
+		if err != nil {
+			return err
+		}
+		if owner != customer {
+			return fmt.Errorf("%w: session", domain.ErrNotFound)
+		}
+		return tx.RevokeFamily(ctx, session)
+	})
+}
+
+// RevokeOtherSessions ends every session of the customer but keep (the one
+// asking), and says how many.
+func (s *Service) RevokeOtherSessions(ctx context.Context, customer, keep uuid.UUID) (int, error) {
+	var n int
+	err := s.store.InTx(ctx, func(tx ports.Tx) error {
+		ids, err := tx.OtherSessions(ctx, customer, keep)
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			if err := tx.RevokeFamily(ctx, id); err != nil {
+				return err
+			}
+		}
+		n = len(ids)
+		return nil
+	})
+	return n, err
+}
+
 // issue signs an access token and stores a new refresh token in family.
 func (s *Service) issue(ctx context.Context, tx ports.Tx, customer, family uuid.UUID, c domain.Credentials, now time.Time) (TokenPair, uuid.UUID, error) {
 	key, err := s.signingKey(ctx)
 	if err != nil {
 		return TokenPair{}, uuid.Nil, err
 	}
-	access, accessExp, err := domain.SignAccessToken(key, customer, c.Role, c.SessionAMR(), now)
+	access, accessExp, err := domain.SignAccessToken(key, customer, c.Role, c.SessionAMR(), family, now)
 	if err != nil {
 		return TokenPair{}, uuid.Nil, err
 	}

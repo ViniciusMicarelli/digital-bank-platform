@@ -283,3 +283,20 @@ test('temporary card: single use', async ({ page }) => {
   await expect(page.getByText('Este cartão temporário já foi usado', { exact: false })).toBeVisible()
   await shot(page, '18-temporary-card')
 })
+
+test('connected devices: see and end another session', async ({ page }) => {
+  const email = await onboard(page)
+  // The same customer signs in from a phone.
+  const iphone = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1'
+  const login = await page.request.post('/v1/auth/login', { headers: { 'User-Agent': iphone }, data: { email, password: PASSWORD } })
+  expect(login.ok()).toBeTruthy()
+
+  await page.goto('/ajustes')
+  const panel = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Dispositivos conectados' }) })
+  await expect(panel.getByText('Este dispositivo')).toBeVisible()
+  await expect(panel.getByText('Safari no iPhone')).toBeVisible()
+  await shot(page, '19-devices')
+  await panel.getByRole('button', { name: 'Encerrar', exact: true }).click()
+  await expect(panel.getByText('Safari no iPhone')).toBeHidden()
+  await expect(panel.getByText('Este dispositivo')).toBeVisible()
+})

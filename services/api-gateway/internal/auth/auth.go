@@ -101,6 +101,9 @@ type Principal struct {
 	// MFA is true when the session was opened with a second factor
 	// (the token's amr has "otp").
 	MFA bool
+	// Session is the login the token belongs to ("sid"); empty for tokens
+	// issued before sessions were tracked.
+	Session string
 }
 
 // VerifyAccess returns the principal of a valid access token.
@@ -109,7 +112,7 @@ func (v *Verifier) VerifyAccess(ctx context.Context, token string) (Principal, e
 	if err := v.parse(ctx, token, Audience, claims); err != nil || claims.Subject == "" {
 		return Principal{}, ErrInvalidToken
 	}
-	p := Principal{Subject: claims.Subject, Role: claims.Role, MFA: slices.Contains(claims.AMR, "otp")}
+	p := Principal{Subject: claims.Subject, Role: claims.Role, MFA: slices.Contains(claims.AMR, "otp"), Session: claims.SID}
 	if p.Role == "" {
 		p.Role = "CUSTOMER"
 	}
@@ -120,6 +123,7 @@ type accessClaims struct {
 	jwt.RegisteredClaims
 	Role string   `json:"role"`
 	AMR  []string `json:"amr"`
+	SID  string   `json:"sid"`
 }
 
 // VerifyStepUp returns the customer id of a valid step-up token (a fresh

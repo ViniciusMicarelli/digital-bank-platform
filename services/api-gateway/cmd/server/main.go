@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/signal"
 	"strings"
@@ -47,6 +48,17 @@ func limiters(log *slog.Logger) httpapi.Options {
 		if o = strings.TrimSpace(o); o != "" {
 			opts.AllowedOrigins = append(opts.AllowedOrigins, o)
 		}
+	}
+	for _, c := range strings.Split(config.String("TRUSTED_PROXIES", ""), ",") {
+		if c = strings.TrimSpace(c); c == "" {
+			continue
+		}
+		prefix, err := netip.ParsePrefix(c)
+		if err != nil {
+			log.Error("TRUSTED_PROXIES: not a CIDR", "value", c)
+			os.Exit(1)
+		}
+		opts.TrustedProxies = append(opts.TrustedProxies, prefix)
 	}
 	if addr := config.String("REDIS_ADDR", ""); addr != "" {
 		client := redis.NewClient(&redis.Options{Addr: addr})

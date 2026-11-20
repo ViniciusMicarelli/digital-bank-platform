@@ -248,6 +248,12 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Monthly budgets on the month's total or per spending category, with a notification at 80% and at 100%, once each per month; statement-service now publishes through its own outbox.
 - Web and mobile: budgets on the spending screen with how much of each is used.
 
+## Phase 37 — Connected devices ✅
+
+- Every login is a session with its device, address and last use; the customer sees where the account is open and ends any other session, or all of them; a login from a new device sends a "Novo acesso" notification.
+- The gateway resolves the real client address behind trusted proxies (`TRUSTED_PROXIES`), which also fixes per-IP rate limits behind the web app's nginx.
+- Web: devices in Settings; mobile: a "Dispositivos conectados" screen.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

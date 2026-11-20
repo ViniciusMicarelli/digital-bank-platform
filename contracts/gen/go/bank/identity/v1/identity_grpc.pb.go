@@ -19,15 +19,18 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	IdentityService_Register_FullMethodName         = "/bank.identity.v1.IdentityService/Register"
-	IdentityService_Login_FullMethodName            = "/bank.identity.v1.IdentityService/Login"
-	IdentityService_Refresh_FullMethodName          = "/bank.identity.v1.IdentityService/Refresh"
-	IdentityService_Logout_FullMethodName           = "/bank.identity.v1.IdentityService/Logout"
-	IdentityService_StepUp_FullMethodName           = "/bank.identity.v1.IdentityService/StepUp"
-	IdentityService_EnrollTotp_FullMethodName       = "/bank.identity.v1.IdentityService/EnrollTotp"
-	IdentityService_ConfirmTotp_FullMethodName      = "/bank.identity.v1.IdentityService/ConfirmTotp"
-	IdentityService_GetJwks_FullMethodName          = "/bank.identity.v1.IdentityService/GetJwks"
-	IdentityService_RotateSigningKey_FullMethodName = "/bank.identity.v1.IdentityService/RotateSigningKey"
+	IdentityService_Register_FullMethodName            = "/bank.identity.v1.IdentityService/Register"
+	IdentityService_Login_FullMethodName               = "/bank.identity.v1.IdentityService/Login"
+	IdentityService_Refresh_FullMethodName             = "/bank.identity.v1.IdentityService/Refresh"
+	IdentityService_Logout_FullMethodName              = "/bank.identity.v1.IdentityService/Logout"
+	IdentityService_StepUp_FullMethodName              = "/bank.identity.v1.IdentityService/StepUp"
+	IdentityService_EnrollTotp_FullMethodName          = "/bank.identity.v1.IdentityService/EnrollTotp"
+	IdentityService_ConfirmTotp_FullMethodName         = "/bank.identity.v1.IdentityService/ConfirmTotp"
+	IdentityService_GetJwks_FullMethodName             = "/bank.identity.v1.IdentityService/GetJwks"
+	IdentityService_RotateSigningKey_FullMethodName    = "/bank.identity.v1.IdentityService/RotateSigningKey"
+	IdentityService_ListSessions_FullMethodName        = "/bank.identity.v1.IdentityService/ListSessions"
+	IdentityService_RevokeSession_FullMethodName       = "/bank.identity.v1.IdentityService/RevokeSession"
+	IdentityService_RevokeOtherSessions_FullMethodName = "/bank.identity.v1.IdentityService/RevokeOtherSessions"
 )
 
 // IdentityServiceClient is the client API for IdentityService service.
@@ -55,6 +58,16 @@ type IdentityServiceClient interface {
 	GetJwks(ctx context.Context, in *GetJwksRequest, opts ...grpc.CallOption) (*GetJwksResponse, error)
 	// Starts signing with a new key. Operator only: never exposed at the edge.
 	RotateSigningKey(ctx context.Context, in *RotateSigningKeyRequest, opts ...grpc.CallOption) (*RotateSigningKeyResponse, error)
+	// Where the customer is signed in (one session per login), most recently
+	// used first. A login from a device never used before publishes
+	// identity.session.new_device.
+	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
+	// Ends a session of the customer: its refresh token stops working; access
+	// tokens already issued expire within 15 minutes. NOT_FOUND for a session
+	// of someone else or already ended.
+	RevokeSession(ctx context.Context, in *RevokeSessionRequest, opts ...grpc.CallOption) (*RevokeSessionResponse, error)
+	// Ends every session of the customer except keep_session_id.
+	RevokeOtherSessions(ctx context.Context, in *RevokeOtherSessionsRequest, opts ...grpc.CallOption) (*RevokeOtherSessionsResponse, error)
 }
 
 type identityServiceClient struct {
@@ -155,6 +168,36 @@ func (c *identityServiceClient) RotateSigningKey(ctx context.Context, in *Rotate
 	return out, nil
 }
 
+func (c *identityServiceClient) ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSessionsResponse)
+	err := c.cc.Invoke(ctx, IdentityService_ListSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) RevokeSession(ctx context.Context, in *RevokeSessionRequest, opts ...grpc.CallOption) (*RevokeSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeSessionResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RevokeSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) RevokeOtherSessions(ctx context.Context, in *RevokeOtherSessionsRequest, opts ...grpc.CallOption) (*RevokeOtherSessionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RevokeOtherSessionsResponse)
+	err := c.cc.Invoke(ctx, IdentityService_RevokeOtherSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IdentityServiceServer is the server API for IdentityService service.
 // All implementations must embed UnimplementedIdentityServiceServer
 // for forward compatibility.
@@ -180,6 +223,16 @@ type IdentityServiceServer interface {
 	GetJwks(context.Context, *GetJwksRequest) (*GetJwksResponse, error)
 	// Starts signing with a new key. Operator only: never exposed at the edge.
 	RotateSigningKey(context.Context, *RotateSigningKeyRequest) (*RotateSigningKeyResponse, error)
+	// Where the customer is signed in (one session per login), most recently
+	// used first. A login from a device never used before publishes
+	// identity.session.new_device.
+	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
+	// Ends a session of the customer: its refresh token stops working; access
+	// tokens already issued expire within 15 minutes. NOT_FOUND for a session
+	// of someone else or already ended.
+	RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error)
+	// Ends every session of the customer except keep_session_id.
+	RevokeOtherSessions(context.Context, *RevokeOtherSessionsRequest) (*RevokeOtherSessionsResponse, error)
 	mustEmbedUnimplementedIdentityServiceServer()
 }
 
@@ -216,6 +269,15 @@ func (UnimplementedIdentityServiceServer) GetJwks(context.Context, *GetJwksReque
 }
 func (UnimplementedIdentityServiceServer) RotateSigningKey(context.Context, *RotateSigningKeyRequest) (*RotateSigningKeyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RotateSigningKey not implemented")
+}
+func (UnimplementedIdentityServiceServer) ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSessions not implemented")
+}
+func (UnimplementedIdentityServiceServer) RevokeSession(context.Context, *RevokeSessionRequest) (*RevokeSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeSession not implemented")
+}
+func (UnimplementedIdentityServiceServer) RevokeOtherSessions(context.Context, *RevokeOtherSessionsRequest) (*RevokeOtherSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeOtherSessions not implemented")
 }
 func (UnimplementedIdentityServiceServer) mustEmbedUnimplementedIdentityServiceServer() {}
 func (UnimplementedIdentityServiceServer) testEmbeddedByValue()                         {}
@@ -400,6 +462,60 @@ func _IdentityService_RotateSigningKey_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IdentityService_ListSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).ListSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_ListSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).ListSessions(ctx, req.(*ListSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_RevokeSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RevokeSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RevokeSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RevokeSession(ctx, req.(*RevokeSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_RevokeOtherSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeOtherSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).RevokeOtherSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_RevokeOtherSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).RevokeOtherSessions(ctx, req.(*RevokeOtherSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // IdentityService_ServiceDesc is the grpc.ServiceDesc for IdentityService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -442,6 +558,18 @@ var IdentityService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RotateSigningKey",
 			Handler:    _IdentityService_RotateSigningKey_Handler,
+		},
+		{
+			MethodName: "ListSessions",
+			Handler:    _IdentityService_ListSessions_Handler,
+		},
+		{
+			MethodName: "RevokeSession",
+			Handler:    _IdentityService_RevokeSession_Handler,
+		},
+		{
+			MethodName: "RevokeOtherSessions",
+			Handler:    _IdentityService_RevokeOtherSessions_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

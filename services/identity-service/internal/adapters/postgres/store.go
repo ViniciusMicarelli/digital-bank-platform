@@ -146,8 +146,61 @@ func (t *txStore) RevokeRefreshToken(ctx context.Context, id uuid.UUID, replaced
 }
 
 func (t *txStore) RevokeFamily(ctx context.Context, family uuid.UUID) error {
-	_, err := t.tx.Exec(ctx, `UPDATE refresh_tokens SET revoked_at = COALESCE(revoked_at, now()) WHERE family_id = $1`, family)
+	if _, err := t.tx.Exec(ctx, `UPDATE refresh_tokens SET revoked_at = COALESCE(revoked_at, now()) WHERE family_id = $1`, family); err != nil {
+		return err
+	}
+	_, err := t.tx.Exec(ctx, `UPDATE sessions SET revoked_at = COALESCE(revoked_at, now()) WHERE id = $1`, family)
 	return err
+}
+
+func (t *txStore) InsertSession(ctx context.Context, s domain.Session) error {
+	_, err := t.tx.Exec(ctx, `INSERT INTO sessions (id, customer_id, device, user_agent, ip, created_at, last_used_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`, s.ID, s.CustomerID, s.Device, s.UserAgent, s.IP, s.CreatedAt, s.LastUsedAt)
+	return err
+}
+
+func (t *txStore) TouchSession(ctx context.Context, id uuid.UUID, ip string, now time.Time) error {
+	_, err := t.tx.Exec(ctx, `UPDATE sessions SET last_used_at = $2, ip = CASE WHEN $3 = '' THEN ip ELSE $3 END WHERE id = $1`, id, now, ip)
+	return err
+}
+
+func (t *txStore) SeenDevice(ctx context.Context, customer uuid.UUID, userAgent string) (anySession, same bool, err error) {
+	err = t.tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM sessions WHERE customer_id = $1),
+		EXISTS (SELECT 1 FROM sessions WHERE customer_id = $1 AND user_agent = $2)`, customer, userAgent).Scan(&anySession, &same)
+	return anySession, same, err
+}
+
+func (t *txStore) SessionOwner(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	var owner uuid.UUID
+	err := t.tx.QueryRow(ctx, `SELECT customer_id FROM sessions WHERE id = $1 AND revoked_at IS NULL FOR UPDATE`, id).Scan(&owner)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return owner, fmt.Errorf("%w: session", domain.ErrNotFound)
+	}
+	return owner, err
+}
+
+func (t *txStore) OtherSessions(ctx context.Context, customer, keep uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := t.tx.Query(ctx, `SELECT id FROM sessions WHERE customer_id = $1 AND id <> $2 AND revoked_at IS NULL FOR UPDATE`, customer, keep)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+}
+
+func (t *txStore) Publish(ctx context.Context, m outbox.Message) error {
+	return outbox.Insert(ctx, t.tx, m)
+}
+
+func (s *Store) Sessions(ctx context.Context, customer uuid.UUID, since time.Time) ([]domain.Session, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id, customer_id, device, user_agent, ip, created_at, last_used_at FROM sessions
+		WHERE customer_id = $1 AND revoked_at IS NULL AND last_used_at > $2 ORDER BY last_used_at DESC, id DESC LIMIT 50`, customer, since)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (domain.Session, error) {
+		var x domain.Session
+		return x, r.Scan(&x.ID, &x.CustomerID, &x.Device, &x.UserAgent, &x.IP, &x.CreatedAt, &x.LastUsedAt)
+	})
 }
 
 // SetRole changes the role of a user (back-office bootstrap).

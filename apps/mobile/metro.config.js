@@ -21,6 +21,9 @@ config.server.enhanceMiddleware = (middleware, server) => {
     if (!req.url.startsWith('/v1/') && req.url !== '/healthz') return next(req, res, fallthrough)
     const headers = { ...req.headers, host: target.host }
     delete headers.origin // same-origin from the app's point of view
+    // Like any reverse proxy: append the phone's address for the gateway.
+    const peer = (req.socket.remoteAddress || '').replace(/^::ffff:/, '')
+    headers['x-forwarded-for'] = headers['x-forwarded-for'] ? `${headers['x-forwarded-for']}, ${peer}` : peer
     const upstream = http.request({ hostname: target.hostname, port: target.port, path: req.url, method: req.method, headers }, (r) => {
       res.writeHead(r.statusCode || 502, r.headers)
       r.pipe(res)

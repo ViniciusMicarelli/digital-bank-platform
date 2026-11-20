@@ -390,3 +390,26 @@ export function scoreFactorText(f: ScoreFactor): { title: string; detail: string
       return { title: 'Parcelamento de fatura', detail: f.value ? `${plural(f.value, 'fatura parcelada', 'faturas parceladas')} nos últimos 12 meses.` : 'Nenhuma fatura parcelada nos últimos 12 meses.' }
   }
 }
+
+/** One login: where the customer is signed in. */
+export interface Session {
+  id: string
+  /** e.g. "Chrome no macOS", "App no iPhone". */
+  device: string
+  ip: string
+  created_at: string
+  last_used_at: string
+  /** The session making the request. */
+  current: boolean
+}
+
+/** "há pouco", "há 3 horas", "há 2 dias": when a session was last used. */
+export function lastSeen(iso: string, now = Date.now()): string {
+  const min = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000))
+  if (min < 16) return 'há pouco' // access tokens last 15 minutes: refreshed within that is "now"
+  if (min < 60) return `há ${min} minutos`
+  const h = Math.round(min / 60)
+  if (h < 24) return h === 1 ? 'há 1 hora' : `há ${h} horas`
+  const d = Math.round(h / 24)
+  return d === 1 ? 'há 1 dia' : `há ${d} dias`
+}

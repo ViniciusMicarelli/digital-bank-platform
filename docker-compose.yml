@@ -435,6 +435,9 @@ services:
       TLS_CERT: /certs/api-gateway.pem
       TLS_KEY: /certs/api-gateway-key.pem
       HTTP_ADDR: ":8080"
+      # The web app's nginx runs on the compose network: believe its
+      # X-Forwarded-For (sessions and per-IP limits see the real client).
+      TRUSTED_PROXIES: 172.16.0.0/12
       SANDBOX: "true"
       # The mobile app on the web (expo start --web / the e2e build).
       CORS_ALLOWED_ORIGINS: http://localhost:8082

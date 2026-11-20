@@ -13,6 +13,7 @@ Who the customer is. It owns credentials and sessions, issues access tokens, and
 | TOTP MFA (RFC 6238, SHA-1, 6 digits, ±1 step), enroll → confirm, replay protection (`totp_last_step`) | ✅ |
 | Ed25519 (EdDSA) access tokens, 15 min, `kid` header, issuer `digital-bank-identity`, audience `digital-bank-api` | ✅ |
 | Rotating refresh tokens (30 days, stored as SHA-256), reuse detection revoking the whole family, logout | ✅ |
+| Sessions (one per login = refresh token family) with a readable device from the User-Agent ("Chrome no macOS", "App no iPhone"), the client IP and last use; access tokens carry `sid`; the customer lists them and ends one or all the others (`ListSessions`, `RevokeSession`, `RevokeOtherSessions`); a login from a device never used before (not the first login) publishes `identity.session.new_device`, which becomes a "Novo acesso" notification. Ending a session stops its refresh at once; access tokens already issued live out their 15 minutes | ✅ |
 | JWKS (`GetJwks`) and key rotation (`RotateSigningKey`, automatic after 30 days); retired keys stay published for 20 min | ✅ |
 | Signing keys and TOTP seeds encrypted at rest (AES-256-GCM under `IDENTITY_KEK`, bound to their row) | ✅ |
 | Step-up tokens (`StepUp`): password (+ TOTP when enabled) re-checked with lockout; 5-minute token, audience `digital-bank-step-up`, `amr` claim, required by the gateway for sensitive actions | ✅ |

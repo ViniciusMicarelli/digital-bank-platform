@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
-import { Barcode, Bell, ChevronRight, LogOut, Palette, PieChart, PiggyBank, ShieldCheck, Wallet } from 'lucide-react-native'
+import { Barcode, Bell, ChevronRight, LogOut, MonitorSmartphone, Palette, PieChart, PiggyBank, ShieldCheck, Wallet } from 'lucide-react-native'
 import { View } from 'react-native'
 import { ThemeSwitch } from '../../components/ThemeSwitch'
 import { Button, Card, Row, Screen, Txt } from '../../components/ui'
@@ -41,7 +41,10 @@ export default function More() {
         <Row icon={Barcode} tone="amber" title="Boletos" subtitle="Pagar e agendar contas" right={chevron} onPress={() => router.push('/boletos')} />
         <Row icon={Wallet} tone="credit" title="Crédito" subtitle="Limite e faturas" right={chevron} onPress={() => router.push('/credito')} />
       </Card>
-      <Card title="Aparência" icon={Palette} index={2}>
+      <Card index={2}>
+        <Row icon={MonitorSmartphone} tone="brand" title="Dispositivos conectados" subtitle="Onde sua conta está aberta" right={chevron} onPress={() => router.push('/dispositivos')} />
+      </Card>
+      <Card title="Aparência" icon={Palette} index={3}>
         <ThemeSwitch />
       </Card>
       <Button title="Sair" icon={LogOut} variant="danger" onPress={() => client.logout()} />
