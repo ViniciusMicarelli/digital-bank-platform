@@ -23,6 +23,8 @@ const (
 	StatementService_GetSpending_FullMethodName   = "/bank.statement.v1.StatementService/GetSpending"
 	StatementService_GetReceipt_FullMethodName    = "/bank.statement.v1.StatementService/GetReceipt"
 	StatementService_VerifyReceipt_FullMethodName = "/bank.statement.v1.StatementService/VerifyReceipt"
+	StatementService_SetBudget_FullMethodName     = "/bank.statement.v1.StatementService/SetBudget"
+	StatementService_ListBudgets_FullMethodName   = "/bank.statement.v1.StatementService/ListBudgets"
 )
 
 // StatementServiceClient is the client API for StatementService service.
@@ -43,6 +45,11 @@ type StatementServiceClient interface {
 	GetReceipt(ctx context.Context, in *GetReceiptRequest, opts ...grpc.CallOption) (*GetReceiptResponse, error)
 	// Checks an authentication code; NOT_FOUND when it is not genuine.
 	VerifyReceipt(ctx context.Context, in *VerifyReceiptRequest, opts ...grpc.CallOption) (*VerifyReceiptResponse, error)
+	// Monthly budgets per spending category (or TOTAL). Reaching 80% and 100%
+	// of one in the current month publishes statement.budget.threshold, once
+	// each per month.
+	SetBudget(ctx context.Context, in *SetBudgetRequest, opts ...grpc.CallOption) (*SetBudgetResponse, error)
+	ListBudgets(ctx context.Context, in *ListBudgetsRequest, opts ...grpc.CallOption) (*ListBudgetsResponse, error)
 }
 
 type statementServiceClient struct {
@@ -93,6 +100,26 @@ func (c *statementServiceClient) VerifyReceipt(ctx context.Context, in *VerifyRe
 	return out, nil
 }
 
+func (c *statementServiceClient) SetBudget(ctx context.Context, in *SetBudgetRequest, opts ...grpc.CallOption) (*SetBudgetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetBudgetResponse)
+	err := c.cc.Invoke(ctx, StatementService_SetBudget_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *statementServiceClient) ListBudgets(ctx context.Context, in *ListBudgetsRequest, opts ...grpc.CallOption) (*ListBudgetsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListBudgetsResponse)
+	err := c.cc.Invoke(ctx, StatementService_ListBudgets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StatementServiceServer is the server API for StatementService service.
 // All implementations must embed UnimplementedStatementServiceServer
 // for forward compatibility.
@@ -111,6 +138,11 @@ type StatementServiceServer interface {
 	GetReceipt(context.Context, *GetReceiptRequest) (*GetReceiptResponse, error)
 	// Checks an authentication code; NOT_FOUND when it is not genuine.
 	VerifyReceipt(context.Context, *VerifyReceiptRequest) (*VerifyReceiptResponse, error)
+	// Monthly budgets per spending category (or TOTAL). Reaching 80% and 100%
+	// of one in the current month publishes statement.budget.threshold, once
+	// each per month.
+	SetBudget(context.Context, *SetBudgetRequest) (*SetBudgetResponse, error)
+	ListBudgets(context.Context, *ListBudgetsRequest) (*ListBudgetsResponse, error)
 	mustEmbedUnimplementedStatementServiceServer()
 }
 
@@ -132,6 +164,12 @@ func (UnimplementedStatementServiceServer) GetReceipt(context.Context, *GetRecei
 }
 func (UnimplementedStatementServiceServer) VerifyReceipt(context.Context, *VerifyReceiptRequest) (*VerifyReceiptResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method VerifyReceipt not implemented")
+}
+func (UnimplementedStatementServiceServer) SetBudget(context.Context, *SetBudgetRequest) (*SetBudgetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetBudget not implemented")
+}
+func (UnimplementedStatementServiceServer) ListBudgets(context.Context, *ListBudgetsRequest) (*ListBudgetsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListBudgets not implemented")
 }
 func (UnimplementedStatementServiceServer) mustEmbedUnimplementedStatementServiceServer() {}
 func (UnimplementedStatementServiceServer) testEmbeddedByValue()                          {}
@@ -226,6 +264,42 @@ func _StatementService_VerifyReceipt_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StatementService_SetBudget_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetBudgetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StatementServiceServer).SetBudget(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StatementService_SetBudget_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StatementServiceServer).SetBudget(ctx, req.(*SetBudgetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StatementService_ListBudgets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListBudgetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StatementServiceServer).ListBudgets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StatementService_ListBudgets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StatementServiceServer).ListBudgets(ctx, req.(*ListBudgetsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StatementService_ServiceDesc is the grpc.ServiceDesc for StatementService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -248,6 +322,14 @@ var StatementService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "VerifyReceipt",
 			Handler:    _StatementService_VerifyReceipt_Handler,
+		},
+		{
+			MethodName: "SetBudget",
+			Handler:    _StatementService_SetBudget_Handler,
+		},
+		{
+			MethodName: "ListBudgets",
+			Handler:    _StatementService_ListBudgets_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

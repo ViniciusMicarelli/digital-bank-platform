@@ -1,9 +1,11 @@
-import { formatBRL, monthLabel, shiftMonth, spendingCategories, type SpendingSummary } from '@bank/core'
-import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, PieChart, Store, TrendingDown, TrendingUp } from 'lucide-react'
+import { budgetLabel, budgetState, errorMessage, formatBRL, monthLabel, shiftMonth, spendingCategories, type Budget, type BudgetCategory, type SpendingSummary } from '@bank/core'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ChevronLeft, ChevronRight, PieChart, Plus, Store, Target, TrendingDown, TrendingUp, X } from 'lucide-react'
 import { useState } from 'react'
 import { useAccount } from '../app/queries'
-import { Empty, IconButton, Loading, PageTitle, Panel } from '../components/ui'
+import { MoneyField } from '../components/MoneyField'
+import { Alert, Button, Empty, IconButton, Loading, Modal, PageTitle, Panel, Select } from '../components/ui'
+import { cx } from '../lib/format'
 import { api } from '../lib/api'
 
 const currentMonth = () => {
@@ -25,6 +27,80 @@ function Donut({ data, total }: { data: SpendingSummary['categories']; total: nu
           strokeDasharray={`${Math.max(lengths[i] - 2, 0)} ${c}`} strokeDashoffset={-offsets[i]} />
       ))}
     </svg>
+  )
+}
+
+const stateFill = { ok: 'bg-positive', near: 'bg-warning', over: 'bg-danger' } as const
+const budgetCategories: BudgetCategory[] = ['TOTAL', ...(Object.keys(spendingCategories) as BudgetCategory[])]
+
+function BudgetForm({ base, taken, onDone }: { base: string; taken: Set<string>; onDone: () => void }) {
+  const free = budgetCategories.filter((c) => !taken.has(c))
+  const [category, setCategory] = useState<BudgetCategory>(free[0] ?? 'TOTAL')
+  const [amount, setAmount] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const save = useMutation({
+    mutationFn: () => api('PUT', `${base}/${category}`, { body: { amount } }),
+    onSuccess: onDone,
+    onError: (e) => setError(errorMessage(e)),
+  })
+  return (
+    <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate() }}>
+      <Select label="Categoria" value={category} onChange={(e) => setCategory(e.target.value as BudgetCategory)}>
+        {free.map((c) => <option key={c} value={c}>{budgetLabel(c)}</option>)}
+      </Select>
+      <MoneyField label="Quanto por mês" onValue={setAmount} />
+      <p className="text-xs text-muted">Avisamos quando você chegar a 80% e a 100% do valor no mês.</p>
+      <Alert>{error}</Alert>
+      <Button type="submit" loading={save.isPending} disabled={!amount}>Definir orçamento</Button>
+    </form>
+  )
+}
+
+/** Monthly budgets with how much of each was spent in the month shown. */
+function BudgetsPanel({ accountId, month, current }: { accountId: string; month: string; current: boolean }) {
+  const qc = useQueryClient()
+  const [adding, setAdding] = useState(false)
+  const base = `/v1/accounts/${accountId}/budgets`
+  const budgets = useQuery({
+    queryKey: ['budgets', accountId, month],
+    queryFn: async () => (await api<{ budgets: Budget[] }>('GET', `${base}?month=${month}`)).budgets,
+  })
+  const refresh = () => qc.invalidateQueries({ queryKey: ['budgets'] })
+  const remove = useMutation({ mutationFn: (c: string) => api('DELETE', `${base}/${c}`), onSuccess: refresh })
+  const list = budgets.data ?? []
+  return (
+    <Panel title="Orçamentos" icon={Target}
+      action={current && list.length < budgetCategories.length && <Button variant="ghost" size="sm" icon={Plus} onClick={() => setAdding(true)}>Novo</Button>}>
+      {budgets.isLoading ? <Loading rows={2} /> : !list.length ? (
+        <div className="space-y-3">
+          <Empty icon={Target}>Defina quanto quer gastar por mês, no total ou por categoria, e receba um aviso antes de passar do ponto.</Empty>
+          {current && <div className="flex justify-center"><Button icon={Plus} onClick={() => setAdding(true)}>Criar orçamento</Button></div>}
+        </div>
+      ) : (
+        <ul className="-my-2 divide-y divide-line">
+          {list.map((b) => {
+            const st = budgetState(b)
+            return (
+              <li key={b.category} className="py-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 font-medium text-fg">{budgetLabel(b.category)}</span>
+                  <span className="tabular text-fg-2"><span className="font-semibold text-fg">{formatBRL(b.spent)}</span> de {formatBRL(b.amount)}</span>
+                  {current && <IconButton icon={X} label={`Remover orçamento de ${budgetLabel(b.category)}`} onClick={() => remove.mutate(b.category)} />}
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-surface-2" role="meter" aria-label={budgetLabel(b.category)}
+                  aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, Math.round(st.pct))}>
+                  <div className={cx('h-full rounded-full', stateFill[st.state])} style={{ width: `${Math.min(100, st.pct)}%` }} />
+                </div>
+                <p className="mt-1 text-xs text-muted">{Math.round(st.pct)}% · {st.label}</p>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <Modal open={adding} onClose={() => setAdding(false)} title="Novo orçamento">
+        <BudgetForm base={base} taken={new Set(list.map((b) => b.category))} onDone={() => { setAdding(false); refresh() }} />
+      </Modal>
+    </Panel>
   )
 }
 
@@ -85,6 +161,7 @@ export function SpendingPage() {
             )}
           </Panel>
           <div className="space-y-6">
+            <BudgetsPanel accountId={account!.id} month={month} current={month === currentMonth()} />
             <Panel>
               <p className="text-sm text-muted">Gasto em {monthLabel(month).split(' ')[0].toLowerCase()}</p>
               <p className="tabular text-[32px] font-bold tracking-tight text-fg">{formatBRL(s.total)}</p>

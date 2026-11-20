@@ -54,7 +54,7 @@ Defined in [`contracts/proto/bank/notification/v1/notification.proto`](../../con
 
 | Publishes | Consumes |
 |---|---|
-| — | `bank.account.events`, `bank.transaction.events`, `bank.pix.events`, `bank.card.events`, `bank.credit.events`, `bank.payment.events` |
+| — | `bank.account.events`, `bank.transaction.events`, `bank.pix.events`, `bank.card.events`, `bank.credit.events`, `bank.payment.events`, `bank.user.events`, `bank.statement.events` (budget alerts) |
 
 ## Dependencies
 

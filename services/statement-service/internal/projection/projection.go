@@ -29,13 +29,17 @@ var ErrInvalidCursor = errors.New("invalid page token")
 type Projector struct {
 	pool       *pgxpool.Pool
 	receiptKey []byte
+	now        func() time.Time
 }
 
 // New builds the projector; receipts are signed with a development key until
 // SetReceiptKey gives the real one.
 func New(pool *pgxpool.Pool) *Projector {
-	return &Projector{pool: pool, receiptKey: []byte("development receipt key")}
+	return &Projector{pool: pool, receiptKey: []byte("development receipt key"), now: time.Now}
 }
+
+// SetClock replaces the clock (tests).
+func (p *Projector) SetClock(now func() time.Time) { p.now = now }
 
 // Handle routes an event to its projection. Unknown types are ignored, so
 // new event types never break this consumer.
@@ -156,7 +160,7 @@ func (p *Projector) transaction(ctx context.Context, ev outbox.Event) error {
 			}
 		}
 		if category, merchant, ok := transactionSpending(t); ok {
-			return insertSpending(ctx, tx, t.FromAccountID, "tx:"+t.TransactionID, category, merchant, t.AmountMinor, t.OccurredAt)
+			return p.spend(ctx, tx, t.FromAccountID, "tx:"+t.TransactionID, category, merchant, t.AmountMinor, t.OccurredAt)
 		}
 		return nil
 	})

@@ -178,6 +178,15 @@ test('spending by category', async ({ page }) => {
     await expect(page.getByText('Alimentação', { exact: true })).toBeVisible({ timeout: 2000 })
   }).toPass({ timeout: 20_000 })
   await expect(page.getByText('PADARIA DO BAIRRO', { exact: true })).toBeVisible()
+
+  // A food budget of R$ 100: the R$ 80 already spent is 80% of it.
+  await page.getByRole('button', { name: 'Criar orçamento' }).click()
+  const dialog = page.getByRole('dialog')
+  await dialog.getByLabel('Categoria').selectOption({ label: 'Alimentação' })
+  await dialog.getByLabel('Quanto por mês').fill('100')
+  await dialog.getByRole('button', { name: 'Definir orçamento' }).click()
+  await expect(page.getByText('80% · Perto do limite')).toBeVisible()
+  await expect(page.getByRole('meter', { name: 'Alimentação' })).toHaveAttribute('aria-valuenow', '80')
   await shot(page, '15-spending')
 })
 

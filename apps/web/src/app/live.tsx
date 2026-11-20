@@ -55,7 +55,7 @@ export function LiveNotifications({ children }: { children: ReactNode }) {
         }
         // The statement is a projection built from the same events by another
         // service; it may land a moment after the notification. Look again.
-        setTimeout(() => qc.invalidateQueries({ queryKey: ['statement'] }), 1500)
+        setTimeout(() => { for (const k of ['statement', 'spending', 'budgets']) qc.invalidateQueries({ queryKey: [k] }) }, 1500)
       },
     })
   }, [qc])

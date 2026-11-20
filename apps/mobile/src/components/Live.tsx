@@ -30,7 +30,7 @@ export function Live({ children }: { children: ReactNode }) {
         timer = setTimeout(() => setBanner(null), 5000)
         qc.invalidateQueries()
         // The statement is projected by another service: look again shortly.
-        setTimeout(() => qc.invalidateQueries({ queryKey: ['statement'] }), 1500)
+        setTimeout(() => { for (const k of ['statement', 'spending', 'budgets']) qc.invalidateQueries({ queryKey: [k] }) }, 1500)
       },
     })
     return () => {

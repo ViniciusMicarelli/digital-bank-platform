@@ -127,3 +127,41 @@ func (s *Server) GetSpending(ctx context.Context, req *statementv1.GetSpendingRe
 	}
 	return out, nil
 }
+
+func (s *Server) SetBudget(ctx context.Context, req *statementv1.SetBudgetRequest) (*statementv1.SetBudgetResponse, error) {
+	account, err := uuid.Parse(req.GetAccountId())
+	if err != nil {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", "account_id must be a UUID")
+	}
+	if c := req.GetAmount().GetCurrency(); c != "" && c != "BRL" {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_AMOUNT", "amount must be in BRL")
+	}
+	err = s.p.SetBudget(ctx, account, req.GetCategory(), req.GetAmount().GetMinorUnits())
+	switch {
+	case errors.Is(err, projection.ErrInvalidBudget):
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_BUDGET", err.Error())
+	case err != nil:
+		return nil, grpcserver.Error(codes.Internal, "INTERNAL", "internal error")
+	}
+	return &statementv1.SetBudgetResponse{}, nil
+}
+
+func (s *Server) ListBudgets(ctx context.Context, req *statementv1.ListBudgetsRequest) (*statementv1.ListBudgetsResponse, error) {
+	account, err := uuid.Parse(req.GetAccountId())
+	if err != nil {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", "account_id must be a UUID")
+	}
+	start, err := projection.ParseMonth(req.GetMonth(), time.Now())
+	if err != nil {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_MONTH", err.Error())
+	}
+	list, err := s.p.Budgets(ctx, account, start)
+	if err != nil {
+		return nil, grpcserver.Error(codes.Internal, "INTERNAL", "internal error")
+	}
+	out := &statementv1.ListBudgetsResponse{Month: start.Format("2006-01")}
+	for _, b := range list {
+		out.Budgets = append(out.Budgets, &statementv1.Budget{Category: b.Category, Amount: brl(b.Amount), Spent: brl(b.Spent)})
+	}
+	return out, nil
+}

@@ -142,6 +142,17 @@ type payload struct {
 	PreviousLimit   int64             `json:"previous_limit"`
 	Installment     int64             `json:"installment"`
 	Source          string            `json:"source"`
+	Category        string            `json:"category"`
+	Threshold       int               `json:"threshold"`
+	Budget          int64             `json:"budget"`
+	Spent           int64             `json:"spent"`
+}
+
+// budgetCategories names the spending categories of a budget alert.
+var budgetCategories = map[string]string{
+	"TOTAL": "Gastos do mês", "FOOD": "Alimentação", "TRANSPORT": "Transporte", "SHOPPING": "Compras", "SUBSCRIPTIONS": "Assinaturas",
+	"HEALTH": "Saúde", "LEISURE": "Lazer", "TRAVEL": "Viagens", "HOME": "Casa", "EDUCATION": "Educação", "BILLS": "Contas e boletos",
+	"TRANSFERS": "Pix e transferências", "OTHER": "Outros",
 }
 
 func brDate(s string) string {
@@ -235,6 +246,19 @@ func FromEvent(ev Event, now time.Time) ([]Draft, error) {
 		d.Category, d.Title, d.Important = CategoryCredit, "Fatura em atraso", true
 		d.Body = fmt.Sprintf("%s não foram pagos e foram para a próxima fatura, com multa de %s e juros de %s.",
 			BRL(p.Unpaid), BRL(p.Fine), BRL(p.Interest))
+	case "statement.budget.threshold":
+		name := budgetCategories[p.Category]
+		if name == "" {
+			name = p.Category
+		}
+		d.Category = CategoryAccount
+		if p.Threshold >= 100 {
+			d.Title, d.Important = "Orçamento estourado: "+name, true
+			d.Body = fmt.Sprintf("Você gastou %s este mês, acima do orçamento de %s.", BRL(p.Spent), BRL(p.Budget))
+		} else {
+			d.Title = fmt.Sprintf("%d%% do orçamento: %s", p.Threshold, name)
+			d.Body = fmt.Sprintf("Você já gastou %s dos %s planejados para o mês.", BRL(p.Spent), BRL(p.Budget))
+		}
 	case "credit.limit.changed":
 		d.Category, d.Title, d.Important = CategoryCredit, "Limite atualizado", true
 		d.Body = fmt.Sprintf("Seu limite agora é de %s.", BRL(p.Granted))

@@ -95,7 +95,7 @@ func (p *Projector) card(ctx context.Context, ev outbox.Event) error {
 				return err // a card this read model never saw: nothing to place
 			}
 			category := Category(c.MCC)
-			if err := insertSpending(ctx, tx, account, "card:"+c.AuthorizationID, category, c.MerchantName, c.ClearedMinor, ev.OccurredAt); err != nil {
+			if err := p.spend(ctx, tx, account, "card:"+c.AuthorizationID, category, c.MerchantName, c.ClearedMinor, ev.OccurredAt); err != nil {
 				return err
 			}
 			// Refunds that arrived first.
@@ -149,6 +149,14 @@ func resolveAccount(ctx context.Context, tx pgx.Tx, c cardEvent) (string, error)
 		return "", nil
 	}
 	return account, err
+}
+
+// spend records money spent and checks the budgets it counts against.
+func (p *Projector) spend(ctx context.Context, tx pgx.Tx, account, ref, category, merchant string, amount int64, at time.Time) error {
+	if err := insertSpending(ctx, tx, account, ref, category, merchant, amount, at); err != nil || amount <= 0 {
+		return err
+	}
+	return p.checkBudgets(ctx, tx, account, category, at)
 }
 
 func insertSpending(ctx context.Context, tx pgx.Tx, account, ref, category, merchant string, amount int64, at time.Time) error {

@@ -86,6 +86,8 @@
 | `GET` | `/v1/accounts/{id}/statement.csv` | CSV export `?from=YYYY-MM-DD&to=YYYY-MM-DD` (inclusive, current month by default, up to a year): `;` separated, decimal comma, UTF-8 BOM |
 | `GET` | `/v1/receipts/{code}` | *(public, rate limited per IP)* Check a receipt's authentication code; names masked (`RECEIPT_NOT_FOUND`) |
 | `GET` | `/v1/accounts/{id}/spending` | Spending of a month (`?month=YYYY-MM`, current by default): `total`, `previous_total`, `categories` (FOOD, TRANSPORT, SHOPPING, SUBSCRIPTIONS, HEALTH, LEISURE, TRAVEL, HOME, EDUCATION, BILLS, TRANSFERS, OTHER), top five `merchants` (eventually consistent) |
+| `GET` | `/v1/accounts/{id}/budgets` | Monthly budgets `[{category, amount, spent}]` (`?month=YYYY-MM`), `TOTAL` first |
+| `PUT` · `DELETE` | `/v1/accounts/{id}/budgets/{category}` | Set `{amount}` / remove the budget on a category or `total` → 204 (`INVALID_BUDGET`); alerts at 80% and 100% arrive as notifications |
 | `GET` · `POST` | `/v1/accounts/{id}/savings` | Savings boxes with `total` and `yielded` / open one `{name, goal?}` (Idempotency-Key) → 201 (`TOO_MANY_BOXES`) |
 | `GET` · `PUT` · `DELETE` | `/v1/accounts/{id}/savings/{boxID}` | A box with its `movements` / rename and set the goal `{name, goal?}` / close it, everything back to the account (Idempotency-Key) |
 | `POST` | `/v1/accounts/{id}/savings/{boxID}/deposits` · `/withdrawals` | `{amount}` (Idempotency-Key); 422 `INSUFFICIENT_FUNDS` with the movement when there is not enough |

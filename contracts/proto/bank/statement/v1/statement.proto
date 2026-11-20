@@ -19,6 +19,11 @@ service StatementService {
   rpc GetReceipt(GetReceiptRequest) returns (GetReceiptResponse);
   // Checks an authentication code; NOT_FOUND when it is not genuine.
   rpc VerifyReceipt(VerifyReceiptRequest) returns (VerifyReceiptResponse);
+  // Monthly budgets per spending category (or TOTAL). Reaching 80% and 100%
+  // of one in the current month publishes statement.budget.threshold, once
+  // each per month.
+  rpc SetBudget(SetBudgetRequest) returns (SetBudgetResponse);
+  rpc ListBudgets(ListBudgetsRequest) returns (ListBudgetsResponse);
 }
 
 enum Direction {
@@ -116,4 +121,33 @@ message VerifyReceiptRequest {
 
 message VerifyReceiptResponse {
   Receipt receipt = 1;
+}
+
+message Budget {
+  // A spending category, or TOTAL.
+  string category = 1;
+  bank.common.v1.Money amount = 2;
+  // Spent against it in the month asked for.
+  bank.common.v1.Money spent = 3;
+}
+
+message SetBudgetRequest {
+  string account_id = 1;
+  string category = 2;
+  // Zero removes the budget.
+  bank.common.v1.Money amount = 3;
+}
+
+message SetBudgetResponse {}
+
+message ListBudgetsRequest {
+  string account_id = 1;
+  // YYYY-MM (Brasília); empty for the current month.
+  string month = 2;
+}
+
+message ListBudgetsResponse {
+  string month = 1;
+  // TOTAL first, then the largest.
+  repeated Budget budgets = 2;
 }

@@ -55,8 +55,12 @@ func main() {
 		log.Warn("KAFKA_BROKERS not set: the feed will not be updated")
 	}
 
+	// Budget alerts.
+	go kafka.RunOutboxRelay(ctx, pool, log, kafka.Brokers(config.String("KAFKA_BROKERS", "")))
+
 	// Delete published outbox rows, old inbox rows, expired data.
 	go postgres.RunRetention(ctx, pool, log, []postgres.RetentionRule{
+		postgres.OutboxRetention(7 * 24 * time.Hour),
 		postgres.InboxRetention(30 * 24 * time.Hour),
 	}, time.Hour)
 

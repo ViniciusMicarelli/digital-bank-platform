@@ -243,6 +243,11 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - It drives the automatic limit analysis (+50%, +100% from 750, refused under 250) and is kept on each request for the analyst.
 - Web and mobile: the score, its band and what helps or hurts it on the credit screen; back office shows it on limit requests.
 
+## Phase 36 — Budgets ✅
+
+- Monthly budgets on the month's total or per spending category, with a notification at 80% and at 100%, once each per month; statement-service now publishes through its own outbox.
+- Web and mobile: budgets on the spending screen with how much of each is used.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

@@ -284,6 +284,27 @@ export const spendingCategories: Record<SpendingCategory, { label: string; color
   OTHER: { label: 'Outros', color: '#a1a1aa' },
 }
 
+export type BudgetCategory = SpendingCategory | 'TOTAL'
+
+/** A monthly budget with what was spent against it in the month asked for. */
+export interface Budget {
+  category: BudgetCategory
+  amount: Money
+  spent: Money
+}
+
+/** Name of what a budget is on. */
+export const budgetLabel = (c: BudgetCategory) => (c === 'TOTAL' ? 'Total do mês' : spendingCategories[c].label)
+
+/** Where a budget stands: under 80%, from 80%, or at / over 100% (the alerts' thresholds). */
+export function budgetState(b: Budget): { pct: number; state: 'ok' | 'near' | 'over'; label: string } {
+  const amount = Number(b.amount.amount)
+  const pct = amount > 0 ? (Number(b.spent.amount) / amount) * 100 : 0
+  if (pct >= 100) return { pct, state: 'over', label: pct > 100 ? 'Estourado' : 'No limite' }
+  if (pct >= 80) return { pct, state: 'near', label: 'Perto do limite' }
+  return { pct, state: 'ok', label: 'Dentro do orçamento' }
+}
+
 /** The month before or after a YYYY-MM month. */
 export function shiftMonth(month: string, delta: number): string {
   const [y, m] = month.split('-').map(Number)

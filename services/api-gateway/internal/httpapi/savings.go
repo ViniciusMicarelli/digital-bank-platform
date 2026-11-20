@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -262,4 +263,41 @@ func (a *API) spending(w http.ResponseWriter, r *http.Request, acc *accountv1.Ac
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"month": resp.GetMonth(), "total": moneyJSON(resp.GetTotal()),
 		"previous_total": moneyJSON(resp.GetPreviousTotal()), "categories": cats, "merchants": merchants})
+}
+
+// budgets lists the monthly budgets with what was spent (?month=YYYY-MM).
+func (a *API) budgets(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	resp, err := a.c.Statement.ListBudgets(r.Context(), &statementv1.ListBudgetsRequest{AccountId: acc.GetId(), Month: r.URL.Query().Get("month")})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	list := []map[string]any{}
+	for _, b := range resp.GetBudgets() {
+		list = append(list, map[string]any{"category": b.GetCategory(), "amount": moneyJSON(b.GetAmount()), "spent": moneyJSON(b.GetSpent())})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"month": resp.GetMonth(), "budgets": list})
+}
+
+// setBudget sets a category's monthly budget {amount} (PUT) or removes it (DELETE).
+func (a *API) setBudget(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	req := &statementv1.SetBudgetRequest{AccountId: acc.GetId(), Category: strings.ToUpper(r.PathValue("category"))}
+	if r.Method == http.MethodPut {
+		var body struct {
+			Amount string `json:"amount"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+		amount, ok := parseBRL(w, r, body.Amount)
+		if !ok {
+			return
+		}
+		req.Amount = amount
+	}
+	if _, err := a.c.Statement.SetBudget(r.Context(), req); err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

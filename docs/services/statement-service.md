@@ -11,6 +11,7 @@ The **read side** (CQRS) for everything the customer sees in their feed and stat
 | Unified feed of completed transactions (transfers, Pix out, Pix in, same-bank Pix), cursor-paginated, newest first | ✅ |
 | Counterparty names (from Pix metadata, or the local holder projection) | ✅ |
 | Spending by month (Brasília time): card purchases (debit and credit, from `card.purchase.cleared`) by category from the merchant category code, Pix and transfers sent, bills paid; refunds subtract from their purchase's category; previous month and top merchants (`GetSpending`) | ✅ |
+| Monthly budgets per category or on the month's total (`SetBudget` / `ListBudgets`, with what was spent); reaching 80% and 100% in the current month publishes `statement.budget.threshold` once each (recorded in `budget_alerts`, sent through the transactional outbox to `bank.statement.events`; locking the budget row serializes two expenses so an alert is never missed; a late event of a past month alerts nobody). Budgets are owned data, not rebuilt from events | ✅ |
 | Receipts for every item, with an authentication code: the item id plus an HMAC-SHA256 tag (80 bits) of what the receipt states under the bank's key (`RECEIPT_KEY`), so it is checked without storing anything and cannot be forged or edited; public check with names masked | ✅ |
 | Period filter on the feed, used by the CSV export | ✅ |
 | Search and text filters | planned |
@@ -43,6 +44,7 @@ flowchart LR
 | `ListFeed` | Paginated transaction feed |
 | `GetReceipt` / `VerifyReceipt` | A receipt of an account's item / the public check of an authentication code |
 | `GetSpending` | A month's spending by category, previous month's total, top five merchants |
+| `SetBudget` / `ListBudgets` | Monthly budgets (amount 0 removes one) with the month's spending against them |
 
 - **Spending sources.** Card purchases come from card events (one source for debit and credit; the debit transaction is not counted again); `PIX_OUT` and `INTERNAL_TRANSFER` count as *Pix e transferências*, `BOLETO_PAYMENT` as *Contas*; paying the card invoice and moving money to savings are not spending. Older card events without the account are placed through `cards_view` (from `card.issued`).
 
