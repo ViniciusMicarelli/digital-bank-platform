@@ -20,7 +20,8 @@ Credit card credit: the **credit line** (limit), holds for card authorizations, 
 | Interest-free installment purchases (`parcelado sem juros`, 2 to 12, at least R$ 5,00 each): the whole amount is held on the limit and posted to the ledger at capture; the first installment (with the remainder centavo) goes on the invoice the purchase is captured on, and each new invoice takes the next installment of every plan (robust to early closings); `upcoming_installments` on the line, `ListInstallmentPlans` | ✅ |
 | Minimum payment on every invoice: 15% of the balance, at least R$ 50 (or all of it); what is not paid by the due date rolls over with the fine and revolving interest | ✅ |
 | Invoice plans (`parcelamento da fatura`): a closed invoice of at least R$ 100 split into 2 to 12 fixed installments (Price table, 4.99% a month, below the revolving rate), quoted with the total, the interest and the CET; the invoice is settled by the plan, the first installment goes on the open invoice and one more on each new invoice; the interest is added to the debt and booked as revenue in the ledger (retried until posted); idempotent | ✅ |
-| Limit changes, blocking the line with the account | planned |
+| Limit changes (whole reais, up to R$ 20.000): a decrease applies at once (never below what is used); an increase is analyzed at once: refused with an overdue invoice or a blocked line, granted up to +50%, otherwise in review for an analyst who may grant less or refuse with a reason (back office, audited); one request in review per line; idempotent | ✅ |
+| Blocking the line with the account, a credit score from payment history | planned |
 
 ## Money in the Ledger
 

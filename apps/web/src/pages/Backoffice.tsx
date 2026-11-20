@@ -1,10 +1,11 @@
-import { disputeReasons, errorMessage, formatBRL, type Account, type Dispute, type Money, type Profile } from '@bank/core'
+import { disputeReasons, errorMessage, formatBRL, type Account, type Dispute, type LimitRequest, type Money, type Profile } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, CreditCard, FileClock, Inbox, Landmark, Lock, LockOpen, LogOut, Search, ShieldAlert, ShieldCheck, UserRound, Users, X } from 'lucide-react'
+import { Check, CreditCard, FileClock, Gauge, Inbox, Landmark, Lock, LockOpen, LogOut, Search, ShieldAlert, ShieldCheck, UserRound, Users, X } from 'lucide-react'
 import { useState } from 'react'
 import { useMe } from '../app/queries'
 import { Brand } from '../components/Brand'
 import { ThemeSwitch } from '../components/ThemeSwitch'
+import { MoneyField } from '../components/MoneyField'
 import { Alert, Badge, Button, Empty, Field, IconTile, Loading, Panel, Select } from '../components/ui'
 import { api, logout } from '../lib/api'
 import { cx, dateTimeBR } from '../lib/format'
@@ -26,6 +27,7 @@ const actionLabels: Record<string, string> = {
   ACCOUNT_BLOCK: 'Conta bloqueada', APPROVAL_REQUESTED: 'Desbloqueio solicitado', APPROVAL_APPROVED: 'Desbloqueio aprovado',
   APPROVAL_REJECTED: 'Desbloqueio recusado', APPROVAL_EXECUTED: 'Conta desbloqueada', APPROVAL_FAILED: 'Desbloqueio falhou',
   APPROVAL_EXPIRED: 'Pedido expirado', DISPUTE_ACCEPT: 'Contestação aceita (estorno)', DISPUTE_REJECT: 'Contestação recusada',
+  LIMIT_APPROVE: 'Aumento de limite aprovado', LIMIT_REJECT: 'Aumento de limite recusado',
 }
 const actionLabel = (a: string) => actionLabels[a] ?? (a.endsWith('_FAILED') ? `${actionLabels[a.slice(0, -7)] ?? a} (falhou)` : a)
 const short = (id: string) => id.slice(0, 8)
@@ -263,6 +265,66 @@ function DisputeItem({ item, onOpen }: { item: Dispute & { customer_id?: string;
   )
 }
 
+function LimitItem({ item, onOpen }: { item: LimitRequest; onOpen: () => void }) {
+  const qc = useQueryClient()
+  const [mode, setMode] = useState<'idle' | 'approve' | 'reject'>('idle')
+  const [granted, setGranted] = useState<string | null>(null)
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState('')
+  const decide = useMutation({
+    mutationFn: (approve: boolean) => api('POST', `/v1/backoffice/limit-requests/${item.id}/decide`, { body: { approve, granted: approve ? granted ?? '' : '', reason } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['backoffice'] }),
+    onError: (e) => setError(errorMessage(e)),
+  })
+  return (
+    <li className="space-y-3 rounded-2xl px-3 py-3 hover:bg-surface-2">
+      <div className="flex items-start gap-3">
+        <IconTile icon={Gauge} tone="credit" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-fg">{item.holder_name ?? 'Cliente'} · {formatBRL(item.current_limit)} → {formatBRL(item.requested)}</p>
+          <p className="text-xs text-muted">Usado {formatBRL(item.used)} · pedido em {dateTimeBR(item.created_at)}</p>
+        </div>
+      </div>
+      {mode === 'idle' && (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" icon={Check} onClick={() => setMode('approve')}>Aprovar</Button>
+          <Button size="sm" variant="secondary" icon={X} onClick={() => setMode('reject')}>Recusar</Button>
+          {item.customer_id && <Button size="sm" variant="ghost" onClick={onOpen}>Ver cliente</Button>}
+        </div>
+      )}
+      {mode !== 'idle' && (
+        <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); decide.mutate(mode === 'approve') }}>
+          {mode === 'approve' && <MoneyField label="Limite concedido" optional hint={`Em branco: ${formatBRL(item.requested)}`} onValue={setGranted} />}
+          <Field label={mode === 'approve' ? 'Observação (opcional)' : 'Motivo da recusa'} value={reason} onChange={(e) => setReason(e.target.value)} />
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" variant={mode === 'approve' ? 'primary' : 'danger'} disabled={mode === 'reject' && !reason.trim()} loading={decide.isPending}>
+              {mode === 'approve' ? 'Confirmar aprovação' : 'Recusar'}
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setMode('idle')}>Voltar</Button>
+          </div>
+        </form>
+      )}
+      <Alert>{error}</Alert>
+    </li>
+  )
+}
+
+function LimitsPanel({ onOpenCustomer }: { onOpenCustomer: (customerId: string) => void }) {
+  const requests = useQuery({
+    queryKey: ['backoffice', 'limits'],
+    queryFn: async () => (await api<{ requests: LimitRequest[] }>('GET', '/v1/backoffice/limit-requests')).requests,
+    refetchInterval: 15_000,
+  })
+  const list = requests.data ?? []
+  return (
+    <Panel title={`Limites · ${list.length}`} icon={Gauge}>
+      {requests.isLoading ? <Loading /> : !list.length ? <Empty icon={Gauge}>Nenhum pedido de limite esperando análise.</Empty> : (
+        <ul className="-mx-2 space-y-1">{list.map((r) => <LimitItem key={r.id} item={r} onOpen={() => r.customer_id && onOpenCustomer(r.customer_id)} />)}</ul>
+      )}
+    </Panel>
+  )
+}
+
 function DisputesPanel({ onOpenCustomer }: { onOpenCustomer: (customerId: string) => void }) {
   const disputes = useQuery({
     queryKey: ['backoffice', 'disputes'],
@@ -348,6 +410,7 @@ export function BackofficePage() {
           </Panel>
           <ApprovalsPanel me={me.data?.customer_id} onOpenCustomer={setSelected} />
           <DisputesPanel onOpenCustomer={setSelected} />
+          <LimitsPanel onOpenCustomer={setSelected} />
         </div>
         <div>
           {selected ? <CustomerPanel key={selected} id={selected} onDecided={() => setSelected(selected)} /> : (

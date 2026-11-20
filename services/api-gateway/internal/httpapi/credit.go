@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -189,4 +190,137 @@ func (a *API) advanceCreditCycle(w http.ResponseWriter, r *http.Request, acc *ac
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func limitRequestJSON(r *creditv1.LimitRequest) map[string]any {
+	out := map[string]any{"id": r.GetId(), "account_id": r.GetAccountId(), "current_limit": moneyJSON(r.GetCurrentLimit()),
+		"requested": moneyJSON(r.GetRequested()), "status": r.GetStatus(), "granted": moneyJSON(r.GetGranted()),
+		"reason": r.GetReason(), "decided_by": r.GetDecidedBy(), "created_at": ts(r.GetCreatedAt())}
+	if r.GetDecidedAt() != nil {
+		out["decided_at"] = ts(r.GetDecidedAt())
+	}
+	return out
+}
+
+// requestLimit asks for a new credit limit {amount} (Idempotency-Key):
+// 200 when decided at once (APPROVED or REJECTED), 202 when in review.
+func (a *API) requestLimit(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	key, ok := idempotencyKey(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Amount string `json:"amount"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	amount, ok := parseBRL(w, r, req.Amount)
+	if !ok {
+		return
+	}
+	resp, err := a.c.Credit.RequestLimit(r.Context(), &creditv1.RequestLimitRequest{IdempotencyKey: key, AccountId: acc.GetId(), Amount: amount})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	code := http.StatusOK
+	if resp.GetRequest().GetStatus() == "IN_REVIEW" {
+		code = http.StatusAccepted
+	}
+	writeJSON(w, code, limitRequestJSON(resp.GetRequest()))
+}
+
+func (a *API) writeLimitRequests(w http.ResponseWriter, r *http.Request, req *creditv1.ListLimitRequestsRequest, staff bool) {
+	resp, err := a.c.Credit.ListLimitRequests(r.Context(), req)
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	out := []map[string]any{}
+	for _, lr := range resp.GetRequests() {
+		item := limitRequestJSON(lr)
+		if staff {
+			if acc, err := a.c.Accounts.GetAccount(r.Context(), &accountv1.GetAccountRequest{Id: lr.GetAccountId()}); err == nil {
+				item["customer_id"], item["holder_name"] = acc.GetAccount().GetCustomerId(), acc.GetAccount().GetHolderName()
+			}
+			if line, err := a.c.Credit.GetCreditLine(r.Context(), &creditv1.GetCreditLineRequest{AccountId: lr.GetAccountId()}); err == nil {
+				item["used"] = moneyJSON(line.GetLine().GetUsed())
+			}
+		}
+		out = append(out, item)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"requests": out})
+}
+
+// limitRequests lists the account's limit requests, newest first.
+func (a *API) limitRequests(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	a.writeLimitRequests(w, r, &creditv1.ListLimitRequestsRequest{AccountId: acc.GetId()}, false)
+}
+
+// backofficeLimitRequests lists requests for analysts (?status=IN_REVIEW by default).
+func (a *API) backofficeLimitRequests(w http.ResponseWriter, r *http.Request) {
+	status := strings.ToUpper(r.URL.Query().Get("status"))
+	if status == "" {
+		status = "IN_REVIEW"
+	}
+	if status == "ALL" {
+		status = ""
+	}
+	a.writeLimitRequests(w, r, &creditv1.ListLimitRequestsRequest{Status: status}, true)
+}
+
+// decideLimitRequest is the analyst's decision {approve, granted?, reason}; audited on the account.
+func (a *API) decideLimitRequest(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Approve bool   `json:"approve"`
+		Granted string `json:"granted"`
+		Reason  string `json:"reason"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	if !req.Approve && strings.TrimSpace(req.Reason) == "" {
+		writeError(w, r.Context(), http.StatusBadRequest, "REASON_REQUIRED", "a rejection needs a reason")
+		return
+	}
+	granted, ok := optionalBRL(w, r, req.Granted)
+	if !ok {
+		return
+	}
+	id := r.PathValue("id")
+	if _, err := uuid.Parse(id); err != nil {
+		writeError(w, r.Context(), http.StatusNotFound, "NOT_FOUND", "limit request not found")
+		return
+	}
+	list, err := a.c.Credit.ListLimitRequests(r.Context(), &creditv1.ListLimitRequestsRequest{Status: "IN_REVIEW"})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	account := ""
+	for _, lr := range list.GetRequests() {
+		if lr.GetId() == id {
+			account = lr.GetAccountId()
+		}
+	}
+	if account == "" {
+		writeError(w, r.Context(), http.StatusUnprocessableEntity, "LIMIT_REQUEST_NOT_IN_REVIEW", "this request was decided already")
+		return
+	}
+	action := "LIMIT_APPROVE"
+	if !req.Approve {
+		action = "LIMIT_REJECT"
+	}
+	if !a.audit(w, r, action, "account", account, map[string]string{"request_id": id, "granted": req.Granted, "reason": req.Reason}) {
+		return
+	}
+	resp, err := a.c.Credit.DecideLimitRequest(r.Context(), &creditv1.DecideLimitRequestRequest{Id: id, AnalystId: customerID(r.Context()),
+		Approve: req.Approve, Granted: granted, Reason: req.Reason})
+	if err != nil {
+		a.auditFailure(r.Context(), action, "account", account, err)
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, limitRequestJSON(resp.GetRequest()))
 }

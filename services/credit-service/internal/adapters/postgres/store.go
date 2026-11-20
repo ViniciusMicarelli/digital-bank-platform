@@ -440,3 +440,83 @@ func (s *Store) MarkPlanInterestPosted(ctx context.Context, id uuid.UUID) error 
 	_, err := s.pool.Exec(ctx, `UPDATE invoice_plans SET interest_posted = true WHERE id = $1`, id)
 	return err
 }
+
+// ---- limit requests ----
+
+const limitCols = `id, idempotency_key, line_id, account_id, current_limit, requested, status, granted, reason, decided_by, created_at, decided_at`
+
+func scanLimit(row pgx.Row) (domain.LimitRequest, error) {
+	var (
+		r      domain.LimitRequest
+		status string
+	)
+	err := row.Scan(&r.ID, &r.IdempotencyKey, &r.LineID, &r.AccountID, &r.CurrentLimit, &r.Requested, &status, &r.Granted,
+		&r.Reason, &r.DecidedBy, &r.CreatedAt, &r.DecidedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return r, fmt.Errorf("%w: limit request", domain.ErrNotFound)
+	}
+	r.Status = domain.LimitStatus(status)
+	return r, err
+}
+
+func (u *unit) InsertLimitRequest(r domain.LimitRequest) error {
+	err := u.exec(`INSERT INTO limit_requests (`+limitCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+		r.ID, r.IdempotencyKey, r.LineID, r.AccountID, r.CurrentLimit, r.Requested, r.Status, r.Granted, r.Reason, r.DecidedBy,
+		r.CreatedAt, r.DecidedAt)
+	if pg.IsUniqueViolation(err, "limit_requests_one_open") {
+		return domain.Refuse("LIMIT_REQUEST_IN_REVIEW", "a request is already being analyzed")
+	}
+	return err
+}
+
+func (u *unit) LockLimitRequest(id uuid.UUID) (domain.LimitRequest, error) {
+	return scanLimit(u.tx.QueryRow(u.ctx, `SELECT `+limitCols+` FROM limit_requests WHERE id = $1 FOR UPDATE`, id))
+}
+
+func (u *unit) SaveLimitRequest(r domain.LimitRequest) error {
+	return u.exec(`UPDATE limit_requests SET status = $2, granted = $3, reason = $4, decided_by = $5, decided_at = $6 WHERE id = $1`,
+		r.ID, r.Status, r.Granted, r.Reason, r.DecidedBy, r.DecidedAt)
+}
+
+func (s *Store) LimitRequestByKey(ctx context.Context, key string) (*domain.LimitRequest, error) {
+	r, err := scanLimit(s.pool.QueryRow(ctx, `SELECT `+limitCols+` FROM limit_requests WHERE idempotency_key = $1`, key))
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil, nil
+	}
+	return &r, err
+}
+
+func (s *Store) LimitRequest(ctx context.Context, id uuid.UUID) (domain.LimitRequest, error) {
+	return scanLimit(s.pool.QueryRow(ctx, `SELECT `+limitCols+` FROM limit_requests WHERE id = $1`, id))
+}
+
+func (s *Store) LimitRequests(ctx context.Context, line uuid.UUID, status domain.LimitStatus, limit int) ([]domain.LimitRequest, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	var lineArg *uuid.UUID
+	if line != uuid.Nil {
+		lineArg = &line
+	}
+	rows, err := s.pool.Query(ctx, `SELECT `+limitCols+` FROM limit_requests WHERE ($1::uuid IS NULL OR line_id = $1)
+		AND ($2 = '' OR status = $2) ORDER BY created_at DESC LIMIT $3`, lineArg, string(status), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.LimitRequest
+	for rows.Next() {
+		r, err := scanLimit(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) HasOverdue(ctx context.Context, line uuid.UUID) (bool, error) {
+	var overdue bool
+	err := s.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM invoices WHERE line_id = $1 AND status = 'OVERDUE')`, line).Scan(&overdue)
+	return overdue, err
+}

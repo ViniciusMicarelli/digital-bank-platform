@@ -271,3 +271,20 @@ export function monthLabel(month: string): string {
   const s = new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
+
+export interface LimitRequest {
+  id: string
+  account_id: string
+  current_limit: Money
+  requested: Money
+  status: 'APPROVED' | 'REJECTED' | 'IN_REVIEW'
+  granted: Money
+  reason: string
+  decided_by: string
+  created_at: string
+  decided_at?: string
+  // Back office only.
+  holder_name?: string
+  customer_id?: string
+  used?: Money
+}

@@ -101,6 +101,8 @@
 | `GET` | `/v1/accounts/{id}/credit` | Limit, used, available |
 | `GET` | `/v1/accounts/{id}/credit/invoices` | Invoices, newest first |
 | `GET` · `POST` | `/v1/accounts/{id}/credit/invoices/{invoiceID}/plans` | Split a closed invoice: the options `{installments, installment, total, interest, monthly_rate, annual_cost}` / choose one `{installments}` (Idempotency-Key) → 201 (`INVOICE_NOT_PLANNABLE`, `INVOICE_TOO_SMALL`, `PAYMENT_IN_PROGRESS`). Invoices also carry `minimum_payment` |
+| `POST` | `/v1/accounts/{id}/credit/limit` | Ask for a new limit `{amount}` (Idempotency-Key) → 200 `APPROVED` / `REJECTED` (`HAS_OVERDUE_INVOICE`), 202 `IN_REVIEW` (`LIMIT_BELOW_USED`, `LIMIT_REQUEST_IN_REVIEW`) |
+| `GET` | `/v1/accounts/{id}/credit/limit-requests` | The account's limit requests, newest first |
 | `GET` | `/v1/accounts/{id}/credit/installments` | Installment purchases with installments to come: `{description, total, installments, billed, installment_amount, remaining}` (the line also has `upcoming_installments`) |
 | `GET` | `/v1/accounts/{id}/credit/invoices/{invoiceID}` | Invoice with its items |
 | `POST` | `/v1/accounts/{id}/credit/invoices/{invoiceID}/payments` | Pay `{amount}` from the account (Idempotency-Key) |
@@ -115,6 +117,8 @@
 | `POST` | `/v1/backoffice/approvals/{id}/approve` · `/reject` | 👤 The second analyst's decision `{reason}` (required to reject); approving runs the action → `EXECUTED` or `FAILED` (`SAME_ANALYST`, `APPROVAL_NOT_PENDING`, `APPROVAL_EXPIRED`) |
 | `GET` | `/v1/backoffice/disputes` | 👤 Card disputes (`?status=OPEN` by default, or `WON`, `LOST`, `ALL`), with the account holder and customer |
 | `POST` | `/v1/backoffice/disputes/{id}/decide` | 👤 `{won, reason}` (reason required to reject); won refunds the amount; audited on the account |
+| `GET` | `/v1/backoffice/limit-requests` | 👤 Limit requests (`?status=IN_REVIEW` by default, or `APPROVED`, `REJECTED`, `ALL`) with the holder and what is used |
+| `POST` | `/v1/backoffice/limit-requests/{id}/decide` | 👤 `{approve, granted?, reason}` (reason required to reject; may grant less); audited on the account |
 | `GET` | `/v1/backoffice/audit` | 👤 Audit trail, newest first (`?target_id=`, `?actor_id=`, `?limit=`) |
 | `GET` | `/v1/backoffice/audit/verify` | 👤 Recompute the hash chain → `{intact, events, broken_at}` |
 | `GET` | `/healthz`, `/metrics` | Health and Prometheus metrics |

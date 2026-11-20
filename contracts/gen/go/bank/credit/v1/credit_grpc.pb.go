@@ -30,6 +30,9 @@ const (
 	CreditService_RefundCredit_FullMethodName         = "/bank.credit.v1.CreditService/RefundCredit"
 	CreditService_QuoteInvoicePlan_FullMethodName     = "/bank.credit.v1.CreditService/QuoteInvoicePlan"
 	CreditService_PlanInvoice_FullMethodName          = "/bank.credit.v1.CreditService/PlanInvoice"
+	CreditService_RequestLimit_FullMethodName         = "/bank.credit.v1.CreditService/RequestLimit"
+	CreditService_ListLimitRequests_FullMethodName    = "/bank.credit.v1.CreditService/ListLimitRequests"
+	CreditService_DecideLimitRequest_FullMethodName   = "/bank.credit.v1.CreditService/DecideLimitRequest"
 	CreditService_ListInstallmentPlans_FullMethodName = "/bank.credit.v1.CreditService/ListInstallmentPlans"
 	CreditService_AdvanceCycle_FullMethodName         = "/bank.credit.v1.CreditService/AdvanceCycle"
 )
@@ -66,6 +69,14 @@ type CreditServiceClient interface {
 	// Splits a closed invoice: it is settled by the plan and one installment
 	// goes on each invoice from the open one. Idempotent on the key.
 	PlanInvoice(ctx context.Context, in *PlanInvoiceRequest, opts ...grpc.CallOption) (*PlanInvoiceResponse, error)
+	// Asks for a new limit (idempotent on the key): decreases (never below
+	// what is used) and increases up to +50% apply at once, an overdue invoice
+	// refuses an increase, larger ones go to an analyst (IN_REVIEW).
+	RequestLimit(ctx context.Context, in *RequestLimitRequest, opts ...grpc.CallOption) (*RequestLimitResponse, error)
+	// By account, or every account (back office) by status.
+	ListLimitRequests(ctx context.Context, in *ListLimitRequestsRequest, opts ...grpc.CallOption) (*ListLimitRequestsResponse, error)
+	// An analyst's decision on a request in review (may grant less).
+	DecideLimitRequest(ctx context.Context, in *DecideLimitRequestRequest, opts ...grpc.CallOption) (*DecideLimitRequestResponse, error)
 	// Installment purchases and invoice plans with installments still to come.
 	ListInstallmentPlans(ctx context.Context, in *ListInstallmentPlansRequest, opts ...grpc.CallOption) (*ListInstallmentPlansResponse, error)
 	// Sandbox: close the open invoice now, or make the closed one overdue.
@@ -190,6 +201,36 @@ func (c *creditServiceClient) PlanInvoice(ctx context.Context, in *PlanInvoiceRe
 	return out, nil
 }
 
+func (c *creditServiceClient) RequestLimit(ctx context.Context, in *RequestLimitRequest, opts ...grpc.CallOption) (*RequestLimitResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestLimitResponse)
+	err := c.cc.Invoke(ctx, CreditService_RequestLimit_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *creditServiceClient) ListLimitRequests(ctx context.Context, in *ListLimitRequestsRequest, opts ...grpc.CallOption) (*ListLimitRequestsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListLimitRequestsResponse)
+	err := c.cc.Invoke(ctx, CreditService_ListLimitRequests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *creditServiceClient) DecideLimitRequest(ctx context.Context, in *DecideLimitRequestRequest, opts ...grpc.CallOption) (*DecideLimitRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DecideLimitRequestResponse)
+	err := c.cc.Invoke(ctx, CreditService_DecideLimitRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *creditServiceClient) ListInstallmentPlans(ctx context.Context, in *ListInstallmentPlansRequest, opts ...grpc.CallOption) (*ListInstallmentPlansResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListInstallmentPlansResponse)
@@ -242,6 +283,14 @@ type CreditServiceServer interface {
 	// Splits a closed invoice: it is settled by the plan and one installment
 	// goes on each invoice from the open one. Idempotent on the key.
 	PlanInvoice(context.Context, *PlanInvoiceRequest) (*PlanInvoiceResponse, error)
+	// Asks for a new limit (idempotent on the key): decreases (never below
+	// what is used) and increases up to +50% apply at once, an overdue invoice
+	// refuses an increase, larger ones go to an analyst (IN_REVIEW).
+	RequestLimit(context.Context, *RequestLimitRequest) (*RequestLimitResponse, error)
+	// By account, or every account (back office) by status.
+	ListLimitRequests(context.Context, *ListLimitRequestsRequest) (*ListLimitRequestsResponse, error)
+	// An analyst's decision on a request in review (may grant less).
+	DecideLimitRequest(context.Context, *DecideLimitRequestRequest) (*DecideLimitRequestResponse, error)
 	// Installment purchases and invoice plans with installments still to come.
 	ListInstallmentPlans(context.Context, *ListInstallmentPlansRequest) (*ListInstallmentPlansResponse, error)
 	// Sandbox: close the open invoice now, or make the closed one overdue.
@@ -288,6 +337,15 @@ func (UnimplementedCreditServiceServer) QuoteInvoicePlan(context.Context, *Quote
 }
 func (UnimplementedCreditServiceServer) PlanInvoice(context.Context, *PlanInvoiceRequest) (*PlanInvoiceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method PlanInvoice not implemented")
+}
+func (UnimplementedCreditServiceServer) RequestLimit(context.Context, *RequestLimitRequest) (*RequestLimitResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestLimit not implemented")
+}
+func (UnimplementedCreditServiceServer) ListLimitRequests(context.Context, *ListLimitRequestsRequest) (*ListLimitRequestsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListLimitRequests not implemented")
+}
+func (UnimplementedCreditServiceServer) DecideLimitRequest(context.Context, *DecideLimitRequestRequest) (*DecideLimitRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DecideLimitRequest not implemented")
 }
 func (UnimplementedCreditServiceServer) ListInstallmentPlans(context.Context, *ListInstallmentPlansRequest) (*ListInstallmentPlansResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListInstallmentPlans not implemented")
@@ -514,6 +572,60 @@ func _CreditService_PlanInvoice_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CreditService_RequestLimit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestLimitRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CreditServiceServer).RequestLimit(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CreditService_RequestLimit_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CreditServiceServer).RequestLimit(ctx, req.(*RequestLimitRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CreditService_ListLimitRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListLimitRequestsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CreditServiceServer).ListLimitRequests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CreditService_ListLimitRequests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CreditServiceServer).ListLimitRequests(ctx, req.(*ListLimitRequestsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CreditService_DecideLimitRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DecideLimitRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CreditServiceServer).DecideLimitRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CreditService_DecideLimitRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CreditServiceServer).DecideLimitRequest(ctx, req.(*DecideLimitRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CreditService_ListInstallmentPlans_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListInstallmentPlansRequest)
 	if err := dec(in); err != nil {
@@ -600,6 +712,18 @@ var CreditService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PlanInvoice",
 			Handler:    _CreditService_PlanInvoice_Handler,
+		},
+		{
+			MethodName: "RequestLimit",
+			Handler:    _CreditService_RequestLimit_Handler,
+		},
+		{
+			MethodName: "ListLimitRequests",
+			Handler:    _CreditService_ListLimitRequests_Handler,
+		},
+		{
+			MethodName: "DecideLimitRequest",
+			Handler:    _CreditService_DecideLimitRequest_Handler,
 		},
 		{
 			MethodName: "ListInstallmentPlans",

@@ -579,6 +579,113 @@ func (s *Service) postAllCharges(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
+// ---- limit changes ----
+
+// RequestLimit asks for a new limit (idempotent on key): decreases and
+// increases the automatic analysis can grant apply at once; refusals and
+// requests in review are recorded too.
+func (s *Service) RequestLimit(ctx context.Context, key string, account uuid.UUID, amount int64) (domain.LimitRequest, error) {
+	if key == "" {
+		return domain.LimitRequest{}, fmt.Errorf("%w: idempotency key is required", domain.ErrInvalidArgument)
+	}
+	if existing, err := s.store.LimitRequestByKey(ctx, key); err != nil || existing != nil {
+		if existing != nil && (existing.AccountID != account || existing.Requested != amount) {
+			return domain.LimitRequest{}, fmt.Errorf("%w: %q", domain.ErrConflict, key)
+		}
+		if existing == nil {
+			return domain.LimitRequest{}, err
+		}
+		return *existing, nil
+	}
+	line, err := s.store.LineByAccount(ctx, account)
+	if err != nil {
+		return domain.LimitRequest{}, err
+	}
+	overdue, err := s.store.HasOverdue(ctx, line.ID)
+	if err != nil {
+		return domain.LimitRequest{}, err
+	}
+	var r domain.LimitRequest
+	err = s.store.InTx(ctx, func(tx ports.Tx) error {
+		l, err := tx.LockLine(line.ID)
+		if err != nil {
+			return err
+		}
+		status, reason, err := domain.AnalyzeLimit(l, amount, overdue)
+		if err != nil {
+			return err
+		}
+		now := s.now()
+		r = domain.LimitRequest{ID: uuid.Must(uuid.NewV7()), IdempotencyKey: key, LineID: l.ID, AccountID: l.AccountID,
+			CurrentLimit: l.Limit, Requested: amount, Status: status, Reason: reason, CreatedAt: now}
+		if status != domain.LimitInReview {
+			r.DecidedBy, r.DecidedAt = "automatic", &now
+		}
+		if status == domain.LimitApproved {
+			r.Granted = amount
+		}
+		if err := tx.InsertLimitRequest(r); err != nil {
+			return err
+		}
+		return s.applyLimit(ctx, tx, l, r)
+	})
+	return r, err
+}
+
+// applyLimit changes the line when a request is approved, and tells the
+// customer how it ended.
+func (s *Service) applyLimit(ctx context.Context, tx ports.Tx, l domain.Line, r domain.LimitRequest) error {
+	if r.Status == domain.LimitApproved {
+		l.Limit = r.Granted
+		if err := tx.SaveLine(l); err != nil {
+			return err
+		}
+	}
+	return publish(ctx, tx, "credit.limit."+map[domain.LimitStatus]string{
+		domain.LimitApproved: "changed", domain.LimitRejected: "rejected", domain.LimitInReview: "in_review"}[r.Status],
+		r.ID.String(), map[string]any{"request_id": r.ID, "account_id": r.AccountID, "previous_limit": r.CurrentLimit,
+			"requested": r.Requested, "granted": r.Granted, "reason": r.Reason, "status": r.Status})
+}
+
+// LimitRequests lists requests of an account (or, with uuid.Nil, all of
+// them, for the back office) filtered by status.
+func (s *Service) LimitRequests(ctx context.Context, account uuid.UUID, status domain.LimitStatus) ([]domain.LimitRequest, error) {
+	var line uuid.UUID
+	if account != uuid.Nil {
+		l, err := s.store.LineByAccount(ctx, account)
+		if err != nil {
+			return nil, err
+		}
+		line = l.ID
+	}
+	return s.store.LimitRequests(ctx, line, status, 100)
+}
+
+// DecideLimit is an analyst's decision on a request in review.
+func (s *Service) DecideLimit(ctx context.Context, id uuid.UUID, analyst string, approve bool, granted int64, reason string) (domain.LimitRequest, error) {
+	r, err := s.store.LimitRequest(ctx, id)
+	if err != nil {
+		return r, err
+	}
+	err = s.store.InTx(ctx, func(tx ports.Tx) error {
+		l, err := tx.LockLine(r.LineID)
+		if err != nil {
+			return err
+		}
+		if r, err = tx.LockLimitRequest(id); err != nil {
+			return err
+		}
+		if err := r.Decide(analyst, approve, granted, reason, s.now()); err != nil {
+			return err
+		}
+		if err := tx.SaveLimitRequest(r); err != nil {
+			return err
+		}
+		return s.applyLimit(ctx, tx, l, r)
+	})
+	return r, err
+}
+
 // ---- invoice plans ----
 
 // PlanQuotes are the ways a closed invoice can be split (2 to 12 installments).

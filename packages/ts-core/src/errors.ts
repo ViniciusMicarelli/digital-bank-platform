@@ -49,6 +49,10 @@ const messages: Record<string, string> = {
   TOO_MANY_BOXES: 'Você chegou ao máximo de 20 caixinhas.',
   BOX_CLOSED: 'Esta caixinha foi encerrada.',
   NOTHING_TO_YIELD: 'Guarde algum valor na caixinha primeiro.',
+  LIMIT_BELOW_USED: 'O limite não pode ficar abaixo do que você já usou.',
+  LIMIT_REQUEST_IN_REVIEW: 'Você já tem um pedido de limite em análise.',
+  INVOICE_NOT_PLANNABLE: 'Só faturas fechadas e não vencidas podem ser parceladas.',
+  INVOICE_TOO_SMALL: 'Faturas a partir de R$ 100,00 podem ser parceladas.',
   GATEWAY_DOWN: 'O servidor do banco está desligado. Rode make up no computador.',
 }
 

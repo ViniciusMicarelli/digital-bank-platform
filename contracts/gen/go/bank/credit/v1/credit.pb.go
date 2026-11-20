@@ -2162,6 +2162,447 @@ func (x *PlanInvoiceResponse) GetPlan() *InvoicePlan {
 	return nil
 }
 
+type LimitRequest struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Id           string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AccountId    string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	CurrentLimit *v1.Money              `protobuf:"bytes,3,opt,name=current_limit,json=currentLimit,proto3" json:"current_limit,omitempty"`
+	Requested    *v1.Money              `protobuf:"bytes,4,opt,name=requested,proto3" json:"requested,omitempty"`
+	// APPROVED, REJECTED, IN_REVIEW.
+	Status  string    `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
+	Granted *v1.Money `protobuf:"bytes,6,opt,name=granted,proto3" json:"granted,omitempty"`
+	// Why it was rejected (HAS_OVERDUE_INVOICE, CREDIT_LINE_BLOCKED or the
+	// analyst's words), or the analyst's note.
+	Reason string `protobuf:"bytes,7,opt,name=reason,proto3" json:"reason,omitempty"`
+	// "automatic" or the analyst.
+	DecidedBy     string                 `protobuf:"bytes,8,opt,name=decided_by,json=decidedBy,proto3" json:"decided_by,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	DecidedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=decided_at,json=decidedAt,proto3" json:"decided_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LimitRequest) Reset() {
+	*x = LimitRequest{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LimitRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LimitRequest) ProtoMessage() {}
+
+func (x *LimitRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LimitRequest.ProtoReflect.Descriptor instead.
+func (*LimitRequest) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *LimitRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *LimitRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *LimitRequest) GetCurrentLimit() *v1.Money {
+	if x != nil {
+		return x.CurrentLimit
+	}
+	return nil
+}
+
+func (x *LimitRequest) GetRequested() *v1.Money {
+	if x != nil {
+		return x.Requested
+	}
+	return nil
+}
+
+func (x *LimitRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *LimitRequest) GetGranted() *v1.Money {
+	if x != nil {
+		return x.Granted
+	}
+	return nil
+}
+
+func (x *LimitRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *LimitRequest) GetDecidedBy() string {
+	if x != nil {
+		return x.DecidedBy
+	}
+	return ""
+}
+
+func (x *LimitRequest) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *LimitRequest) GetDecidedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DecidedAt
+	}
+	return nil
+}
+
+type RequestLimitRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	IdempotencyKey string                 `protobuf:"bytes,1,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`
+	AccountId      string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Amount         *v1.Money              `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *RequestLimitRequest) Reset() {
+	*x = RequestLimitRequest{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestLimitRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestLimitRequest) ProtoMessage() {}
+
+func (x *RequestLimitRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestLimitRequest.ProtoReflect.Descriptor instead.
+func (*RequestLimitRequest) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *RequestLimitRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
+}
+
+func (x *RequestLimitRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *RequestLimitRequest) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+type RequestLimitResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Request       *LimitRequest          `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestLimitResponse) Reset() {
+	*x = RequestLimitResponse{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestLimitResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestLimitResponse) ProtoMessage() {}
+
+func (x *RequestLimitResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestLimitResponse.ProtoReflect.Descriptor instead.
+func (*RequestLimitResponse) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *RequestLimitResponse) GetRequest() *LimitRequest {
+	if x != nil {
+		return x.Request
+	}
+	return nil
+}
+
+type ListLimitRequestsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListLimitRequestsRequest) Reset() {
+	*x = ListLimitRequestsRequest{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListLimitRequestsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListLimitRequestsRequest) ProtoMessage() {}
+
+func (x *ListLimitRequestsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListLimitRequestsRequest.ProtoReflect.Descriptor instead.
+func (*ListLimitRequestsRequest) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *ListLimitRequestsRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ListLimitRequestsRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type ListLimitRequestsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Requests      []*LimitRequest        `protobuf:"bytes,1,rep,name=requests,proto3" json:"requests,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListLimitRequestsResponse) Reset() {
+	*x = ListLimitRequestsResponse{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListLimitRequestsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListLimitRequestsResponse) ProtoMessage() {}
+
+func (x *ListLimitRequestsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListLimitRequestsResponse.ProtoReflect.Descriptor instead.
+func (*ListLimitRequestsResponse) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *ListLimitRequestsResponse) GetRequests() []*LimitRequest {
+	if x != nil {
+		return x.Requests
+	}
+	return nil
+}
+
+type DecideLimitRequestRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AnalystId string                 `protobuf:"bytes,2,opt,name=analyst_id,json=analystId,proto3" json:"analyst_id,omitempty"`
+	Approve   bool                   `protobuf:"varint,3,opt,name=approve,proto3" json:"approve,omitempty"`
+	// Optional: grant less than requested.
+	Granted       *v1.Money `protobuf:"bytes,4,opt,name=granted,proto3" json:"granted,omitempty"`
+	Reason        string    `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DecideLimitRequestRequest) Reset() {
+	*x = DecideLimitRequestRequest{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DecideLimitRequestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DecideLimitRequestRequest) ProtoMessage() {}
+
+func (x *DecideLimitRequestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DecideLimitRequestRequest.ProtoReflect.Descriptor instead.
+func (*DecideLimitRequestRequest) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *DecideLimitRequestRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *DecideLimitRequestRequest) GetAnalystId() string {
+	if x != nil {
+		return x.AnalystId
+	}
+	return ""
+}
+
+func (x *DecideLimitRequestRequest) GetApprove() bool {
+	if x != nil {
+		return x.Approve
+	}
+	return false
+}
+
+func (x *DecideLimitRequestRequest) GetGranted() *v1.Money {
+	if x != nil {
+		return x.Granted
+	}
+	return nil
+}
+
+func (x *DecideLimitRequestRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type DecideLimitRequestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Request       *LimitRequest          `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DecideLimitRequestResponse) Reset() {
+	*x = DecideLimitRequestResponse{}
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DecideLimitRequestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DecideLimitRequestResponse) ProtoMessage() {}
+
+func (x *DecideLimitRequestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_credit_v1_credit_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DecideLimitRequestResponse.ProtoReflect.Descriptor instead.
+func (*DecideLimitRequestResponse) Descriptor() ([]byte, []int) {
+	return file_bank_credit_v1_credit_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *DecideLimitRequestResponse) GetRequest() *LimitRequest {
+	if x != nil {
+		return x.Request
+	}
+	return nil
+}
+
 var File_bank_credit_v1_credit_proto protoreflect.FileDescriptor
 
 const file_bank_credit_v1_credit_proto_rawDesc = "" +
@@ -2337,7 +2778,45 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"\binterest\x18\x06 \x01(\v2\x15.bank.common.v1.MoneyR\binterest\x12&\n" +
 	"\x0fmonthly_rate_bp\x18\a \x01(\x05R\rmonthlyRateBp\"F\n" +
 	"\x13PlanInvoiceResponse\x12/\n" +
-	"\x04plan\x18\x01 \x01(\v2\x1b.bank.credit.v1.InvoicePlanR\x04plan2\xd5\t\n" +
+	"\x04plan\x18\x01 \x01(\v2\x1b.bank.credit.v1.InvoicePlanR\x04plan\"\xa4\x03\n" +
+	"\fLimitRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12:\n" +
+	"\rcurrent_limit\x18\x03 \x01(\v2\x15.bank.common.v1.MoneyR\fcurrentLimit\x123\n" +
+	"\trequested\x18\x04 \x01(\v2\x15.bank.common.v1.MoneyR\trequested\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\x12/\n" +
+	"\agranted\x18\x06 \x01(\v2\x15.bank.common.v1.MoneyR\agranted\x12\x16\n" +
+	"\x06reason\x18\a \x01(\tR\x06reason\x12\x1d\n" +
+	"\n" +
+	"decided_by\x18\b \x01(\tR\tdecidedBy\x129\n" +
+	"\n" +
+	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"decided_at\x18\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tdecidedAt\"\x8c\x01\n" +
+	"\x13RequestLimitRequest\x12'\n" +
+	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12-\n" +
+	"\x06amount\x18\x03 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\"N\n" +
+	"\x14RequestLimitResponse\x126\n" +
+	"\arequest\x18\x01 \x01(\v2\x1c.bank.credit.v1.LimitRequestR\arequest\"Q\n" +
+	"\x18ListLimitRequestsRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\"U\n" +
+	"\x19ListLimitRequestsResponse\x128\n" +
+	"\brequests\x18\x01 \x03(\v2\x1c.bank.credit.v1.LimitRequestR\brequests\"\xad\x01\n" +
+	"\x19DecideLimitRequestRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"analyst_id\x18\x02 \x01(\tR\tanalystId\x12\x18\n" +
+	"\aapprove\x18\x03 \x01(\bR\aapprove\x12/\n" +
+	"\agranted\x18\x04 \x01(\v2\x15.bank.common.v1.MoneyR\agranted\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\"T\n" +
+	"\x1aDecideLimitRequestResponse\x126\n" +
+	"\arequest\x18\x01 \x01(\v2\x1c.bank.credit.v1.LimitRequestR\arequest2\x87\f\n" +
 	"\rCreditService\x12_\n" +
 	"\x0eOpenCreditLine\x12%.bank.credit.v1.OpenCreditLineRequest\x1a&.bank.credit.v1.OpenCreditLineResponse\x12\\\n" +
 	"\rGetCreditLine\x12$.bank.credit.v1.GetCreditLineRequest\x1a%.bank.credit.v1.GetCreditLineResponse\x12Y\n" +
@@ -2351,7 +2830,10 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"\rReleaseCredit\x12$.bank.credit.v1.ReleaseCreditRequest\x1a%.bank.credit.v1.ReleaseCreditResponse\x12Y\n" +
 	"\fRefundCredit\x12#.bank.credit.v1.RefundCreditRequest\x1a$.bank.credit.v1.RefundCreditResponse\x12e\n" +
 	"\x10QuoteInvoicePlan\x12'.bank.credit.v1.QuoteInvoicePlanRequest\x1a(.bank.credit.v1.QuoteInvoicePlanResponse\x12V\n" +
-	"\vPlanInvoice\x12\".bank.credit.v1.PlanInvoiceRequest\x1a#.bank.credit.v1.PlanInvoiceResponse\x12q\n" +
+	"\vPlanInvoice\x12\".bank.credit.v1.PlanInvoiceRequest\x1a#.bank.credit.v1.PlanInvoiceResponse\x12Y\n" +
+	"\fRequestLimit\x12#.bank.credit.v1.RequestLimitRequest\x1a$.bank.credit.v1.RequestLimitResponse\x12h\n" +
+	"\x11ListLimitRequests\x12(.bank.credit.v1.ListLimitRequestsRequest\x1a).bank.credit.v1.ListLimitRequestsResponse\x12k\n" +
+	"\x12DecideLimitRequest\x12).bank.credit.v1.DecideLimitRequestRequest\x1a*.bank.credit.v1.DecideLimitRequestResponse\x12q\n" +
 	"\x14ListInstallmentPlans\x12+.bank.credit.v1.ListInstallmentPlansRequest\x1a,.bank.credit.v1.ListInstallmentPlansResponse\x12Y\n" +
 	"\fAdvanceCycle\x12#.bank.credit.v1.AdvanceCycleRequest\x1a$.bank.credit.v1.AdvanceCycleResponseB\xd8\x01\n" +
 	"\x12com.bank.credit.v1B\vCreditProtoP\x01Z[github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1;creditv1\xa2\x02\x03BCX\xaa\x02\x0eBank.Credit.V1\xca\x02\x0eBank\\Credit\\V1\xe2\x02\x1aBank\\Credit\\V1\\GPBMetadata\xea\x02\x10Bank::Credit::V1b\x06proto3"
@@ -2368,7 +2850,7 @@ func file_bank_credit_v1_credit_proto_rawDescGZIP() []byte {
 	return file_bank_credit_v1_credit_proto_rawDescData
 }
 
-var file_bank_credit_v1_credit_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
+var file_bank_credit_v1_credit_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
 var file_bank_credit_v1_credit_proto_goTypes = []any{
 	(*CreditLine)(nil),                   // 0: bank.credit.v1.CreditLine
 	(*Invoice)(nil),                      // 1: bank.credit.v1.Invoice
@@ -2405,88 +2887,111 @@ var file_bank_credit_v1_credit_proto_goTypes = []any{
 	(*PlanInvoiceRequest)(nil),           // 32: bank.credit.v1.PlanInvoiceRequest
 	(*InvoicePlan)(nil),                  // 33: bank.credit.v1.InvoicePlan
 	(*PlanInvoiceResponse)(nil),          // 34: bank.credit.v1.PlanInvoiceResponse
-	nil,                                  // 35: bank.credit.v1.ReserveCreditRequest.MetadataEntry
-	nil,                                  // 36: bank.credit.v1.RefundCreditRequest.MetadataEntry
-	(*v1.Money)(nil),                     // 37: bank.common.v1.Money
-	(*timestamppb.Timestamp)(nil),        // 38: google.protobuf.Timestamp
+	(*LimitRequest)(nil),                 // 35: bank.credit.v1.LimitRequest
+	(*RequestLimitRequest)(nil),          // 36: bank.credit.v1.RequestLimitRequest
+	(*RequestLimitResponse)(nil),         // 37: bank.credit.v1.RequestLimitResponse
+	(*ListLimitRequestsRequest)(nil),     // 38: bank.credit.v1.ListLimitRequestsRequest
+	(*ListLimitRequestsResponse)(nil),    // 39: bank.credit.v1.ListLimitRequestsResponse
+	(*DecideLimitRequestRequest)(nil),    // 40: bank.credit.v1.DecideLimitRequestRequest
+	(*DecideLimitRequestResponse)(nil),   // 41: bank.credit.v1.DecideLimitRequestResponse
+	nil,                                  // 42: bank.credit.v1.ReserveCreditRequest.MetadataEntry
+	nil,                                  // 43: bank.credit.v1.RefundCreditRequest.MetadataEntry
+	(*v1.Money)(nil),                     // 44: bank.common.v1.Money
+	(*timestamppb.Timestamp)(nil),        // 45: google.protobuf.Timestamp
 }
 var file_bank_credit_v1_credit_proto_depIdxs = []int32{
-	37, // 0: bank.credit.v1.CreditLine.limit:type_name -> bank.common.v1.Money
-	37, // 1: bank.credit.v1.CreditLine.used:type_name -> bank.common.v1.Money
-	37, // 2: bank.credit.v1.CreditLine.available:type_name -> bank.common.v1.Money
-	38, // 3: bank.credit.v1.CreditLine.created_at:type_name -> google.protobuf.Timestamp
-	37, // 4: bank.credit.v1.CreditLine.upcoming_installments:type_name -> bank.common.v1.Money
-	37, // 5: bank.credit.v1.Invoice.total:type_name -> bank.common.v1.Money
-	37, // 6: bank.credit.v1.Invoice.paid:type_name -> bank.common.v1.Money
-	37, // 7: bank.credit.v1.Invoice.remaining:type_name -> bank.common.v1.Money
-	37, // 8: bank.credit.v1.Invoice.minimum_payment:type_name -> bank.common.v1.Money
-	37, // 9: bank.credit.v1.InvoiceItem.amount:type_name -> bank.common.v1.Money
-	38, // 10: bank.credit.v1.InvoiceItem.occurred_at:type_name -> google.protobuf.Timestamp
-	37, // 11: bank.credit.v1.Hold.amount:type_name -> bank.common.v1.Money
-	37, // 12: bank.credit.v1.Hold.captured:type_name -> bank.common.v1.Money
-	37, // 13: bank.credit.v1.Payment.amount:type_name -> bank.common.v1.Money
-	38, // 14: bank.credit.v1.Payment.created_at:type_name -> google.protobuf.Timestamp
+	44, // 0: bank.credit.v1.CreditLine.limit:type_name -> bank.common.v1.Money
+	44, // 1: bank.credit.v1.CreditLine.used:type_name -> bank.common.v1.Money
+	44, // 2: bank.credit.v1.CreditLine.available:type_name -> bank.common.v1.Money
+	45, // 3: bank.credit.v1.CreditLine.created_at:type_name -> google.protobuf.Timestamp
+	44, // 4: bank.credit.v1.CreditLine.upcoming_installments:type_name -> bank.common.v1.Money
+	44, // 5: bank.credit.v1.Invoice.total:type_name -> bank.common.v1.Money
+	44, // 6: bank.credit.v1.Invoice.paid:type_name -> bank.common.v1.Money
+	44, // 7: bank.credit.v1.Invoice.remaining:type_name -> bank.common.v1.Money
+	44, // 8: bank.credit.v1.Invoice.minimum_payment:type_name -> bank.common.v1.Money
+	44, // 9: bank.credit.v1.InvoiceItem.amount:type_name -> bank.common.v1.Money
+	45, // 10: bank.credit.v1.InvoiceItem.occurred_at:type_name -> google.protobuf.Timestamp
+	44, // 11: bank.credit.v1.Hold.amount:type_name -> bank.common.v1.Money
+	44, // 12: bank.credit.v1.Hold.captured:type_name -> bank.common.v1.Money
+	44, // 13: bank.credit.v1.Payment.amount:type_name -> bank.common.v1.Money
+	45, // 14: bank.credit.v1.Payment.created_at:type_name -> google.protobuf.Timestamp
 	0,  // 15: bank.credit.v1.OpenCreditLineResponse.line:type_name -> bank.credit.v1.CreditLine
 	0,  // 16: bank.credit.v1.GetCreditLineResponse.line:type_name -> bank.credit.v1.CreditLine
 	1,  // 17: bank.credit.v1.ListInvoicesResponse.invoices:type_name -> bank.credit.v1.Invoice
 	1,  // 18: bank.credit.v1.GetInvoiceResponse.invoice:type_name -> bank.credit.v1.Invoice
 	2,  // 19: bank.credit.v1.GetInvoiceResponse.items:type_name -> bank.credit.v1.InvoiceItem
-	37, // 20: bank.credit.v1.PayInvoiceRequest.amount:type_name -> bank.common.v1.Money
+	44, // 20: bank.credit.v1.PayInvoiceRequest.amount:type_name -> bank.common.v1.Money
 	4,  // 21: bank.credit.v1.PayInvoiceResponse.payment:type_name -> bank.credit.v1.Payment
-	37, // 22: bank.credit.v1.ReserveCreditRequest.amount:type_name -> bank.common.v1.Money
-	35, // 23: bank.credit.v1.ReserveCreditRequest.metadata:type_name -> bank.credit.v1.ReserveCreditRequest.MetadataEntry
+	44, // 22: bank.credit.v1.ReserveCreditRequest.amount:type_name -> bank.common.v1.Money
+	42, // 23: bank.credit.v1.ReserveCreditRequest.metadata:type_name -> bank.credit.v1.ReserveCreditRequest.MetadataEntry
 	3,  // 24: bank.credit.v1.ReserveCreditResponse.hold:type_name -> bank.credit.v1.Hold
-	37, // 25: bank.credit.v1.CaptureCreditRequest.amount:type_name -> bank.common.v1.Money
+	44, // 25: bank.credit.v1.CaptureCreditRequest.amount:type_name -> bank.common.v1.Money
 	3,  // 26: bank.credit.v1.CaptureCreditResponse.hold:type_name -> bank.credit.v1.Hold
 	3,  // 27: bank.credit.v1.ReleaseCreditResponse.hold:type_name -> bank.credit.v1.Hold
-	37, // 28: bank.credit.v1.RefundCreditRequest.amount:type_name -> bank.common.v1.Money
-	36, // 29: bank.credit.v1.RefundCreditRequest.metadata:type_name -> bank.credit.v1.RefundCreditRequest.MetadataEntry
-	37, // 30: bank.credit.v1.CreditRefund.amount:type_name -> bank.common.v1.Money
+	44, // 28: bank.credit.v1.RefundCreditRequest.amount:type_name -> bank.common.v1.Money
+	43, // 29: bank.credit.v1.RefundCreditRequest.metadata:type_name -> bank.credit.v1.RefundCreditRequest.MetadataEntry
+	44, // 30: bank.credit.v1.CreditRefund.amount:type_name -> bank.common.v1.Money
 	24, // 31: bank.credit.v1.RefundCreditResponse.refund:type_name -> bank.credit.v1.CreditRefund
-	37, // 32: bank.credit.v1.InstallmentPlan.total:type_name -> bank.common.v1.Money
-	37, // 33: bank.credit.v1.InstallmentPlan.installment_amount:type_name -> bank.common.v1.Money
-	37, // 34: bank.credit.v1.InstallmentPlan.remaining:type_name -> bank.common.v1.Money
-	38, // 35: bank.credit.v1.InstallmentPlan.purchased_at:type_name -> google.protobuf.Timestamp
+	44, // 32: bank.credit.v1.InstallmentPlan.total:type_name -> bank.common.v1.Money
+	44, // 33: bank.credit.v1.InstallmentPlan.installment_amount:type_name -> bank.common.v1.Money
+	44, // 34: bank.credit.v1.InstallmentPlan.remaining:type_name -> bank.common.v1.Money
+	45, // 35: bank.credit.v1.InstallmentPlan.purchased_at:type_name -> google.protobuf.Timestamp
 	26, // 36: bank.credit.v1.ListInstallmentPlansResponse.plans:type_name -> bank.credit.v1.InstallmentPlan
-	37, // 37: bank.credit.v1.PlanQuote.installment:type_name -> bank.common.v1.Money
-	37, // 38: bank.credit.v1.PlanQuote.total:type_name -> bank.common.v1.Money
-	37, // 39: bank.credit.v1.PlanQuote.interest:type_name -> bank.common.v1.Money
+	44, // 37: bank.credit.v1.PlanQuote.installment:type_name -> bank.common.v1.Money
+	44, // 38: bank.credit.v1.PlanQuote.total:type_name -> bank.common.v1.Money
+	44, // 39: bank.credit.v1.PlanQuote.interest:type_name -> bank.common.v1.Money
 	29, // 40: bank.credit.v1.QuoteInvoicePlanResponse.quotes:type_name -> bank.credit.v1.PlanQuote
-	37, // 41: bank.credit.v1.InvoicePlan.principal:type_name -> bank.common.v1.Money
-	37, // 42: bank.credit.v1.InvoicePlan.installment:type_name -> bank.common.v1.Money
-	37, // 43: bank.credit.v1.InvoicePlan.interest:type_name -> bank.common.v1.Money
+	44, // 41: bank.credit.v1.InvoicePlan.principal:type_name -> bank.common.v1.Money
+	44, // 42: bank.credit.v1.InvoicePlan.installment:type_name -> bank.common.v1.Money
+	44, // 43: bank.credit.v1.InvoicePlan.interest:type_name -> bank.common.v1.Money
 	33, // 44: bank.credit.v1.PlanInvoiceResponse.plan:type_name -> bank.credit.v1.InvoicePlan
-	5,  // 45: bank.credit.v1.CreditService.OpenCreditLine:input_type -> bank.credit.v1.OpenCreditLineRequest
-	7,  // 46: bank.credit.v1.CreditService.GetCreditLine:input_type -> bank.credit.v1.GetCreditLineRequest
-	9,  // 47: bank.credit.v1.CreditService.ListInvoices:input_type -> bank.credit.v1.ListInvoicesRequest
-	11, // 48: bank.credit.v1.CreditService.GetInvoice:input_type -> bank.credit.v1.GetInvoiceRequest
-	13, // 49: bank.credit.v1.CreditService.PayInvoice:input_type -> bank.credit.v1.PayInvoiceRequest
-	15, // 50: bank.credit.v1.CreditService.ReserveCredit:input_type -> bank.credit.v1.ReserveCreditRequest
-	17, // 51: bank.credit.v1.CreditService.CaptureCredit:input_type -> bank.credit.v1.CaptureCreditRequest
-	19, // 52: bank.credit.v1.CreditService.ReleaseCredit:input_type -> bank.credit.v1.ReleaseCreditRequest
-	23, // 53: bank.credit.v1.CreditService.RefundCredit:input_type -> bank.credit.v1.RefundCreditRequest
-	30, // 54: bank.credit.v1.CreditService.QuoteInvoicePlan:input_type -> bank.credit.v1.QuoteInvoicePlanRequest
-	32, // 55: bank.credit.v1.CreditService.PlanInvoice:input_type -> bank.credit.v1.PlanInvoiceRequest
-	27, // 56: bank.credit.v1.CreditService.ListInstallmentPlans:input_type -> bank.credit.v1.ListInstallmentPlansRequest
-	21, // 57: bank.credit.v1.CreditService.AdvanceCycle:input_type -> bank.credit.v1.AdvanceCycleRequest
-	6,  // 58: bank.credit.v1.CreditService.OpenCreditLine:output_type -> bank.credit.v1.OpenCreditLineResponse
-	8,  // 59: bank.credit.v1.CreditService.GetCreditLine:output_type -> bank.credit.v1.GetCreditLineResponse
-	10, // 60: bank.credit.v1.CreditService.ListInvoices:output_type -> bank.credit.v1.ListInvoicesResponse
-	12, // 61: bank.credit.v1.CreditService.GetInvoice:output_type -> bank.credit.v1.GetInvoiceResponse
-	14, // 62: bank.credit.v1.CreditService.PayInvoice:output_type -> bank.credit.v1.PayInvoiceResponse
-	16, // 63: bank.credit.v1.CreditService.ReserveCredit:output_type -> bank.credit.v1.ReserveCreditResponse
-	18, // 64: bank.credit.v1.CreditService.CaptureCredit:output_type -> bank.credit.v1.CaptureCreditResponse
-	20, // 65: bank.credit.v1.CreditService.ReleaseCredit:output_type -> bank.credit.v1.ReleaseCreditResponse
-	25, // 66: bank.credit.v1.CreditService.RefundCredit:output_type -> bank.credit.v1.RefundCreditResponse
-	31, // 67: bank.credit.v1.CreditService.QuoteInvoicePlan:output_type -> bank.credit.v1.QuoteInvoicePlanResponse
-	34, // 68: bank.credit.v1.CreditService.PlanInvoice:output_type -> bank.credit.v1.PlanInvoiceResponse
-	28, // 69: bank.credit.v1.CreditService.ListInstallmentPlans:output_type -> bank.credit.v1.ListInstallmentPlansResponse
-	22, // 70: bank.credit.v1.CreditService.AdvanceCycle:output_type -> bank.credit.v1.AdvanceCycleResponse
-	58, // [58:71] is the sub-list for method output_type
-	45, // [45:58] is the sub-list for method input_type
-	45, // [45:45] is the sub-list for extension type_name
-	45, // [45:45] is the sub-list for extension extendee
-	0,  // [0:45] is the sub-list for field type_name
+	44, // 45: bank.credit.v1.LimitRequest.current_limit:type_name -> bank.common.v1.Money
+	44, // 46: bank.credit.v1.LimitRequest.requested:type_name -> bank.common.v1.Money
+	44, // 47: bank.credit.v1.LimitRequest.granted:type_name -> bank.common.v1.Money
+	45, // 48: bank.credit.v1.LimitRequest.created_at:type_name -> google.protobuf.Timestamp
+	45, // 49: bank.credit.v1.LimitRequest.decided_at:type_name -> google.protobuf.Timestamp
+	44, // 50: bank.credit.v1.RequestLimitRequest.amount:type_name -> bank.common.v1.Money
+	35, // 51: bank.credit.v1.RequestLimitResponse.request:type_name -> bank.credit.v1.LimitRequest
+	35, // 52: bank.credit.v1.ListLimitRequestsResponse.requests:type_name -> bank.credit.v1.LimitRequest
+	44, // 53: bank.credit.v1.DecideLimitRequestRequest.granted:type_name -> bank.common.v1.Money
+	35, // 54: bank.credit.v1.DecideLimitRequestResponse.request:type_name -> bank.credit.v1.LimitRequest
+	5,  // 55: bank.credit.v1.CreditService.OpenCreditLine:input_type -> bank.credit.v1.OpenCreditLineRequest
+	7,  // 56: bank.credit.v1.CreditService.GetCreditLine:input_type -> bank.credit.v1.GetCreditLineRequest
+	9,  // 57: bank.credit.v1.CreditService.ListInvoices:input_type -> bank.credit.v1.ListInvoicesRequest
+	11, // 58: bank.credit.v1.CreditService.GetInvoice:input_type -> bank.credit.v1.GetInvoiceRequest
+	13, // 59: bank.credit.v1.CreditService.PayInvoice:input_type -> bank.credit.v1.PayInvoiceRequest
+	15, // 60: bank.credit.v1.CreditService.ReserveCredit:input_type -> bank.credit.v1.ReserveCreditRequest
+	17, // 61: bank.credit.v1.CreditService.CaptureCredit:input_type -> bank.credit.v1.CaptureCreditRequest
+	19, // 62: bank.credit.v1.CreditService.ReleaseCredit:input_type -> bank.credit.v1.ReleaseCreditRequest
+	23, // 63: bank.credit.v1.CreditService.RefundCredit:input_type -> bank.credit.v1.RefundCreditRequest
+	30, // 64: bank.credit.v1.CreditService.QuoteInvoicePlan:input_type -> bank.credit.v1.QuoteInvoicePlanRequest
+	32, // 65: bank.credit.v1.CreditService.PlanInvoice:input_type -> bank.credit.v1.PlanInvoiceRequest
+	36, // 66: bank.credit.v1.CreditService.RequestLimit:input_type -> bank.credit.v1.RequestLimitRequest
+	38, // 67: bank.credit.v1.CreditService.ListLimitRequests:input_type -> bank.credit.v1.ListLimitRequestsRequest
+	40, // 68: bank.credit.v1.CreditService.DecideLimitRequest:input_type -> bank.credit.v1.DecideLimitRequestRequest
+	27, // 69: bank.credit.v1.CreditService.ListInstallmentPlans:input_type -> bank.credit.v1.ListInstallmentPlansRequest
+	21, // 70: bank.credit.v1.CreditService.AdvanceCycle:input_type -> bank.credit.v1.AdvanceCycleRequest
+	6,  // 71: bank.credit.v1.CreditService.OpenCreditLine:output_type -> bank.credit.v1.OpenCreditLineResponse
+	8,  // 72: bank.credit.v1.CreditService.GetCreditLine:output_type -> bank.credit.v1.GetCreditLineResponse
+	10, // 73: bank.credit.v1.CreditService.ListInvoices:output_type -> bank.credit.v1.ListInvoicesResponse
+	12, // 74: bank.credit.v1.CreditService.GetInvoice:output_type -> bank.credit.v1.GetInvoiceResponse
+	14, // 75: bank.credit.v1.CreditService.PayInvoice:output_type -> bank.credit.v1.PayInvoiceResponse
+	16, // 76: bank.credit.v1.CreditService.ReserveCredit:output_type -> bank.credit.v1.ReserveCreditResponse
+	18, // 77: bank.credit.v1.CreditService.CaptureCredit:output_type -> bank.credit.v1.CaptureCreditResponse
+	20, // 78: bank.credit.v1.CreditService.ReleaseCredit:output_type -> bank.credit.v1.ReleaseCreditResponse
+	25, // 79: bank.credit.v1.CreditService.RefundCredit:output_type -> bank.credit.v1.RefundCreditResponse
+	31, // 80: bank.credit.v1.CreditService.QuoteInvoicePlan:output_type -> bank.credit.v1.QuoteInvoicePlanResponse
+	34, // 81: bank.credit.v1.CreditService.PlanInvoice:output_type -> bank.credit.v1.PlanInvoiceResponse
+	37, // 82: bank.credit.v1.CreditService.RequestLimit:output_type -> bank.credit.v1.RequestLimitResponse
+	39, // 83: bank.credit.v1.CreditService.ListLimitRequests:output_type -> bank.credit.v1.ListLimitRequestsResponse
+	41, // 84: bank.credit.v1.CreditService.DecideLimitRequest:output_type -> bank.credit.v1.DecideLimitRequestResponse
+	28, // 85: bank.credit.v1.CreditService.ListInstallmentPlans:output_type -> bank.credit.v1.ListInstallmentPlansResponse
+	22, // 86: bank.credit.v1.CreditService.AdvanceCycle:output_type -> bank.credit.v1.AdvanceCycleResponse
+	71, // [71:87] is the sub-list for method output_type
+	55, // [55:71] is the sub-list for method input_type
+	55, // [55:55] is the sub-list for extension type_name
+	55, // [55:55] is the sub-list for extension extendee
+	0,  // [0:55] is the sub-list for field type_name
 }
 
 func init() { file_bank_credit_v1_credit_proto_init() }
@@ -2500,7 +3005,7 @@ func file_bank_credit_v1_credit_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_credit_v1_credit_proto_rawDesc), len(file_bank_credit_v1_credit_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   37,
+			NumMessages:   44,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

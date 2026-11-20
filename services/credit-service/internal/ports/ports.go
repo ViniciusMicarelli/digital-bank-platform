@@ -29,6 +29,12 @@ type Store interface {
 	// UnpostedPlanInterest lists plans whose interest is not in the ledger yet.
 	UnpostedPlanInterest(ctx context.Context, limit int) ([]domain.InvoicePlan, error)
 	MarkPlanInterestPosted(ctx context.Context, id uuid.UUID) error
+	LimitRequestByKey(ctx context.Context, key string) (*domain.LimitRequest, error)
+	LimitRequest(ctx context.Context, id uuid.UUID) (domain.LimitRequest, error)
+	// LimitRequests by line (zero for all) and/or status, newest first.
+	LimitRequests(ctx context.Context, line uuid.UUID, status domain.LimitStatus, limit int) ([]domain.LimitRequest, error)
+	// HasOverdue reports whether the line has an invoice that went overdue.
+	HasOverdue(ctx context.Context, line uuid.UUID) (bool, error)
 	RefundByKey(ctx context.Context, key string) (*domain.Refund, error)
 
 	// LinesDue lists lines with an invoice to close or to make overdue.
@@ -69,6 +75,10 @@ type Tx interface {
 	SavePayment(p domain.Payment) error
 
 	InsertInstallments(list []domain.Installment) error
+	// InsertLimitRequest fails with LIMIT_REQUEST_IN_REVIEW when one is open.
+	InsertLimitRequest(r domain.LimitRequest) error
+	LockLimitRequest(id uuid.UUID) (domain.LimitRequest, error)
+	SaveLimitRequest(r domain.LimitRequest) error
 	// InsertInvoicePlan fails with a refusal when the invoice has a plan already.
 	InsertInvoicePlan(p domain.InvoicePlan) error
 	// NextInstallments lists the lowest pending installment of each plan of a

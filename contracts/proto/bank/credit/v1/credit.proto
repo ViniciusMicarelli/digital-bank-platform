@@ -36,6 +36,15 @@ service CreditService {
   // goes on each invoice from the open one. Idempotent on the key.
   rpc PlanInvoice(PlanInvoiceRequest) returns (PlanInvoiceResponse);
 
+  // Asks for a new limit (idempotent on the key): decreases (never below
+  // what is used) and increases up to +50% apply at once, an overdue invoice
+  // refuses an increase, larger ones go to an analyst (IN_REVIEW).
+  rpc RequestLimit(RequestLimitRequest) returns (RequestLimitResponse);
+  // By account, or every account (back office) by status.
+  rpc ListLimitRequests(ListLimitRequestsRequest) returns (ListLimitRequestsResponse);
+  // An analyst's decision on a request in review (may grant less).
+  rpc DecideLimitRequest(DecideLimitRequestRequest) returns (DecideLimitRequestResponse);
+
   // Installment purchases and invoice plans with installments still to come.
   rpc ListInstallmentPlans(ListInstallmentPlansRequest) returns (ListInstallmentPlansResponse);
 
@@ -275,4 +284,53 @@ message InvoicePlan {
 
 message PlanInvoiceResponse {
   InvoicePlan plan = 1;
+}
+
+message LimitRequest {
+  string id = 1;
+  string account_id = 2;
+  bank.common.v1.Money current_limit = 3;
+  bank.common.v1.Money requested = 4;
+  // APPROVED, REJECTED, IN_REVIEW.
+  string status = 5;
+  bank.common.v1.Money granted = 6;
+  // Why it was rejected (HAS_OVERDUE_INVOICE, CREDIT_LINE_BLOCKED or the
+  // analyst's words), or the analyst's note.
+  string reason = 7;
+  // "automatic" or the analyst.
+  string decided_by = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp decided_at = 10;
+}
+
+message RequestLimitRequest {
+  string idempotency_key = 1;
+  string account_id = 2;
+  bank.common.v1.Money amount = 3;
+}
+
+message RequestLimitResponse {
+  LimitRequest request = 1;
+}
+
+message ListLimitRequestsRequest {
+  string account_id = 1;
+  string status = 2;
+}
+
+message ListLimitRequestsResponse {
+  repeated LimitRequest requests = 1;
+}
+
+message DecideLimitRequestRequest {
+  string id = 1;
+  string analyst_id = 2;
+  bool approve = 3;
+  // Optional: grant less than requested.
+  bank.common.v1.Money granted = 4;
+  string reason = 5;
+}
+
+message DecideLimitRequestResponse {
+  LimitRequest request = 1;
 }

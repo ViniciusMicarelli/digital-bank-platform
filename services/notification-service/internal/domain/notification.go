@@ -137,6 +137,9 @@ type payload struct {
 	Metadata        map[string]string `json:"metadata"`
 	DecisionReason  string            `json:"decision_reason"`
 	Installments    int               `json:"installments"`
+	Granted         int64             `json:"granted"`
+	Requested       int64             `json:"requested"`
+	PreviousLimit   int64             `json:"previous_limit"`
 	Installment     int64             `json:"installment"`
 	Source          string            `json:"source"`
 }
@@ -232,6 +235,18 @@ func FromEvent(ev Event, now time.Time) ([]Draft, error) {
 		d.Category, d.Title, d.Important = CategoryCredit, "Fatura em atraso", true
 		d.Body = fmt.Sprintf("%s não foram pagos e foram para a próxima fatura, com multa de %s e juros de %s.",
 			BRL(p.Unpaid), BRL(p.Fine), BRL(p.Interest))
+	case "credit.limit.changed":
+		d.Category, d.Title, d.Important = CategoryCredit, "Limite atualizado", true
+		d.Body = fmt.Sprintf("Seu limite agora é de %s.", BRL(p.Granted))
+		if p.Granted > p.PreviousLimit {
+			d.Title, d.Body = "Limite aumentado", fmt.Sprintf("Seu limite passou de %s para %s.", BRL(p.PreviousLimit), BRL(p.Granted))
+		}
+	case "credit.limit.in_review":
+		d.Category, d.Title = CategoryCredit, "Pedido de limite em análise"
+		d.Body = fmt.Sprintf("Recebemos seu pedido de limite de %s. Avisamos quando terminar.", BRL(p.Requested))
+	case "credit.limit.rejected":
+		d.Category, d.Title, d.Important = CategoryCredit, "Pedido de limite recusado", true
+		d.Body = fmt.Sprintf("Não conseguimos aumentar seu limite para %s agora.", BRL(p.Requested))
 	case "credit.invoice.planned":
 		d.Category, d.Title, d.Important = CategoryCredit, "Fatura parcelada", true
 		d.Body = fmt.Sprintf("Sua fatura foi parcelada em %dx de %s. A primeira parcela já está na fatura atual.", p.Installments, BRL(p.Installment))

@@ -1,8 +1,8 @@
-import { ApiError, compareBRL, errorMessage, formatBRL, type CreditLine, type InstallmentPlan, type Invoice, type PlanQuote } from '@bank/core'
+import { ApiError, compareBRL, errorMessage, formatBRL, type CreditLine, type InstallmentPlan, type Invoice, type LimitRequest, type PlanQuote } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { View } from 'react-native'
-import { CalendarClock, Layers, Receipt, Wallet } from 'lucide-react-native'
+import { CalendarClock, Gauge, Layers, Receipt, Wallet } from 'lucide-react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Button, Card, Loading, MoneyField, Muted, Notice, Press, Row, Sandbox, Screen, Txt } from '../components/ui'
 import { useCountUp } from '../lib/motion'
@@ -52,6 +52,36 @@ function PlanPicker({ base, invoice, onDone }: { base: string; invoice: Invoice;
       <Notice>{error}</Notice>
       <Button title={pick ? `Parcelar em ${pick.installments}x` : 'Escolha as parcelas'} variant="credit" disabled={!pick} loading={plan.isPending} onPress={() => plan.mutate()} />
     </View>
+  )
+}
+
+function LimitCard({ base, line }: { base: string; line: CreditLine }) {
+  const qc = useQueryClient()
+  const [amount, setAmount] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ tone: 'green' | 'red' | 'amber'; text: string } | null>(null)
+  const requests = useQuery({ queryKey: ['limit-requests', base], queryFn: async () => (await api<{ requests: LimitRequest[] }>('GET', `${base}/limit-requests`)).requests })
+  const ask = useMutation({
+    mutationFn: () => api<LimitRequest>('POST', `${base}/limit`, { body: { amount }, idempotent: true }),
+    onSuccess: (r) => {
+      setMessage(r.status === 'APPROVED' ? { tone: 'green', text: `Seu limite agora é ${formatBRL(r.granted)}.` }
+        : r.status === 'IN_REVIEW' ? { tone: 'amber', text: 'Pedido em análise. Avisamos quando terminar.' }
+          : { tone: 'red', text: 'Não foi possível aumentar o limite agora.' })
+      for (const k of ['credit', 'limit-requests']) qc.invalidateQueries({ queryKey: [k] })
+    },
+    onError: (e) => setMessage({ tone: 'red', text: errorMessage(e) }),
+  })
+  const inReview = requests.data?.find((r) => r.status === 'IN_REVIEW')
+  return (
+    <Card title="Ajustar limite" icon={Gauge} index={3}>
+      {inReview ? <Notice tone="amber">Pedido de {formatBRL(inReview.requested)} em análise.</Notice> : (
+        <>
+          <Muted>Limite atual de {formatBRL(line.limit)}. Diminuir e aumentar até 50% é na hora; acima disso, um analista avalia.</Muted>
+          <MoneyField label="Novo limite" onValue={setAmount} />
+          <Button title="Pedir novo limite" variant="credit" disabled={!amount} loading={ask.isPending} onPress={() => ask.mutate()} />
+        </>
+      )}
+      {message && <Notice tone={message.tone}>{message.text}</Notice>}
+    </Card>
   )
 }
 
@@ -110,6 +140,7 @@ export default function Credit() {
           ))}
         </Card>
       )}
+      <LimitCard base={base} line={l} />
       <Card title="Faturas" icon={Receipt} index={2}>
         {invoices.data?.map((i) => <Row key={i.id} icon={Receipt} tone={i.status === 'PAID' ? 'green' : i.status === 'OVERDUE' ? 'red' : i.status === 'CLOSED' ? 'amber' : 'credit'} title={`Fechamento ${date(i.closing_date)}`} subtitle={label[i.status]} right={<Txt variant="label" style={{ fontFamily: font.semibold }}>{formatBRL(i.total)}</Txt>} />)}
       </Card>

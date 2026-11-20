@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, Layers, Receipt, Wallet } from 'lucide-react'
+import { CalendarClock, Gauge, Layers, Receipt, Wallet } from 'lucide-react'
 import { useState } from 'react'
 import { BankCard } from '../components/BankCard'
 import { useCountUp } from '../lib/motion'
@@ -8,7 +8,7 @@ import { MoneyField } from '../components/MoneyField'
 import { Alert, Amount, Badge, Button, Empty, Loading, Modal, PageTitle, Panel, Sandbox, Select } from '../components/ui'
 import { dateBR, dateTimeBR } from '../lib/format'
 import { api, ApiError } from '../lib/api'
-import { errorMessage, compareBRL, formatBRL, type CreditLine, type InstallmentPlan, type Invoice, type PlanQuote } from '@bank/core'
+import { errorMessage, compareBRL, formatBRL, type CreditLine, type InstallmentPlan, type Invoice, type LimitRequest, type PlanQuote } from '@bank/core'
 
 const invoiceStatus: Record<Invoice['status'], [string, 'credit' | 'amber' | 'green' | 'red']> = {
   OPEN: ['Aberta', 'credit'], CLOSED: ['Fechada', 'amber'], PAID: ['Paga', 'green'], OVERDUE: ['Vencida', 'red'],
@@ -123,6 +123,57 @@ function InvoiceModal({ base, invoice, onClose }: { base: string; invoice: Invoi
   )
 }
 
+const limitStatus = { APPROVED: ['green', 'Aprovado'], REJECTED: ['red', 'Recusado'], IN_REVIEW: ['amber', 'Em análise'] } as const
+const limitReasons: Record<string, string> = { HAS_OVERDUE_INVOICE: 'há uma fatura em atraso', CREDIT_LINE_BLOCKED: 'o crédito está bloqueado' }
+
+function LimitPanel({ base, line }: { base: string; line: CreditLine }) {
+  const qc = useQueryClient()
+  const [amount, setAmount] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ tone: 'green' | 'red' | 'amber'; text: string } | null>(null)
+  const requests = useQuery({
+    queryKey: ['limit-requests', base],
+    queryFn: async () => (await api<{ requests: LimitRequest[] }>('GET', `${base}/limit-requests`)).requests,
+  })
+  const ask = useMutation({
+    mutationFn: () => api<LimitRequest>('POST', `${base}/limit`, { body: { amount }, idempotent: true }),
+    onSuccess: (r) => {
+      setMessage(r.status === 'APPROVED' ? { tone: 'green', text: `Pronto: seu limite agora é ${formatBRL(r.granted)}.` }
+        : r.status === 'IN_REVIEW' ? { tone: 'amber', text: 'Pedido enviado para análise. Avisamos quando terminar.' }
+          : { tone: 'red', text: `Não foi possível agora: ${limitReasons[r.reason] ?? r.reason}.` })
+      for (const k of ['credit', 'limit-requests']) qc.invalidateQueries({ queryKey: [k] })
+    },
+    onError: (e) => setMessage({ tone: 'red', text: errorMessage(e) }),
+  })
+  const inReview = requests.data?.find((r) => r.status === 'IN_REVIEW')
+  return (
+    <Panel title="Ajustar limite" icon={Gauge}>
+      {inReview ? (
+        <Alert tone="amber">Pedido de {formatBRL(inReview.requested)} em análise desde {dateTimeBR(inReview.created_at)}.</Alert>
+      ) : (
+        <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); setMessage(null); ask.mutate() }}>
+          <p className="text-sm text-fg-2">Limite atual de {formatBRL(line.limit)}. Para diminuir é na hora; aumentos de até 50% também. Acima disso, um analista avalia.</p>
+          <MoneyField label="Novo limite" onValue={setAmount} />
+          <Button type="submit" variant="credit" loading={ask.isPending} disabled={!amount}>Pedir novo limite</Button>
+        </form>
+      )}
+      {message && <div className="mt-3"><Alert tone={message.tone}>{message.text}</Alert></div>}
+      {!!requests.data?.length && (
+        <ul className="mt-4 divide-y divide-line border-t border-line">
+          {requests.data.slice(0, 4).map((r) => (
+            <li key={r.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+              <span className="text-fg-2">{formatBRL(r.current_limit)} → {formatBRL(r.requested)}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-xs text-muted">{dateTimeBR(r.created_at)}</span>
+                <Badge tone={limitStatus[r.status][0]}>{limitStatus[r.status][1]}</Badge>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  )
+}
+
 function CreditHero({ line, usedPct }: { line: CreditLine; usedPct: number }) {
   const ref = useCountUp(Number(line.available.amount), (n) => formatBRL(n.toFixed(2)))
   return (
@@ -226,6 +277,7 @@ export function CreditPage() {
           </Panel>
         )}
       </div>
+      <LimitPanel base={base} line={l} />
       {!!plans.data?.length && (
         <Panel title="Compras parceladas" icon={Layers}
           action={l.upcoming_installments && <span className="text-sm text-muted">a vencer {formatBRL(l.upcoming_installments)}</span>}>

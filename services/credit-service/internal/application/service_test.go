@@ -459,3 +459,61 @@ func reason(err error) string {
 	}
 	return ""
 }
+
+func TestLimitRequests(t *testing.T) {
+	e := setup(t)
+	_, _ = e.svc.OpenLine(e.ctx, "k", e.account, 10) // R$ 1.000
+	h, _ := e.svc.Reserve(e.ctx, "h", e.account, 400_00, 1, "LOJA", nil)
+	_, _ = e.svc.Capture(e.ctx, h.ID, nil)
+
+	if _, err := e.svc.RequestLimit(e.ctx, "r0", e.account, 300_00); reason(err) != "LIMIT_BELOW_USED" {
+		t.Fatalf("below what is used: %v", err)
+	}
+	down, err := e.svc.RequestLimit(e.ctx, "r1", e.account, 800_00)
+	if err != nil || down.Status != domain.LimitApproved || e.line(t).Limit != 800_00 {
+		t.Fatalf("decrease = %+v %v", down, err)
+	}
+	// Up to +50% is automatic.
+	up, _ := e.svc.RequestLimit(e.ctx, "r2", e.account, 1_200_00)
+	if up.Status != domain.LimitApproved || up.DecidedBy != "automatic" || e.line(t).Limit != 1_200_00 {
+		t.Fatalf("automatic increase = %+v", up)
+	}
+	if again, _ := e.svc.RequestLimit(e.ctx, "r2", e.account, 1_200_00); again.ID != up.ID {
+		t.Fatal("same key, same request")
+	}
+	// More goes to an analyst; one request in review at a time.
+	review, _ := e.svc.RequestLimit(e.ctx, "r3", e.account, 5_000_00)
+	if review.Status != domain.LimitInReview || e.line(t).Limit != 1_200_00 {
+		t.Fatalf("large increase = %+v", review)
+	}
+	if _, err := e.svc.RequestLimit(e.ctx, "r4", e.account, 6_000_00); reason(err) != "LIMIT_REQUEST_IN_REVIEW" {
+		t.Fatalf("second request in review: %v", err)
+	}
+	if list, _ := e.svc.LimitRequests(e.ctx, uuid.Nil, domain.LimitInReview); len(list) != 1 || list[0].ID != review.ID {
+		t.Fatalf("queue = %+v", list)
+	}
+	if _, err := e.svc.DecideLimit(e.ctx, review.ID, "analyst-1", true, 6_000_00, ""); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatal("cannot grant more than asked")
+	}
+	decided, err := e.svc.DecideLimit(e.ctx, review.ID, "analyst-1", true, 3_000_00, "Renda compatível com R$ 3 mil")
+	if err != nil || decided.Granted != 3_000_00 || e.line(t).Limit != 3_000_00 {
+		t.Fatalf("partial approval = %+v %v", decided, err)
+	}
+	if _, err := e.svc.DecideLimit(e.ctx, review.ID, "analyst-2", false, 0, "x"); reason(err) != "LIMIT_REQUEST_NOT_IN_REVIEW" {
+		t.Fatalf("decided twice: %v", err)
+	}
+
+	// An overdue invoice: increases are refused.
+	if err := e.svc.AdvanceCycle(e.ctx, e.account, "CLOSE"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.AdvanceCycle(e.ctx, e.account, "EXPIRE"); err != nil {
+		t.Fatal(err)
+	}
+	if r, _ := e.svc.RequestLimit(e.ctx, "r5", e.account, 3_100_00); r.Status != domain.LimitRejected || r.Reason != "HAS_OVERDUE_INVOICE" {
+		t.Fatalf("with an overdue invoice = %+v", r)
+	}
+	if _, err := e.svc.RequestLimit(e.ctx, "r6", e.account, 1_234_56); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatal("whole reais only")
+	}
+}

@@ -40,6 +40,7 @@ The gateway writes an event **before** each staff action and refuses the action 
 | `KYC_APPROVE`, `KYC_REJECT` | customer | gateway |
 | `ACCOUNT_BLOCK` | account | gateway |
 | `DISPUTE_ACCEPT`, `DISPUTE_REJECT` | account | gateway (card disputes) |
+| `LIMIT_APPROVE`, `LIMIT_REJECT` | account | gateway (credit limit requests) |
 | `APPROVAL_REQUESTED`, `APPROVAL_APPROVED`, `APPROVAL_REJECTED`, `APPROVAL_EXECUTED`, `APPROVAL_FAILED`, `APPROVAL_EXPIRED` | account | backoffice-service |
 
 ## Configuration

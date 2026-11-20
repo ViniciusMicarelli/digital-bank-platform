@@ -124,6 +124,69 @@ func (s *Server) PlanInvoice(ctx context.Context, req *creditv1.PlanInvoiceReque
 		Installments: int32(p.Installments), Installment: brl(p.Installment), Interest: brl(p.Interest()), MonthlyRateBp: int32(p.MonthlyBP)}}, nil //nolint:gosec // small
 }
 
+func limitPB(r domain.LimitRequest) *creditv1.LimitRequest {
+	out := &creditv1.LimitRequest{Id: r.ID.String(), AccountId: r.AccountID.String(), CurrentLimit: brl(r.CurrentLimit),
+		Requested: brl(r.Requested), Status: string(r.Status), Granted: brl(r.Granted), Reason: r.Reason, DecidedBy: r.DecidedBy,
+		CreatedAt: timestamppb.New(r.CreatedAt)}
+	if r.DecidedAt != nil {
+		out.DecidedAt = timestamppb.New(*r.DecidedAt)
+	}
+	return out
+}
+
+func (s *Server) RequestLimit(ctx context.Context, req *creditv1.RequestLimitRequest) (*creditv1.RequestLimitResponse, error) {
+	account, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	amt, err := amount(req.GetAmount())
+	if err != nil {
+		return nil, err
+	}
+	r, err := s.app.RequestLimit(ctx, req.GetIdempotencyKey(), account, amt)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &creditv1.RequestLimitResponse{Request: limitPB(r)}, nil
+}
+
+func (s *Server) ListLimitRequests(ctx context.Context, req *creditv1.ListLimitRequestsRequest) (*creditv1.ListLimitRequestsResponse, error) {
+	var account uuid.UUID
+	if req.GetAccountId() != "" {
+		var err error
+		if account, err = parseID(req.GetAccountId()); err != nil {
+			return nil, err
+		}
+	}
+	list, err := s.app.LimitRequests(ctx, account, domain.LimitStatus(req.GetStatus()))
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	out := &creditv1.ListLimitRequestsResponse{}
+	for _, r := range list {
+		out.Requests = append(out.Requests, limitPB(r))
+	}
+	return out, nil
+}
+
+func (s *Server) DecideLimitRequest(ctx context.Context, req *creditv1.DecideLimitRequestRequest) (*creditv1.DecideLimitRequestResponse, error) {
+	id, err := parseID(req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	var granted int64
+	if req.GetGranted() != nil {
+		if granted, err = amount(req.GetGranted()); err != nil {
+			return nil, err
+		}
+	}
+	r, err := s.app.DecideLimit(ctx, id, req.GetAnalystId(), req.GetApprove(), granted, req.GetReason())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &creditv1.DecideLimitRequestResponse{Request: limitPB(r)}, nil
+}
+
 func (s *Server) ListInstallmentPlans(ctx context.Context, req *creditv1.ListInstallmentPlansRequest) (*creditv1.ListInstallmentPlansResponse, error) {
 	account, err := parseID(req.GetAccountId())
 	if err != nil {

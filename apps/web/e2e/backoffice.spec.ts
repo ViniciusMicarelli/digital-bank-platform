@@ -124,3 +124,26 @@ test('customers cannot open the back office', async ({ page, request }) => {
   await page.goto('/backoffice')
   await expect(page.getByRole('heading', { name: 'Análises', exact: true })).toHaveCount(0)
 })
+
+test('a limit increase goes to an analyst', async ({ page, browser }) => {
+  await onboard(page)
+  await page.goto('/credito')
+  await page.getByRole('button', { name: 'Ativar crédito' }).click()
+  await page.getByLabel('Novo limite').fill('5000')
+  await page.getByRole('button', { name: 'Pedir novo limite' }).click()
+  await expect(page.getByText('Pedido enviado para análise.', { exact: false })).toBeVisible()
+
+  const other = await browser.newContext()
+  const staff = await other.newPage()
+  await staffLogin(staff, REVIEWER)
+  const item = staff.getByRole('listitem').filter({ hasText: 'R$ 1.000,00 → R$ 5.000,00' }).first()
+  await item.getByRole('button', { name: 'Aprovar' }).click()
+  await item.getByLabel('Limite concedido').fill('3000')
+  await item.getByRole('button', { name: 'Confirmar aprovação' }).click()
+  await expect(item).toHaveCount(0)
+  await other.close()
+
+  await page.reload()
+  await expect(page.getByText('R$ 1.000,00 → R$ 5.000,00')).toBeVisible()
+  await expect(page.getByText('Limite atual de R$ 3.000,00.', { exact: false })).toBeVisible()
+})

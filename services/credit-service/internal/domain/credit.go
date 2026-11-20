@@ -449,3 +449,87 @@ func (p InvoicePlan) Interest() int64 { return p.Installment*int64(p.Installment
 
 // InterestKey is the idempotency key of the ledger posting of the interest.
 func (p InvoicePlan) InterestKey() string { return "invoice-plan-interest:" + p.ID.String() }
+
+// ---- limit changes ----
+
+const (
+	// MaxLimit is the highest limit a line can have.
+	MaxLimit = 20_000_00
+	// AutoIncreaseBP is how much more the automatic analysis may grant (+50%).
+	AutoIncreaseBP = 15_000
+)
+
+type LimitStatus string
+
+const (
+	LimitApproved LimitStatus = "APPROVED"
+	LimitRejected LimitStatus = "REJECTED"
+	LimitInReview LimitStatus = "IN_REVIEW"
+)
+
+// LimitRequest is a customer's request to change the credit limit.
+type LimitRequest struct {
+	ID             uuid.UUID
+	IdempotencyKey string
+	LineID         uuid.UUID
+	AccountID      uuid.UUID
+	CurrentLimit   int64
+	Requested      int64
+	Status         LimitStatus
+	Granted        int64
+	Reason         string
+	DecidedBy      string
+	CreatedAt      time.Time
+	DecidedAt      *time.Time
+}
+
+// AnalyzeLimit decides a request at once when it can: a decrease (never
+// below what is used), a refusal (an overdue invoice), or an increase up to
+// +50%; anything larger goes to an analyst.
+func AnalyzeLimit(l Line, requested int64, overdue bool) (LimitStatus, string, error) {
+	switch {
+	case requested <= 0 || requested%100 != 0:
+		return "", "", fmt.Errorf("%w: the limit is a positive amount in whole reais", ErrInvalidArgument)
+	case requested > MaxLimit:
+		return "", "", fmt.Errorf("%w: the limit is at most R$ 20.000,00", ErrInvalidArgument)
+	case requested == l.Limit:
+		return "", "", fmt.Errorf("%w: that is the current limit", ErrInvalidArgument)
+	case requested < l.Limit && requested < l.Used:
+		return "", "", Refuse("LIMIT_BELOW_USED", "the limit cannot be lower than what is already used")
+	case requested < l.Limit:
+		return LimitApproved, "", nil
+	case l.Status != LineActive:
+		return LimitRejected, "CREDIT_LINE_BLOCKED", nil
+	case overdue:
+		return LimitRejected, "HAS_OVERDUE_INVOICE", nil
+	case requested <= percent(l.Limit, AutoIncreaseBP):
+		return LimitApproved, "", nil
+	}
+	return LimitInReview, "", nil
+}
+
+// Decide is an analyst's decision on a request in review: approve (the
+// requested amount, or less) or reject with a reason.
+func (r *LimitRequest) Decide(analyst string, approve bool, granted int64, reason string, now time.Time) error {
+	switch {
+	case analyst == "":
+		return fmt.Errorf("%w: analyst is required", ErrInvalidArgument)
+	case r.Status != LimitInReview:
+		return Refuse("LIMIT_REQUEST_NOT_IN_REVIEW", "this request was decided already")
+	case !approve && reason == "":
+		return fmt.Errorf("%w: a rejection needs a reason", ErrInvalidArgument)
+	}
+	r.DecidedBy, r.DecidedAt = analyst, &now
+	if !approve {
+		r.Status, r.Reason = LimitRejected, reason
+		return nil
+	}
+	if granted == 0 {
+		granted = r.Requested
+	}
+	if granted <= r.CurrentLimit || granted > r.Requested || granted%100 != 0 {
+		return fmt.Errorf("%w: grant more than the current limit and at most what was asked", ErrInvalidArgument)
+	}
+	r.Status, r.Granted, r.Reason = LimitApproved, granted, reason
+	return nil
+}

@@ -211,6 +211,11 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - A closed invoice can be split into 2 to 12 fixed installments with interest (Price table, 4.99% a month), with the total, the interest and the CET shown before confirming; the invoice is settled by the plan, the installments follow on the next invoices, the interest is booked in the ledger.
 - Web and mobile: minimum payment and *Parcelar fatura* on the invoice to pay.
 
+## Phase 30 — Credit limit changes ✅
+
+- Customers ask for a new limit: decreases at once (never below what is used), increases up to +50% at once, refused with an overdue invoice, larger ones to an analyst who may grant less or refuse with a reason (audited); notifications for each outcome.
+- Web and mobile: *Ajustar limite* on the credit screen with the history of requests; back-office *Limites* queue.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.
