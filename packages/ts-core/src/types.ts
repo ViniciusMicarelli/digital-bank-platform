@@ -226,7 +226,20 @@ export interface SavingsBox {
   status: 'ACTIVE' | 'CLOSED'
   created_at: string
   annual_rate_bp: number
+  /** The monthly deposit, when there is one. */
+  schedule?: SavingsSchedule
   movements?: SavingsMovement[]
+}
+
+/** A monthly deposit from the checking account into a box. */
+export interface SavingsSchedule {
+  amount: Money
+  /** 1..28 of every month. */
+  day: number
+  /** YYYY-MM-DD. */
+  next_run: string
+  /** Why the last run moved nothing (e.g. INSUFFICIENT_FUNDS); empty if it ran. */
+  last_failure: string
 }
 
 export interface SavingsMovement {

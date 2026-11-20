@@ -31,14 +31,20 @@ func (s *Store) InTx(ctx context.Context, fn func(ports.Tx) error) error {
 	return pg.InTx(ctx, s.pool, func(tx pgx.Tx) error { return fn(&unit{ctx: ctx, tx: tx}) })
 }
 
-const boxCols = `id, idempotency_key, account_id, name, goal, status, yielded, yield_carry_micro, last_accrued, created_at`
+const boxCols = `id, idempotency_key, account_id, name, goal, status, yielded, yield_carry_micro, last_accrued,
+	schedule_amount, schedule_day, schedule_next, schedule_last_failure, created_at`
 
 func scanBox(row pgx.Row) (domain.Box, error) {
 	var (
 		b      domain.Box
 		status string
+		next   *time.Time
 	)
-	err := row.Scan(&b.ID, &b.IdempotencyKey, &b.AccountID, &b.Name, &b.Goal, &status, &b.Yielded, &b.YieldCarryMicro, &b.LastAccrued, &b.CreatedAt)
+	err := row.Scan(&b.ID, &b.IdempotencyKey, &b.AccountID, &b.Name, &b.Goal, &status, &b.Yielded, &b.YieldCarryMicro, &b.LastAccrued,
+		&b.Schedule.Amount, &b.Schedule.Day, &next, &b.Schedule.LastFailure, &b.CreatedAt)
+	if next != nil {
+		b.Schedule.Next = *next
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return b, fmt.Errorf("%w: box", domain.ErrNotFound)
 	}
@@ -120,6 +126,22 @@ func (s *Store) BoxesToAccrue(ctx context.Context, day time.Time, limit int) ([]
 	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
 
+func (s *Store) BoxesScheduled(ctx context.Context, day time.Time, limit int) ([]uuid.UUID, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id FROM boxes WHERE status = 'ACTIVE' AND schedule_next <= $1
+		ORDER BY schedule_next LIMIT $2`, day, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+}
+
+func scheduleNext(s domain.Schedule) *time.Time {
+	if !s.Active() {
+		return nil
+	}
+	return &s.Next
+}
+
 func (u *unit) InsertBox(b domain.Box) (bool, error) {
 	tag, err := u.tx.Exec(u.ctx, `INSERT INTO boxes (id, idempotency_key, account_id, name, goal, status, last_accrued, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (idempotency_key) DO NOTHING`,
@@ -139,7 +161,9 @@ func (u *unit) LockBox(id uuid.UUID) (domain.Box, error) {
 
 func (u *unit) SaveBox(b domain.Box) error {
 	_, err := u.tx.Exec(u.ctx, `UPDATE boxes SET name = $2, goal = $3, status = $4, yielded = $5, yield_carry_micro = $6,
-		last_accrued = $7, updated_at = now() WHERE id = $1`, b.ID, b.Name, b.Goal, b.Status, b.Yielded, b.YieldCarryMicro, b.LastAccrued)
+		last_accrued = $7, schedule_amount = $8, schedule_day = $9, schedule_next = $10, schedule_last_failure = $11,
+		updated_at = now() WHERE id = $1`, b.ID, b.Name, b.Goal, b.Status, b.Yielded, b.YieldCarryMicro, b.LastAccrued,
+		b.Schedule.Amount, b.Schedule.Day, scheduleNext(b.Schedule), b.Schedule.LastFailure)
 	return err
 }
 

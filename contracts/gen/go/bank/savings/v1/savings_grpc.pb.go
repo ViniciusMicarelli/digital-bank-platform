@@ -27,6 +27,8 @@ const (
 	SavingsService_Deposit_FullMethodName       = "/bank.savings.v1.SavingsService/Deposit"
 	SavingsService_Withdraw_FullMethodName      = "/bank.savings.v1.SavingsService/Withdraw"
 	SavingsService_ListMovements_FullMethodName = "/bank.savings.v1.SavingsService/ListMovements"
+	SavingsService_SetSchedule_FullMethodName   = "/bank.savings.v1.SavingsService/SetSchedule"
+	SavingsService_RunSchedule_FullMethodName   = "/bank.savings.v1.SavingsService/RunSchedule"
 	SavingsService_SimulateYield_FullMethodName = "/bank.savings.v1.SavingsService/SimulateYield"
 )
 
@@ -51,6 +53,11 @@ type SavingsServiceClient interface {
 	Withdraw(ctx context.Context, in *WithdrawRequest, opts ...grpc.CallOption) (*WithdrawResponse, error)
 	// Deposits, withdrawals and yields, newest first.
 	ListMovements(ctx context.Context, in *ListMovementsRequest, opts ...grpc.CallOption) (*ListMovementsResponse, error)
+	// Sets (or, with a zero amount, removes) the monthly deposit from the
+	// checking account. The first run is the next such day after today.
+	SetSchedule(ctx context.Context, in *SetScheduleRequest, opts ...grpc.CallOption) (*SetScheduleResponse, error)
+	// Sandbox: makes the next monthly deposit now.
+	RunSchedule(ctx context.Context, in *RunScheduleRequest, opts ...grpc.CallOption) (*RunScheduleResponse, error)
 	// Sandbox: pays the yield of `days` days at once, on today's balance.
 	SimulateYield(ctx context.Context, in *SimulateYieldRequest, opts ...grpc.CallOption) (*SimulateYieldResponse, error)
 }
@@ -143,6 +150,26 @@ func (c *savingsServiceClient) ListMovements(ctx context.Context, in *ListMoveme
 	return out, nil
 }
 
+func (c *savingsServiceClient) SetSchedule(ctx context.Context, in *SetScheduleRequest, opts ...grpc.CallOption) (*SetScheduleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetScheduleResponse)
+	err := c.cc.Invoke(ctx, SavingsService_SetSchedule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *savingsServiceClient) RunSchedule(ctx context.Context, in *RunScheduleRequest, opts ...grpc.CallOption) (*RunScheduleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RunScheduleResponse)
+	err := c.cc.Invoke(ctx, SavingsService_RunSchedule_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *savingsServiceClient) SimulateYield(ctx context.Context, in *SimulateYieldRequest, opts ...grpc.CallOption) (*SimulateYieldResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SimulateYieldResponse)
@@ -174,6 +201,11 @@ type SavingsServiceServer interface {
 	Withdraw(context.Context, *WithdrawRequest) (*WithdrawResponse, error)
 	// Deposits, withdrawals and yields, newest first.
 	ListMovements(context.Context, *ListMovementsRequest) (*ListMovementsResponse, error)
+	// Sets (or, with a zero amount, removes) the monthly deposit from the
+	// checking account. The first run is the next such day after today.
+	SetSchedule(context.Context, *SetScheduleRequest) (*SetScheduleResponse, error)
+	// Sandbox: makes the next monthly deposit now.
+	RunSchedule(context.Context, *RunScheduleRequest) (*RunScheduleResponse, error)
 	// Sandbox: pays the yield of `days` days at once, on today's balance.
 	SimulateYield(context.Context, *SimulateYieldRequest) (*SimulateYieldResponse, error)
 	mustEmbedUnimplementedSavingsServiceServer()
@@ -209,6 +241,12 @@ func (UnimplementedSavingsServiceServer) Withdraw(context.Context, *WithdrawRequ
 }
 func (UnimplementedSavingsServiceServer) ListMovements(context.Context, *ListMovementsRequest) (*ListMovementsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListMovements not implemented")
+}
+func (UnimplementedSavingsServiceServer) SetSchedule(context.Context, *SetScheduleRequest) (*SetScheduleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetSchedule not implemented")
+}
+func (UnimplementedSavingsServiceServer) RunSchedule(context.Context, *RunScheduleRequest) (*RunScheduleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RunSchedule not implemented")
 }
 func (UnimplementedSavingsServiceServer) SimulateYield(context.Context, *SimulateYieldRequest) (*SimulateYieldResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SimulateYield not implemented")
@@ -378,6 +416,42 @@ func _SavingsService_ListMovements_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SavingsService_SetSchedule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetScheduleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SavingsServiceServer).SetSchedule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SavingsService_SetSchedule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SavingsServiceServer).SetSchedule(ctx, req.(*SetScheduleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SavingsService_RunSchedule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RunScheduleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SavingsServiceServer).RunSchedule(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SavingsService_RunSchedule_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SavingsServiceServer).RunSchedule(ctx, req.(*RunScheduleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SavingsService_SimulateYield_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SimulateYieldRequest)
 	if err := dec(in); err != nil {
@@ -434,6 +508,14 @@ var SavingsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListMovements",
 			Handler:    _SavingsService_ListMovements_Handler,
+		},
+		{
+			MethodName: "SetSchedule",
+			Handler:    _SavingsService_SetSchedule_Handler,
+		},
+		{
+			MethodName: "RunSchedule",
+			Handler:    _SavingsService_RunSchedule_Handler,
 		},
 		{
 			MethodName: "SimulateYield",

@@ -210,3 +210,74 @@ func TestDailyYield(t *testing.T) {
 		t.Fatalf("simulated year = %+v %+v %v", m, v, err)
 	}
 }
+
+func TestMonthlyDeposit(t *testing.T) {
+	e := setup(t) // the 18th of November, R$ 1.000 in checking
+	b, _ := e.svc.Create(e.ctx, "k1", e.account, "Reserva", 0)
+	if _, err := e.svc.SetSchedule(e.ctx, b.ID, 300_00, 29); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatalf("day 29: %v", err)
+	}
+	// Day 18 is today: the first run is next month, nothing moves now.
+	v, err := e.svc.SetSchedule(e.ctx, b.ID, 300_00, 18)
+	if err != nil || v.Schedule.Next.Format(time.DateOnly) != "2026-12-18" || v.Balance != 0 {
+		t.Fatalf("schedule = %+v %v", v, err)
+	}
+	v, _ = e.svc.SetSchedule(e.ctx, b.ID, 300_00, 20)
+	if v.Schedule.Next.Format(time.DateOnly) != "2026-11-20" {
+		t.Fatalf("day 20 = %s", v.Schedule.Next)
+	}
+
+	e.svc.ScheduleOnce(e.ctx) // not due yet
+	if v, _ := e.svc.Box(e.ctx, b.ID); v.Balance != 0 {
+		t.Fatalf("ran early: %+v", v)
+	}
+	// The 20th, at 01:00 in Brasília: the deposit runs once.
+	e.now = time.Date(2026, 11, 20, 4, 0, 0, 0, time.UTC)
+	e.svc.ScheduleOnce(e.ctx)
+	e.svc.ScheduleOnce(e.ctx)
+	v, _ = e.svc.Box(e.ctx, b.ID)
+	if v.Balance != 300_00 || v.Schedule.Next.Format(time.DateOnly) != "2026-12-20" || v.Schedule.LastFailure != "" {
+		t.Fatalf("after the run = %+v", v)
+	}
+
+	// An outage keeps the run due; it runs once the bank is back.
+	e.now = time.Date(2026, 12, 20, 12, 0, 0, 0, time.UTC)
+	e.bank.down = true
+	e.svc.ScheduleOnce(e.ctx)
+	if v, _ := e.svc.Box(e.ctx, b.ID); v.Schedule.Next.Format(time.DateOnly) != "2026-12-20" {
+		t.Fatalf("during the outage = %+v", v.Schedule)
+	}
+	e.bank.down = false
+	e.svc.ScheduleOnce(e.ctx)
+	if v, _ := e.svc.Box(e.ctx, b.ID); v.Balance != 600_00 || v.Schedule.Next.Format(time.DateOnly) != "2027-01-20" {
+		t.Fatalf("after the outage = %+v", v)
+	}
+
+	// Not enough in checking (R$ 400 left, R$ 500 asked): skipped, reason kept.
+	_, _ = e.svc.SetSchedule(e.ctx, b.ID, 500_00, 20)
+	m, v, err := e.svc.RunSchedule(e.ctx, b.ID) // sandbox: brings January forward
+	if err != nil || m.Status != domain.Failed || v.Schedule.LastFailure != "INSUFFICIENT_FUNDS" ||
+		v.Schedule.Next.Format(time.DateOnly) != "2027-02-20" || v.Balance != 600_00 {
+		t.Fatalf("refused run = %+v %+v %v", m, v, err)
+	}
+	// Months missed (the service was down) are not caught up.
+	_, _ = e.svc.SetSchedule(e.ctx, b.ID, 100_00, 20)
+	e.now = time.Date(2027, 5, 1, 12, 0, 0, 0, time.UTC)
+	e.svc.ScheduleOnce(e.ctx)
+	v, _ = e.svc.Box(e.ctx, b.ID)
+	if v.Balance != 700_00 || v.Schedule.Next.Format(time.DateOnly) != "2027-05-20" || v.Schedule.LastFailure != "" {
+		t.Fatalf("after a long gap = %+v", v)
+	}
+
+	// Removing it, and closing the box, stop it.
+	if v, _ := e.svc.SetSchedule(e.ctx, b.ID, 0, 0); v.Schedule.Active() {
+		t.Fatalf("removed = %+v", v.Schedule)
+	}
+	if _, _, err := e.svc.RunSchedule(e.ctx, b.ID); reason(err) != "NO_SCHEDULE" {
+		t.Fatalf("run without a schedule: %v", err)
+	}
+	_, _ = e.svc.SetSchedule(e.ctx, b.ID, 100_00, 2)
+	if closed, _ := e.svc.Close(e.ctx, "c1", b.ID); closed.Schedule.Active() {
+		t.Fatalf("closed box keeps its schedule: %+v", closed.Schedule)
+	}
+}

@@ -247,7 +247,7 @@ func (s *Service) Close(ctx context.Context, key string, id uuid.UUID) (View, er
 		if err != nil {
 			return err
 		}
-		b.Status = domain.Closed
+		b.Status, b.Schedule = domain.Closed, domain.Schedule{}
 		return tx.SaveBox(b)
 	})
 	if err != nil {
@@ -378,10 +378,110 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 	for {
 		s.RecoverOnce(ctx, interval)
 		s.AccrueOnce(ctx)
+		s.ScheduleOnce(ctx)
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 		}
 	}
+}
+
+// SetSchedule sets (or, with amount 0, removes) the box's monthly deposit.
+func (s *Service) SetSchedule(ctx context.Context, id uuid.UUID, amount int64, day int) (View, error) {
+	var b domain.Box
+	err := s.store.InTx(ctx, func(tx ports.Tx) error {
+		var err error
+		if b, err = tx.LockBox(id); err != nil {
+			return err
+		}
+		if err := b.SetSchedule(amount, day, s.now()); err != nil {
+			return err
+		}
+		return tx.SaveBox(b)
+	})
+	if err != nil {
+		return View{}, err
+	}
+	return s.view(ctx, b)
+}
+
+// ScheduleOnce runs every monthly deposit that is due.
+func (s *Service) ScheduleOnce(ctx context.Context) {
+	ids, err := s.store.BoxesScheduled(ctx, domain.Day(s.now()), 200)
+	if err != nil {
+		s.log.ErrorContext(ctx, "scheduled deposits", "error", err)
+		return
+	}
+	for _, id := range ids {
+		if _, err := s.runSchedule(ctx, id, false); err != nil {
+			s.log.WarnContext(ctx, "scheduled deposit not run yet, will retry", "box_id", id, "error", err)
+		}
+	}
+}
+
+// runSchedule makes the deposit of the box's next run and moves the
+// schedule on to the first run after today (missed months are not caught
+// up). With early, the next run is brought forward (sandbox). A deposit
+// refused for lack of funds is skipped, not retried, and its reason kept on
+// the box; a technical failure keeps the run due for the next pass
+// (idempotent on the run's day).
+func (s *Service) runSchedule(ctx context.Context, id uuid.UUID, early bool) (domain.Movement, error) {
+	b, err := s.store.Box(ctx, id)
+	if err != nil {
+		return domain.Movement{}, err
+	}
+	if !b.Schedule.Active() || b.Status != domain.Active {
+		return domain.Movement{}, domain.Refuse("NO_SCHEDULE", "this box has no monthly deposit")
+	}
+	today, day := domain.Day(s.now()), b.Schedule.Next
+	if day.After(today) && !early {
+		return domain.Movement{}, nil
+	}
+	m := domain.Movement{ID: uuid.Must(uuid.NewV7()), BoxID: b.ID, IdempotencyKey: domain.ScheduleKey(day),
+		Kind: domain.Deposit, Amount: b.Schedule.Amount, Status: domain.Pending, CreatedAt: s.now()}
+	err = s.store.InTx(ctx, func(tx ports.Tx) error {
+		existing, err := tx.InsertMovement(m)
+		if existing != nil {
+			m = *existing
+		}
+		return err
+	})
+	if err != nil {
+		return m, err
+	}
+	if m, err = s.settle(ctx, m, b); err != nil {
+		return m, err
+	}
+	if m.Status == domain.Pending {
+		return m, errors.New("scheduled deposit pending")
+	}
+	err = s.store.InTx(ctx, func(tx ports.Tx) error {
+		cur, err := tx.LockBox(id)
+		if err != nil || !cur.Schedule.Active() || !cur.Schedule.Next.Equal(day) {
+			return err // removed or changed meanwhile, or already moved on
+		}
+		cur.Schedule.Next = domain.NextRun(cur.Schedule.Day, maxDay(day, today))
+		cur.Schedule.LastFailure = m.FailureReason
+		return tx.SaveBox(cur)
+	})
+	return m, err
+}
+
+func maxDay(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+	return b
+}
+
+// RunSchedule (sandbox) makes the monthly deposit now, as if it were due
+// today; the next run moves to the following month.
+func (s *Service) RunSchedule(ctx context.Context, id uuid.UUID) (domain.Movement, View, error) {
+	m, err := s.runSchedule(ctx, id, true)
+	if err != nil {
+		return m, View{}, err
+	}
+	v, err := s.Box(ctx, id)
+	return m, v, err
 }

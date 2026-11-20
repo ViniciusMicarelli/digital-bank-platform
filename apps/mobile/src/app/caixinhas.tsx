@@ -1,11 +1,11 @@
 import { errorMessage, formatBRL, type SavingsBox, type SavingsSummary } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDownLeft, ArrowUpRight, PiggyBank, Plus, Sparkles, X } from 'lucide-react-native'
+import { ArrowDownLeft, ArrowUpRight, CalendarClock, PiggyBank, Plus, Sparkles, X } from 'lucide-react-native'
 import { useState } from 'react'
 import { View } from 'react-native'
 import { Button, Card, Field, Loading, MoneyField, Muted, Notice, Press, Row, Sandbox, Screen, Segmented, Txt } from '../components/ui'
 import { api } from '../lib/client'
-import { dateTime, useAccount } from '../lib/queries'
+import { date, dateTime, useAccount } from '../lib/queries'
 import { font, useTheme } from '../lib/theme'
 
 const movementLabel = { DEPOSIT: 'Guardado', WITHDRAWAL: 'Resgate', YIELD: 'Rendimento' } as const
@@ -30,6 +30,57 @@ function NewBox({ base, onDone }: { base: string; onDone: (b: SavingsBox) => voi
   )
 }
 
+/** The monthly deposit: set, change or remove it. */
+function ScheduleCard({ base, box, onChange }: { base: string; box: SavingsBox; onChange: () => void }) {
+  const sc = box.schedule
+  const [editing, setEditing] = useState(false)
+  const [amount, setAmount] = useState<string | null>(null)
+  const [day, setDay] = useState(String(sc?.day ?? 5))
+  const [error, setError] = useState('')
+  const n = Number(day)
+  const validDay = Number.isInteger(n) && n >= 1 && n <= 28
+  const save = useMutation({
+    mutationFn: () => api('PUT', `${base}/${box.id}/schedule`, { body: { amount, day: n } }),
+    onSuccess: () => { setEditing(false); setError(''); onChange() },
+    onError: (e) => setError(errorMessage(e)),
+  })
+  const remove = useMutation({
+    mutationFn: () => api('DELETE', `${base}/${box.id}/schedule`),
+    onSuccess: () => { setEditing(false); onChange() },
+    onError: (e) => setError(errorMessage(e)),
+  })
+  return (
+    <Card title="Depósito programado" icon={CalendarClock} index={2}>
+      {sc && !editing ? (
+        <>
+          <Txt>{formatBRL(sc.amount)} todo dia {sc.day}, da conta para a caixinha.</Txt>
+          <Muted>Próximo depósito em {date(sc.next_run)}.</Muted>
+          {!!sc.last_failure && (
+            <Notice tone="amber">O último depósito não foi feito{sc.last_failure === 'INSUFFICIENT_FUNDS' ? ': faltou saldo na conta' : ''}. O próximo segue programado.</Notice>
+          )}
+          <Button title="Alterar" variant="secondary" onPress={() => setEditing(true)} />
+        </>
+      ) : !editing ? (
+        <>
+          <Muted>Guarde todo mês sem precisar lembrar: escolha o valor e o dia.</Muted>
+          <Button title="Programar depósito mensal" icon={CalendarClock} variant="secondary" onPress={() => setEditing(true)} />
+        </>
+      ) : (
+        <>
+          <MoneyField label="Quanto por mês" onValue={setAmount} />
+          <Field label="Todo dia (1 a 28)" keyboardType="number-pad" maxLength={2} value={day} onChangeText={setDay}
+            error={day && !validDay ? 'Escolha um dia de 1 a 28' : undefined} />
+          <Muted>Se faltar saldo no dia, o mês é pulado.</Muted>
+          <Notice>{error}</Notice>
+          <Button title={sc ? 'Salvar' : 'Programar'} disabled={!amount || !validDay} loading={save.isPending} onPress={() => save.mutate()} />
+          {sc && <Button title="Remover" variant="ghost" loading={remove.isPending} onPress={() => remove.mutate()} />}
+          <Button title="Cancelar" variant="ghost" onPress={() => { setEditing(false); setError('') }} />
+        </>
+      )}
+    </Card>
+  )
+}
+
 function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId: string; id: string; onClosed: () => void }) {
   const qc = useQueryClient()
   const [tab, setTab] = useState<'in' | 'out'>('in')
@@ -44,6 +95,11 @@ function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId:
     onError: fail,
   })
   const close = useMutation({ mutationFn: () => api('DELETE', `${base}/${id}`, { idempotent: true }), onSuccess: () => { refresh(); onClosed() }, onError: fail })
+  const runSchedule = useMutation({
+    mutationFn: () => api('POST', `/v1/sandbox/accounts/${accountId}/savings/${id}/schedule/run`),
+    onSuccess: refresh,
+    onError: (e) => { fail(e); refresh() },
+  })
   const simulate = useMutation({ mutationFn: () => api('POST', `/v1/sandbox/accounts/${accountId}/savings/${id}/yield`, { body: { days: 30 } }), onSuccess: refresh, onError: fail })
   const b = detail.data
   if (!b) return <Loading />
@@ -60,7 +116,8 @@ function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId:
         <Button title={tab === 'in' ? 'Guardar' : 'Resgatar'} icon={tab === 'in' ? ArrowDownLeft : ArrowUpRight} disabled={!amount} loading={move.isPending} onPress={() => move.mutate()} />
         {message && <Notice tone={message.tone}>{message.text}</Notice>}
       </Card>
-      <Card title="Histórico" index={2}>
+      <ScheduleCard base={base} box={b} onChange={refresh} />
+      <Card title="Histórico" index={3}>
         {!b.movements?.length ? <Muted>Nada guardado ainda.</Muted> : b.movements.map((m) => (
           <Row key={m.id} title={movementLabel[m.kind] + (m.status === 'PENDING' ? ' · processando' : '')} subtitle={dateTime(m.created_at)}
             right={<Txt variant="label" tone={m.kind === 'WITHDRAWAL' ? 'fg' : 'positive'} style={{ fontFamily: font.semibold }}>{m.kind === 'WITHDRAWAL' ? '− ' : '+ '}{formatBRL(m.amount)}</Txt>} />
@@ -68,6 +125,10 @@ function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId:
       </Card>
       <Sandbox>
         <Button title="Simular 30 dias de rendimento" icon={Sparkles} variant="secondary" loading={simulate.isPending} onPress={() => simulate.mutate()} />
+        {b.schedule && (
+          <Button title="Fazer o depósito programado agora" icon={CalendarClock} variant="secondary" loading={runSchedule.isPending}
+            onPress={() => { setMessage(null); runSchedule.mutate() }} />
+        )}
       </Sandbox>
       <Button title="Encerrar e resgatar tudo" icon={X} variant="danger" loading={close.isPending} onPress={() => close.mutate()} />
     </>
@@ -107,6 +168,7 @@ export default function Savings() {
                 <Txt variant="heading">{b.name}</Txt>
                 <Txt variant="heading">{formatBRL(b.balance)}</Txt>
               </View>
+              {b.schedule && <Txt variant="caption" tone="muted">{formatBRL(b.schedule.amount)} todo dia {b.schedule.day}</Txt>}
               {pct !== null && (
                 <View style={{ gap: 6 }}>
                   <View style={{ height: 6, borderRadius: 3, backgroundColor: c.surface2, overflow: 'hidden' }}>

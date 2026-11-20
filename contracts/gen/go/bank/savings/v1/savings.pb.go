@@ -37,7 +37,9 @@ type Box struct {
 	Status    string                 `protobuf:"bytes,7,opt,name=status,proto3" json:"status,omitempty"`
 	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	// Yearly rate paid, in basis points (e.g. 1065 = 10.65% a year).
-	AnnualRateBp  int32 `protobuf:"varint,9,opt,name=annual_rate_bp,json=annualRateBp,proto3" json:"annual_rate_bp,omitempty"`
+	AnnualRateBp int32 `protobuf:"varint,9,opt,name=annual_rate_bp,json=annualRateBp,proto3" json:"annual_rate_bp,omitempty"`
+	// Unset without a monthly deposit.
+	Schedule      *Schedule `protobuf:"bytes,10,opt,name=schedule,proto3" json:"schedule,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -135,6 +137,86 @@ func (x *Box) GetAnnualRateBp() int32 {
 	return 0
 }
 
+func (x *Box) GetSchedule() *Schedule {
+	if x != nil {
+		return x.Schedule
+	}
+	return nil
+}
+
+// A monthly deposit from the checking account into the box. A run refused
+// for lack of funds is skipped (not retried) and its reason kept.
+type Schedule struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Amount *v1.Money              `protobuf:"bytes,1,opt,name=amount,proto3" json:"amount,omitempty"`
+	// 1..28 of every month.
+	Day int32 `protobuf:"varint,2,opt,name=day,proto3" json:"day,omitempty"`
+	// The next run, YYYY-MM-DD (Brasília).
+	NextRun string `protobuf:"bytes,3,opt,name=next_run,json=nextRun,proto3" json:"next_run,omitempty"`
+	// Why the last run moved nothing, e.g. INSUFFICIENT_FUNDS; empty if it ran.
+	LastFailure   string `protobuf:"bytes,4,opt,name=last_failure,json=lastFailure,proto3" json:"last_failure,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Schedule) Reset() {
+	*x = Schedule{}
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Schedule) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Schedule) ProtoMessage() {}
+
+func (x *Schedule) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Schedule.ProtoReflect.Descriptor instead.
+func (*Schedule) Descriptor() ([]byte, []int) {
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Schedule) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *Schedule) GetDay() int32 {
+	if x != nil {
+		return x.Day
+	}
+	return 0
+}
+
+func (x *Schedule) GetNextRun() string {
+	if x != nil {
+		return x.NextRun
+	}
+	return ""
+}
+
+func (x *Schedule) GetLastFailure() string {
+	if x != nil {
+		return x.LastFailure
+	}
+	return ""
+}
+
 type Movement struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -152,7 +234,7 @@ type Movement struct {
 
 func (x *Movement) Reset() {
 	*x = Movement{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[1]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -164,7 +246,7 @@ func (x *Movement) String() string {
 func (*Movement) ProtoMessage() {}
 
 func (x *Movement) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[1]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -177,7 +259,7 @@ func (x *Movement) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Movement.ProtoReflect.Descriptor instead.
 func (*Movement) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{1}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Movement) GetId() string {
@@ -241,7 +323,7 @@ type CreateBoxRequest struct {
 
 func (x *CreateBoxRequest) Reset() {
 	*x = CreateBoxRequest{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[2]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -253,7 +335,7 @@ func (x *CreateBoxRequest) String() string {
 func (*CreateBoxRequest) ProtoMessage() {}
 
 func (x *CreateBoxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[2]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -266,7 +348,7 @@ func (x *CreateBoxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateBoxRequest.ProtoReflect.Descriptor instead.
 func (*CreateBoxRequest) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{2}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateBoxRequest) GetIdempotencyKey() string {
@@ -306,7 +388,7 @@ type CreateBoxResponse struct {
 
 func (x *CreateBoxResponse) Reset() {
 	*x = CreateBoxResponse{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[3]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -318,7 +400,7 @@ func (x *CreateBoxResponse) String() string {
 func (*CreateBoxResponse) ProtoMessage() {}
 
 func (x *CreateBoxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[3]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -331,7 +413,7 @@ func (x *CreateBoxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateBoxResponse.ProtoReflect.Descriptor instead.
 func (*CreateBoxResponse) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{3}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CreateBoxResponse) GetBox() *Box {
@@ -350,7 +432,7 @@ type GetBoxRequest struct {
 
 func (x *GetBoxRequest) Reset() {
 	*x = GetBoxRequest{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[4]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -362,7 +444,7 @@ func (x *GetBoxRequest) String() string {
 func (*GetBoxRequest) ProtoMessage() {}
 
 func (x *GetBoxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[4]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -375,7 +457,7 @@ func (x *GetBoxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBoxRequest.ProtoReflect.Descriptor instead.
 func (*GetBoxRequest) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{4}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetBoxRequest) GetId() string {
@@ -394,7 +476,7 @@ type GetBoxResponse struct {
 
 func (x *GetBoxResponse) Reset() {
 	*x = GetBoxResponse{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[5]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -406,7 +488,7 @@ func (x *GetBoxResponse) String() string {
 func (*GetBoxResponse) ProtoMessage() {}
 
 func (x *GetBoxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[5]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -419,7 +501,7 @@ func (x *GetBoxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetBoxResponse.ProtoReflect.Descriptor instead.
 func (*GetBoxResponse) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{5}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetBoxResponse) GetBox() *Box {
@@ -438,7 +520,7 @@ type ListBoxesRequest struct {
 
 func (x *ListBoxesRequest) Reset() {
 	*x = ListBoxesRequest{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[6]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -450,7 +532,7 @@ func (x *ListBoxesRequest) String() string {
 func (*ListBoxesRequest) ProtoMessage() {}
 
 func (x *ListBoxesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[6]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -463,7 +545,7 @@ func (x *ListBoxesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBoxesRequest.ProtoReflect.Descriptor instead.
 func (*ListBoxesRequest) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{6}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListBoxesRequest) GetAccountId() string {
@@ -482,7 +564,7 @@ type ListBoxesResponse struct {
 
 func (x *ListBoxesResponse) Reset() {
 	*x = ListBoxesResponse{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[7]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -494,7 +576,7 @@ func (x *ListBoxesResponse) String() string {
 func (*ListBoxesResponse) ProtoMessage() {}
 
 func (x *ListBoxesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[7]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -507,7 +589,7 @@ func (x *ListBoxesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBoxesResponse.ProtoReflect.Descriptor instead.
 func (*ListBoxesResponse) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{7}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListBoxesResponse) GetBoxes() []*Box {
@@ -529,7 +611,7 @@ type UpdateBoxRequest struct {
 
 func (x *UpdateBoxRequest) Reset() {
 	*x = UpdateBoxRequest{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[8]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -541,7 +623,7 @@ func (x *UpdateBoxRequest) String() string {
 func (*UpdateBoxRequest) ProtoMessage() {}
 
 func (x *UpdateBoxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[8]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -554,7 +636,7 @@ func (x *UpdateBoxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateBoxRequest.ProtoReflect.Descriptor instead.
 func (*UpdateBoxRequest) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{8}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateBoxRequest) GetId() string {
@@ -587,7 +669,7 @@ type UpdateBoxResponse struct {
 
 func (x *UpdateBoxResponse) Reset() {
 	*x = UpdateBoxResponse{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[9]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -599,7 +681,7 @@ func (x *UpdateBoxResponse) String() string {
 func (*UpdateBoxResponse) ProtoMessage() {}
 
 func (x *UpdateBoxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[9]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -612,7 +694,7 @@ func (x *UpdateBoxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateBoxResponse.ProtoReflect.Descriptor instead.
 func (*UpdateBoxResponse) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{9}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdateBoxResponse) GetBox() *Box {
@@ -632,7 +714,7 @@ type CloseBoxRequest struct {
 
 func (x *CloseBoxRequest) Reset() {
 	*x = CloseBoxRequest{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[10]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -644,7 +726,7 @@ func (x *CloseBoxRequest) String() string {
 func (*CloseBoxRequest) ProtoMessage() {}
 
 func (x *CloseBoxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[10]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -657,7 +739,7 @@ func (x *CloseBoxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseBoxRequest.ProtoReflect.Descriptor instead.
 func (*CloseBoxRequest) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{10}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *CloseBoxRequest) GetId() string {
@@ -683,7 +765,7 @@ type CloseBoxResponse struct {
 
 func (x *CloseBoxResponse) Reset() {
 	*x = CloseBoxResponse{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[11]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -695,7 +777,7 @@ func (x *CloseBoxResponse) String() string {
 func (*CloseBoxResponse) ProtoMessage() {}
 
 func (x *CloseBoxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[11]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -708,7 +790,7 @@ func (x *CloseBoxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CloseBoxResponse.ProtoReflect.Descriptor instead.
 func (*CloseBoxResponse) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{11}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *CloseBoxResponse) GetBox() *Box {
@@ -729,7 +811,7 @@ type DepositRequest struct {
 
 func (x *DepositRequest) Reset() {
 	*x = DepositRequest{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[12]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -741,7 +823,7 @@ func (x *DepositRequest) String() string {
 func (*DepositRequest) ProtoMessage() {}
 
 func (x *DepositRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[12]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -754,7 +836,7 @@ func (x *DepositRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DepositRequest.ProtoReflect.Descriptor instead.
 func (*DepositRequest) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{12}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DepositRequest) GetIdempotencyKey() string {
@@ -788,7 +870,7 @@ type DepositResponse struct {
 
 func (x *DepositResponse) Reset() {
 	*x = DepositResponse{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[13]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -800,7 +882,7 @@ func (x *DepositResponse) String() string {
 func (*DepositResponse) ProtoMessage() {}
 
 func (x *DepositResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[13]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -813,7 +895,7 @@ func (x *DepositResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DepositResponse.ProtoReflect.Descriptor instead.
 func (*DepositResponse) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{13}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *DepositResponse) GetMovement() *Movement {
@@ -841,7 +923,7 @@ type WithdrawRequest struct {
 
 func (x *WithdrawRequest) Reset() {
 	*x = WithdrawRequest{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[14]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -853,7 +935,7 @@ func (x *WithdrawRequest) String() string {
 func (*WithdrawRequest) ProtoMessage() {}
 
 func (x *WithdrawRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[14]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -866,7 +948,7 @@ func (x *WithdrawRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WithdrawRequest.ProtoReflect.Descriptor instead.
 func (*WithdrawRequest) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{14}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *WithdrawRequest) GetIdempotencyKey() string {
@@ -900,7 +982,7 @@ type WithdrawResponse struct {
 
 func (x *WithdrawResponse) Reset() {
 	*x = WithdrawResponse{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[15]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -912,7 +994,7 @@ func (x *WithdrawResponse) String() string {
 func (*WithdrawResponse) ProtoMessage() {}
 
 func (x *WithdrawResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[15]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -925,7 +1007,7 @@ func (x *WithdrawResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WithdrawResponse.ProtoReflect.Descriptor instead.
 func (*WithdrawResponse) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{15}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *WithdrawResponse) GetMovement() *Movement {
@@ -952,7 +1034,7 @@ type ListMovementsRequest struct {
 
 func (x *ListMovementsRequest) Reset() {
 	*x = ListMovementsRequest{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[16]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -964,7 +1046,7 @@ func (x *ListMovementsRequest) String() string {
 func (*ListMovementsRequest) ProtoMessage() {}
 
 func (x *ListMovementsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[16]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -977,7 +1059,7 @@ func (x *ListMovementsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMovementsRequest.ProtoReflect.Descriptor instead.
 func (*ListMovementsRequest) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{16}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *ListMovementsRequest) GetBoxId() string {
@@ -1003,7 +1085,7 @@ type ListMovementsResponse struct {
 
 func (x *ListMovementsResponse) Reset() {
 	*x = ListMovementsResponse{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[17]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1015,7 +1097,7 @@ func (x *ListMovementsResponse) String() string {
 func (*ListMovementsResponse) ProtoMessage() {}
 
 func (x *ListMovementsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[17]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1028,7 +1110,7 @@ func (x *ListMovementsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMovementsResponse.ProtoReflect.Descriptor instead.
 func (*ListMovementsResponse) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{17}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ListMovementsResponse) GetMovements() []*Movement {
@@ -1048,7 +1130,7 @@ type SimulateYieldRequest struct {
 
 func (x *SimulateYieldRequest) Reset() {
 	*x = SimulateYieldRequest{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[18]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1060,7 +1142,7 @@ func (x *SimulateYieldRequest) String() string {
 func (*SimulateYieldRequest) ProtoMessage() {}
 
 func (x *SimulateYieldRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[18]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1073,7 +1155,7 @@ func (x *SimulateYieldRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SimulateYieldRequest.ProtoReflect.Descriptor instead.
 func (*SimulateYieldRequest) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{18}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *SimulateYieldRequest) GetBoxId() string {
@@ -1100,7 +1182,7 @@ type SimulateYieldResponse struct {
 
 func (x *SimulateYieldResponse) Reset() {
 	*x = SimulateYieldResponse{}
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[19]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1112,7 +1194,7 @@ func (x *SimulateYieldResponse) String() string {
 func (*SimulateYieldResponse) ProtoMessage() {}
 
 func (x *SimulateYieldResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_savings_v1_savings_proto_msgTypes[19]
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1125,7 +1207,7 @@ func (x *SimulateYieldResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SimulateYieldResponse.ProtoReflect.Descriptor instead.
 func (*SimulateYieldResponse) Descriptor() ([]byte, []int) {
-	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{19}
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *SimulateYieldResponse) GetMovement() *Movement {
@@ -1142,11 +1224,212 @@ func (x *SimulateYieldResponse) GetBox() *Box {
 	return nil
 }
 
+type SetScheduleRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	BoxId string                 `protobuf:"bytes,1,opt,name=box_id,json=boxId,proto3" json:"box_id,omitempty"`
+	// Zero removes the schedule.
+	Amount        *v1.Money `protobuf:"bytes,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	Day           int32     `protobuf:"varint,3,opt,name=day,proto3" json:"day,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetScheduleRequest) Reset() {
+	*x = SetScheduleRequest{}
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetScheduleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetScheduleRequest) ProtoMessage() {}
+
+func (x *SetScheduleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetScheduleRequest.ProtoReflect.Descriptor instead.
+func (*SetScheduleRequest) Descriptor() ([]byte, []int) {
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *SetScheduleRequest) GetBoxId() string {
+	if x != nil {
+		return x.BoxId
+	}
+	return ""
+}
+
+func (x *SetScheduleRequest) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *SetScheduleRequest) GetDay() int32 {
+	if x != nil {
+		return x.Day
+	}
+	return 0
+}
+
+type SetScheduleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Box           *Box                   `protobuf:"bytes,1,opt,name=box,proto3" json:"box,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetScheduleResponse) Reset() {
+	*x = SetScheduleResponse{}
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetScheduleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetScheduleResponse) ProtoMessage() {}
+
+func (x *SetScheduleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetScheduleResponse.ProtoReflect.Descriptor instead.
+func (*SetScheduleResponse) Descriptor() ([]byte, []int) {
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *SetScheduleResponse) GetBox() *Box {
+	if x != nil {
+		return x.Box
+	}
+	return nil
+}
+
+type RunScheduleRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	BoxId         string                 `protobuf:"bytes,1,opt,name=box_id,json=boxId,proto3" json:"box_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunScheduleRequest) Reset() {
+	*x = RunScheduleRequest{}
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunScheduleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunScheduleRequest) ProtoMessage() {}
+
+func (x *RunScheduleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunScheduleRequest.ProtoReflect.Descriptor instead.
+func (*RunScheduleRequest) Descriptor() ([]byte, []int) {
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *RunScheduleRequest) GetBoxId() string {
+	if x != nil {
+		return x.BoxId
+	}
+	return ""
+}
+
+type RunScheduleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Movement      *Movement              `protobuf:"bytes,1,opt,name=movement,proto3" json:"movement,omitempty"`
+	Box           *Box                   `protobuf:"bytes,2,opt,name=box,proto3" json:"box,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunScheduleResponse) Reset() {
+	*x = RunScheduleResponse{}
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunScheduleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunScheduleResponse) ProtoMessage() {}
+
+func (x *RunScheduleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunScheduleResponse.ProtoReflect.Descriptor instead.
+func (*RunScheduleResponse) Descriptor() ([]byte, []int) {
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *RunScheduleResponse) GetMovement() *Movement {
+	if x != nil {
+		return x.Movement
+	}
+	return nil
+}
+
+func (x *RunScheduleResponse) GetBox() *Box {
+	if x != nil {
+		return x.Box
+	}
+	return nil
+}
+
 var File_bank_savings_v1_savings_proto protoreflect.FileDescriptor
 
 const file_bank_savings_v1_savings_proto_rawDesc = "" +
 	"\n" +
-	"\x1dbank/savings/v1/savings.proto\x12\x0fbank.savings.v1\x1a\x1abank/common/v1/money.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xce\x02\n" +
+	"\x1dbank/savings/v1/savings.proto\x12\x0fbank.savings.v1\x1a\x1abank/common/v1/money.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x85\x03\n" +
 	"\x03Box\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1158,7 +1441,14 @@ const file_bank_savings_v1_savings_proto_rawDesc = "" +
 	"\x06status\x18\a \x01(\tR\x06status\x129\n" +
 	"\n" +
 	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12$\n" +
-	"\x0eannual_rate_bp\x18\t \x01(\x05R\fannualRateBp\"\xee\x01\n" +
+	"\x0eannual_rate_bp\x18\t \x01(\x05R\fannualRateBp\x125\n" +
+	"\bschedule\x18\n" +
+	" \x01(\v2\x19.bank.savings.v1.ScheduleR\bschedule\"\x89\x01\n" +
+	"\bSchedule\x12-\n" +
+	"\x06amount\x18\x01 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12\x10\n" +
+	"\x03day\x18\x02 \x01(\x05R\x03day\x12\x19\n" +
+	"\bnext_run\x18\x03 \x01(\tR\anextRun\x12!\n" +
+	"\flast_failure\x18\x04 \x01(\tR\vlastFailure\"\xee\x01\n" +
 	"\bMovement\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x15\n" +
 	"\x06box_id\x18\x02 \x01(\tR\x05boxId\x12\x12\n" +
@@ -1220,7 +1510,18 @@ const file_bank_savings_v1_savings_proto_rawDesc = "" +
 	"\x04days\x18\x02 \x01(\x05R\x04days\"v\n" +
 	"\x15SimulateYieldResponse\x125\n" +
 	"\bmovement\x18\x01 \x01(\v2\x19.bank.savings.v1.MovementR\bmovement\x12&\n" +
-	"\x03box\x18\x02 \x01(\v2\x14.bank.savings.v1.BoxR\x03box2\x87\x06\n" +
+	"\x03box\x18\x02 \x01(\v2\x14.bank.savings.v1.BoxR\x03box\"l\n" +
+	"\x12SetScheduleRequest\x12\x15\n" +
+	"\x06box_id\x18\x01 \x01(\tR\x05boxId\x12-\n" +
+	"\x06amount\x18\x02 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12\x10\n" +
+	"\x03day\x18\x03 \x01(\x05R\x03day\"=\n" +
+	"\x13SetScheduleResponse\x12&\n" +
+	"\x03box\x18\x01 \x01(\v2\x14.bank.savings.v1.BoxR\x03box\"+\n" +
+	"\x12RunScheduleRequest\x12\x15\n" +
+	"\x06box_id\x18\x01 \x01(\tR\x05boxId\"t\n" +
+	"\x13RunScheduleResponse\x125\n" +
+	"\bmovement\x18\x01 \x01(\v2\x19.bank.savings.v1.MovementR\bmovement\x12&\n" +
+	"\x03box\x18\x02 \x01(\v2\x14.bank.savings.v1.BoxR\x03box2\xbb\a\n" +
 	"\x0eSavingsService\x12R\n" +
 	"\tCreateBox\x12!.bank.savings.v1.CreateBoxRequest\x1a\".bank.savings.v1.CreateBoxResponse\x12I\n" +
 	"\x06GetBox\x12\x1e.bank.savings.v1.GetBoxRequest\x1a\x1f.bank.savings.v1.GetBoxResponse\x12R\n" +
@@ -1229,7 +1530,9 @@ const file_bank_savings_v1_savings_proto_rawDesc = "" +
 	"\bCloseBox\x12 .bank.savings.v1.CloseBoxRequest\x1a!.bank.savings.v1.CloseBoxResponse\x12L\n" +
 	"\aDeposit\x12\x1f.bank.savings.v1.DepositRequest\x1a .bank.savings.v1.DepositResponse\x12O\n" +
 	"\bWithdraw\x12 .bank.savings.v1.WithdrawRequest\x1a!.bank.savings.v1.WithdrawResponse\x12^\n" +
-	"\rListMovements\x12%.bank.savings.v1.ListMovementsRequest\x1a&.bank.savings.v1.ListMovementsResponse\x12^\n" +
+	"\rListMovements\x12%.bank.savings.v1.ListMovementsRequest\x1a&.bank.savings.v1.ListMovementsResponse\x12X\n" +
+	"\vSetSchedule\x12#.bank.savings.v1.SetScheduleRequest\x1a$.bank.savings.v1.SetScheduleResponse\x12X\n" +
+	"\vRunSchedule\x12#.bank.savings.v1.RunScheduleRequest\x1a$.bank.savings.v1.RunScheduleResponse\x12^\n" +
 	"\rSimulateYield\x12%.bank.savings.v1.SimulateYieldRequest\x1a&.bank.savings.v1.SimulateYieldResponseB\xe0\x01\n" +
 	"\x13com.bank.savings.v1B\fSavingsProtoP\x01Z]github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/savings/v1;savingsv1\xa2\x02\x03BSX\xaa\x02\x0fBank.Savings.V1\xca\x02\x0fBank\\Savings\\V1\xe2\x02\x1bBank\\Savings\\V1\\GPBMetadata\xea\x02\x11Bank::Savings::V1b\x06proto3"
 
@@ -1245,77 +1548,92 @@ func file_bank_savings_v1_savings_proto_rawDescGZIP() []byte {
 	return file_bank_savings_v1_savings_proto_rawDescData
 }
 
-var file_bank_savings_v1_savings_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
+var file_bank_savings_v1_savings_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_bank_savings_v1_savings_proto_goTypes = []any{
 	(*Box)(nil),                   // 0: bank.savings.v1.Box
-	(*Movement)(nil),              // 1: bank.savings.v1.Movement
-	(*CreateBoxRequest)(nil),      // 2: bank.savings.v1.CreateBoxRequest
-	(*CreateBoxResponse)(nil),     // 3: bank.savings.v1.CreateBoxResponse
-	(*GetBoxRequest)(nil),         // 4: bank.savings.v1.GetBoxRequest
-	(*GetBoxResponse)(nil),        // 5: bank.savings.v1.GetBoxResponse
-	(*ListBoxesRequest)(nil),      // 6: bank.savings.v1.ListBoxesRequest
-	(*ListBoxesResponse)(nil),     // 7: bank.savings.v1.ListBoxesResponse
-	(*UpdateBoxRequest)(nil),      // 8: bank.savings.v1.UpdateBoxRequest
-	(*UpdateBoxResponse)(nil),     // 9: bank.savings.v1.UpdateBoxResponse
-	(*CloseBoxRequest)(nil),       // 10: bank.savings.v1.CloseBoxRequest
-	(*CloseBoxResponse)(nil),      // 11: bank.savings.v1.CloseBoxResponse
-	(*DepositRequest)(nil),        // 12: bank.savings.v1.DepositRequest
-	(*DepositResponse)(nil),       // 13: bank.savings.v1.DepositResponse
-	(*WithdrawRequest)(nil),       // 14: bank.savings.v1.WithdrawRequest
-	(*WithdrawResponse)(nil),      // 15: bank.savings.v1.WithdrawResponse
-	(*ListMovementsRequest)(nil),  // 16: bank.savings.v1.ListMovementsRequest
-	(*ListMovementsResponse)(nil), // 17: bank.savings.v1.ListMovementsResponse
-	(*SimulateYieldRequest)(nil),  // 18: bank.savings.v1.SimulateYieldRequest
-	(*SimulateYieldResponse)(nil), // 19: bank.savings.v1.SimulateYieldResponse
-	(*v1.Money)(nil),              // 20: bank.common.v1.Money
-	(*timestamppb.Timestamp)(nil), // 21: google.protobuf.Timestamp
+	(*Schedule)(nil),              // 1: bank.savings.v1.Schedule
+	(*Movement)(nil),              // 2: bank.savings.v1.Movement
+	(*CreateBoxRequest)(nil),      // 3: bank.savings.v1.CreateBoxRequest
+	(*CreateBoxResponse)(nil),     // 4: bank.savings.v1.CreateBoxResponse
+	(*GetBoxRequest)(nil),         // 5: bank.savings.v1.GetBoxRequest
+	(*GetBoxResponse)(nil),        // 6: bank.savings.v1.GetBoxResponse
+	(*ListBoxesRequest)(nil),      // 7: bank.savings.v1.ListBoxesRequest
+	(*ListBoxesResponse)(nil),     // 8: bank.savings.v1.ListBoxesResponse
+	(*UpdateBoxRequest)(nil),      // 9: bank.savings.v1.UpdateBoxRequest
+	(*UpdateBoxResponse)(nil),     // 10: bank.savings.v1.UpdateBoxResponse
+	(*CloseBoxRequest)(nil),       // 11: bank.savings.v1.CloseBoxRequest
+	(*CloseBoxResponse)(nil),      // 12: bank.savings.v1.CloseBoxResponse
+	(*DepositRequest)(nil),        // 13: bank.savings.v1.DepositRequest
+	(*DepositResponse)(nil),       // 14: bank.savings.v1.DepositResponse
+	(*WithdrawRequest)(nil),       // 15: bank.savings.v1.WithdrawRequest
+	(*WithdrawResponse)(nil),      // 16: bank.savings.v1.WithdrawResponse
+	(*ListMovementsRequest)(nil),  // 17: bank.savings.v1.ListMovementsRequest
+	(*ListMovementsResponse)(nil), // 18: bank.savings.v1.ListMovementsResponse
+	(*SimulateYieldRequest)(nil),  // 19: bank.savings.v1.SimulateYieldRequest
+	(*SimulateYieldResponse)(nil), // 20: bank.savings.v1.SimulateYieldResponse
+	(*SetScheduleRequest)(nil),    // 21: bank.savings.v1.SetScheduleRequest
+	(*SetScheduleResponse)(nil),   // 22: bank.savings.v1.SetScheduleResponse
+	(*RunScheduleRequest)(nil),    // 23: bank.savings.v1.RunScheduleRequest
+	(*RunScheduleResponse)(nil),   // 24: bank.savings.v1.RunScheduleResponse
+	(*v1.Money)(nil),              // 25: bank.common.v1.Money
+	(*timestamppb.Timestamp)(nil), // 26: google.protobuf.Timestamp
 }
 var file_bank_savings_v1_savings_proto_depIdxs = []int32{
-	20, // 0: bank.savings.v1.Box.goal:type_name -> bank.common.v1.Money
-	20, // 1: bank.savings.v1.Box.balance:type_name -> bank.common.v1.Money
-	20, // 2: bank.savings.v1.Box.yielded:type_name -> bank.common.v1.Money
-	21, // 3: bank.savings.v1.Box.created_at:type_name -> google.protobuf.Timestamp
-	20, // 4: bank.savings.v1.Movement.amount:type_name -> bank.common.v1.Money
-	21, // 5: bank.savings.v1.Movement.created_at:type_name -> google.protobuf.Timestamp
-	20, // 6: bank.savings.v1.CreateBoxRequest.goal:type_name -> bank.common.v1.Money
-	0,  // 7: bank.savings.v1.CreateBoxResponse.box:type_name -> bank.savings.v1.Box
-	0,  // 8: bank.savings.v1.GetBoxResponse.box:type_name -> bank.savings.v1.Box
-	0,  // 9: bank.savings.v1.ListBoxesResponse.boxes:type_name -> bank.savings.v1.Box
-	20, // 10: bank.savings.v1.UpdateBoxRequest.goal:type_name -> bank.common.v1.Money
-	0,  // 11: bank.savings.v1.UpdateBoxResponse.box:type_name -> bank.savings.v1.Box
-	0,  // 12: bank.savings.v1.CloseBoxResponse.box:type_name -> bank.savings.v1.Box
-	20, // 13: bank.savings.v1.DepositRequest.amount:type_name -> bank.common.v1.Money
-	1,  // 14: bank.savings.v1.DepositResponse.movement:type_name -> bank.savings.v1.Movement
-	0,  // 15: bank.savings.v1.DepositResponse.box:type_name -> bank.savings.v1.Box
-	20, // 16: bank.savings.v1.WithdrawRequest.amount:type_name -> bank.common.v1.Money
-	1,  // 17: bank.savings.v1.WithdrawResponse.movement:type_name -> bank.savings.v1.Movement
-	0,  // 18: bank.savings.v1.WithdrawResponse.box:type_name -> bank.savings.v1.Box
-	1,  // 19: bank.savings.v1.ListMovementsResponse.movements:type_name -> bank.savings.v1.Movement
-	1,  // 20: bank.savings.v1.SimulateYieldResponse.movement:type_name -> bank.savings.v1.Movement
-	0,  // 21: bank.savings.v1.SimulateYieldResponse.box:type_name -> bank.savings.v1.Box
-	2,  // 22: bank.savings.v1.SavingsService.CreateBox:input_type -> bank.savings.v1.CreateBoxRequest
-	4,  // 23: bank.savings.v1.SavingsService.GetBox:input_type -> bank.savings.v1.GetBoxRequest
-	6,  // 24: bank.savings.v1.SavingsService.ListBoxes:input_type -> bank.savings.v1.ListBoxesRequest
-	8,  // 25: bank.savings.v1.SavingsService.UpdateBox:input_type -> bank.savings.v1.UpdateBoxRequest
-	10, // 26: bank.savings.v1.SavingsService.CloseBox:input_type -> bank.savings.v1.CloseBoxRequest
-	12, // 27: bank.savings.v1.SavingsService.Deposit:input_type -> bank.savings.v1.DepositRequest
-	14, // 28: bank.savings.v1.SavingsService.Withdraw:input_type -> bank.savings.v1.WithdrawRequest
-	16, // 29: bank.savings.v1.SavingsService.ListMovements:input_type -> bank.savings.v1.ListMovementsRequest
-	18, // 30: bank.savings.v1.SavingsService.SimulateYield:input_type -> bank.savings.v1.SimulateYieldRequest
-	3,  // 31: bank.savings.v1.SavingsService.CreateBox:output_type -> bank.savings.v1.CreateBoxResponse
-	5,  // 32: bank.savings.v1.SavingsService.GetBox:output_type -> bank.savings.v1.GetBoxResponse
-	7,  // 33: bank.savings.v1.SavingsService.ListBoxes:output_type -> bank.savings.v1.ListBoxesResponse
-	9,  // 34: bank.savings.v1.SavingsService.UpdateBox:output_type -> bank.savings.v1.UpdateBoxResponse
-	11, // 35: bank.savings.v1.SavingsService.CloseBox:output_type -> bank.savings.v1.CloseBoxResponse
-	13, // 36: bank.savings.v1.SavingsService.Deposit:output_type -> bank.savings.v1.DepositResponse
-	15, // 37: bank.savings.v1.SavingsService.Withdraw:output_type -> bank.savings.v1.WithdrawResponse
-	17, // 38: bank.savings.v1.SavingsService.ListMovements:output_type -> bank.savings.v1.ListMovementsResponse
-	19, // 39: bank.savings.v1.SavingsService.SimulateYield:output_type -> bank.savings.v1.SimulateYieldResponse
-	31, // [31:40] is the sub-list for method output_type
-	22, // [22:31] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	25, // 0: bank.savings.v1.Box.goal:type_name -> bank.common.v1.Money
+	25, // 1: bank.savings.v1.Box.balance:type_name -> bank.common.v1.Money
+	25, // 2: bank.savings.v1.Box.yielded:type_name -> bank.common.v1.Money
+	26, // 3: bank.savings.v1.Box.created_at:type_name -> google.protobuf.Timestamp
+	1,  // 4: bank.savings.v1.Box.schedule:type_name -> bank.savings.v1.Schedule
+	25, // 5: bank.savings.v1.Schedule.amount:type_name -> bank.common.v1.Money
+	25, // 6: bank.savings.v1.Movement.amount:type_name -> bank.common.v1.Money
+	26, // 7: bank.savings.v1.Movement.created_at:type_name -> google.protobuf.Timestamp
+	25, // 8: bank.savings.v1.CreateBoxRequest.goal:type_name -> bank.common.v1.Money
+	0,  // 9: bank.savings.v1.CreateBoxResponse.box:type_name -> bank.savings.v1.Box
+	0,  // 10: bank.savings.v1.GetBoxResponse.box:type_name -> bank.savings.v1.Box
+	0,  // 11: bank.savings.v1.ListBoxesResponse.boxes:type_name -> bank.savings.v1.Box
+	25, // 12: bank.savings.v1.UpdateBoxRequest.goal:type_name -> bank.common.v1.Money
+	0,  // 13: bank.savings.v1.UpdateBoxResponse.box:type_name -> bank.savings.v1.Box
+	0,  // 14: bank.savings.v1.CloseBoxResponse.box:type_name -> bank.savings.v1.Box
+	25, // 15: bank.savings.v1.DepositRequest.amount:type_name -> bank.common.v1.Money
+	2,  // 16: bank.savings.v1.DepositResponse.movement:type_name -> bank.savings.v1.Movement
+	0,  // 17: bank.savings.v1.DepositResponse.box:type_name -> bank.savings.v1.Box
+	25, // 18: bank.savings.v1.WithdrawRequest.amount:type_name -> bank.common.v1.Money
+	2,  // 19: bank.savings.v1.WithdrawResponse.movement:type_name -> bank.savings.v1.Movement
+	0,  // 20: bank.savings.v1.WithdrawResponse.box:type_name -> bank.savings.v1.Box
+	2,  // 21: bank.savings.v1.ListMovementsResponse.movements:type_name -> bank.savings.v1.Movement
+	2,  // 22: bank.savings.v1.SimulateYieldResponse.movement:type_name -> bank.savings.v1.Movement
+	0,  // 23: bank.savings.v1.SimulateYieldResponse.box:type_name -> bank.savings.v1.Box
+	25, // 24: bank.savings.v1.SetScheduleRequest.amount:type_name -> bank.common.v1.Money
+	0,  // 25: bank.savings.v1.SetScheduleResponse.box:type_name -> bank.savings.v1.Box
+	2,  // 26: bank.savings.v1.RunScheduleResponse.movement:type_name -> bank.savings.v1.Movement
+	0,  // 27: bank.savings.v1.RunScheduleResponse.box:type_name -> bank.savings.v1.Box
+	3,  // 28: bank.savings.v1.SavingsService.CreateBox:input_type -> bank.savings.v1.CreateBoxRequest
+	5,  // 29: bank.savings.v1.SavingsService.GetBox:input_type -> bank.savings.v1.GetBoxRequest
+	7,  // 30: bank.savings.v1.SavingsService.ListBoxes:input_type -> bank.savings.v1.ListBoxesRequest
+	9,  // 31: bank.savings.v1.SavingsService.UpdateBox:input_type -> bank.savings.v1.UpdateBoxRequest
+	11, // 32: bank.savings.v1.SavingsService.CloseBox:input_type -> bank.savings.v1.CloseBoxRequest
+	13, // 33: bank.savings.v1.SavingsService.Deposit:input_type -> bank.savings.v1.DepositRequest
+	15, // 34: bank.savings.v1.SavingsService.Withdraw:input_type -> bank.savings.v1.WithdrawRequest
+	17, // 35: bank.savings.v1.SavingsService.ListMovements:input_type -> bank.savings.v1.ListMovementsRequest
+	21, // 36: bank.savings.v1.SavingsService.SetSchedule:input_type -> bank.savings.v1.SetScheduleRequest
+	23, // 37: bank.savings.v1.SavingsService.RunSchedule:input_type -> bank.savings.v1.RunScheduleRequest
+	19, // 38: bank.savings.v1.SavingsService.SimulateYield:input_type -> bank.savings.v1.SimulateYieldRequest
+	4,  // 39: bank.savings.v1.SavingsService.CreateBox:output_type -> bank.savings.v1.CreateBoxResponse
+	6,  // 40: bank.savings.v1.SavingsService.GetBox:output_type -> bank.savings.v1.GetBoxResponse
+	8,  // 41: bank.savings.v1.SavingsService.ListBoxes:output_type -> bank.savings.v1.ListBoxesResponse
+	10, // 42: bank.savings.v1.SavingsService.UpdateBox:output_type -> bank.savings.v1.UpdateBoxResponse
+	12, // 43: bank.savings.v1.SavingsService.CloseBox:output_type -> bank.savings.v1.CloseBoxResponse
+	14, // 44: bank.savings.v1.SavingsService.Deposit:output_type -> bank.savings.v1.DepositResponse
+	16, // 45: bank.savings.v1.SavingsService.Withdraw:output_type -> bank.savings.v1.WithdrawResponse
+	18, // 46: bank.savings.v1.SavingsService.ListMovements:output_type -> bank.savings.v1.ListMovementsResponse
+	22, // 47: bank.savings.v1.SavingsService.SetSchedule:output_type -> bank.savings.v1.SetScheduleResponse
+	24, // 48: bank.savings.v1.SavingsService.RunSchedule:output_type -> bank.savings.v1.RunScheduleResponse
+	20, // 49: bank.savings.v1.SavingsService.SimulateYield:output_type -> bank.savings.v1.SimulateYieldResponse
+	39, // [39:50] is the sub-list for method output_type
+	28, // [28:39] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_bank_savings_v1_savings_proto_init() }
@@ -1329,7 +1647,7 @@ func file_bank_savings_v1_savings_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_savings_v1_savings_proto_rawDesc), len(file_bank_savings_v1_savings_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   20,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

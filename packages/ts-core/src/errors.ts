@@ -48,6 +48,7 @@ const messages: Record<string, string> = {
   CARD_COMPROMISED: 'Este cartão foi bloqueado por segurança. Peça um novo.',
   TOO_MANY_BOXES: 'Você chegou ao máximo de 20 caixinhas.',
   BOX_CLOSED: 'Esta caixinha foi encerrada.',
+  NO_SCHEDULE: 'Esta caixinha não tem depósito programado.',
   NOTHING_TO_YIELD: 'Guarde algum valor na caixinha primeiro.',
   RECEIPT_NOT_FOUND: 'Este código não corresponde a um comprovante do Digital Bank.',
   TOO_MANY_TEMPORARY_CARDS: 'Você pode ter até 3 cartões temporários ao mesmo tempo.',

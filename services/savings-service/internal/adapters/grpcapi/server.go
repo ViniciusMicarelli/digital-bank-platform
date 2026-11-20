@@ -4,6 +4,7 @@ package grpcapi
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
@@ -26,7 +27,12 @@ func NewServer(app *application.Service) *Server { return &Server{app: app} }
 func brl(minor int64) *commonv1.Money { return &commonv1.Money{MinorUnits: minor, Currency: "BRL"} }
 
 func (s *Server) boxPB(v application.View) *savingsv1.Box {
-	return &savingsv1.Box{Id: v.ID.String(), AccountId: v.AccountID.String(), Name: v.Name, Goal: brl(v.Goal),
+	var sched *savingsv1.Schedule
+	if v.Schedule.Active() {
+		sched = &savingsv1.Schedule{Amount: brl(v.Schedule.Amount), Day: int32(v.Schedule.Day), //nolint:gosec // 1..28
+			NextRun: v.Schedule.Next.Format(time.DateOnly), LastFailure: v.Schedule.LastFailure}
+	}
+	return &savingsv1.Box{Schedule: sched, Id: v.ID.String(), AccountId: v.AccountID.String(), Name: v.Name, Goal: brl(v.Goal),
 		Balance: brl(v.Balance), Yielded: brl(v.Yielded), Status: string(v.Status), CreatedAt: timestamppb.New(v.CreatedAt),
 		AnnualRateBp: int32(s.app.AnnualRateBP())} //nolint:gosec // basis points
 }
@@ -203,4 +209,32 @@ func (s *Server) SimulateYield(ctx context.Context, req *savingsv1.SimulateYield
 		return nil, toStatus(err)
 	}
 	return &savingsv1.SimulateYieldResponse{Movement: movementPB(m), Box: s.boxPB(v)}, nil
+}
+
+func (s *Server) SetSchedule(ctx context.Context, req *savingsv1.SetScheduleRequest) (*savingsv1.SetScheduleResponse, error) {
+	id, err := parseID(req.GetBoxId())
+	if err != nil {
+		return nil, err
+	}
+	amt, err := amount(req.GetAmount(), true)
+	if err != nil {
+		return nil, err
+	}
+	v, err := s.app.SetSchedule(ctx, id, amt, int(req.GetDay()))
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &savingsv1.SetScheduleResponse{Box: s.boxPB(v)}, nil
+}
+
+func (s *Server) RunSchedule(ctx context.Context, req *savingsv1.RunScheduleRequest) (*savingsv1.RunScheduleResponse, error) {
+	id, err := parseID(req.GetBoxId())
+	if err != nil {
+		return nil, err
+	}
+	m, v, err := s.app.RunSchedule(ctx, id)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &savingsv1.RunScheduleResponse{Movement: movementPB(m), Box: s.boxPB(v)}, nil
 }

@@ -89,7 +89,9 @@
 | `GET` · `POST` | `/v1/accounts/{id}/savings` | Savings boxes with `total` and `yielded` / open one `{name, goal?}` (Idempotency-Key) → 201 (`TOO_MANY_BOXES`) |
 | `GET` · `PUT` · `DELETE` | `/v1/accounts/{id}/savings/{boxID}` | A box with its `movements` / rename and set the goal `{name, goal?}` / close it, everything back to the account (Idempotency-Key) |
 | `POST` | `/v1/accounts/{id}/savings/{boxID}/deposits` · `/withdrawals` | `{amount}` (Idempotency-Key); 422 `INSUFFICIENT_FUNDS` with the movement when there is not enough |
+| `PUT` · `DELETE` | `/v1/accounts/{id}/savings/{boxID}/schedule` | Monthly deposit `{amount, day}` (day 1–28; the box then has `schedule {amount, day, next_run, last_failure}`) / remove it |
 | `POST` | `/v1/sandbox/accounts/{id}/savings/{boxID}/yield` | *(sandbox)* Pay `{days}` of yield at once |
+| `POST` | `/v1/sandbox/accounts/{id}/savings/{boxID}/schedule/run` | *(sandbox)* Make the next monthly deposit now; 422 `INSUFFICIENT_FUNDS` / `NO_SCHEDULE` |
 | `POST` | `/v1/sandbox/card-network/authorizations` | *(sandbox)* Network authorization `{pan, expiry_month, expiry_year, cvv, amount, merchant_name, mcc, country, channel, function?}` (`function`: `DEBIT` default, or `CREDIT`; `installments`: 2 to 12 on credit) |
 | `POST` | `/v1/sandbox/card-network/authorizations/{id}/clear` · `/reverse` | *(sandbox)* Clearing `{amount?}` / merchant reversal |
 | `POST` | `/v1/sandbox/card-network/authorizations/{id}/refund` | *(sandbox)* Merchant refund `{amount, refund_reference?}` of a cleared purchase (`REFUND_TOO_LARGE`) |

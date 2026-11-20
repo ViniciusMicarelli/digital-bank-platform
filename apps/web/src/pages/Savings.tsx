@@ -1,12 +1,12 @@
 import { errorMessage, formatBRL, type SavingsBox, type SavingsMovement, type SavingsSummary } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDownLeft, ArrowUpRight, Pencil, PiggyBank, Plus, Sparkles, Target, TrendingUp, X } from 'lucide-react'
+import { ArrowDownLeft, ArrowUpRight, CalendarClock, Pencil, PiggyBank, Plus, Sparkles, Target, TrendingUp, X } from 'lucide-react'
 import { useState } from 'react'
 import { useAccount } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
-import { Alert, Button, Empty, Field, IconTile, Loading, Modal, PageTitle, Panel, Sandbox, Stat, Tabs } from '../components/ui'
+import { Alert, Button, Empty, Field, IconTile, Loading, Modal, PageTitle, Panel, Sandbox, Select, Stat, Tabs } from '../components/ui'
 import { api } from '../lib/api'
-import { cx, dateTimeBR } from '../lib/format'
+import { cx, dateBR, dateTimeBR } from '../lib/format'
 
 const rate = (bp?: number) => (bp ? `${(bp / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%` : '')
 const movementLabel = { DEPOSIT: 'Guardado', WITHDRAWAL: 'Resgate', YIELD: 'Rendimento' } as const
@@ -39,6 +39,64 @@ function BoxForm({ base, box, onDone }: { base: string; box?: SavingsBox; onDone
   )
 }
 
+const days = Array.from({ length: 28 }, (_, i) => i + 1)
+
+/** The monthly deposit: set, change or remove it. */
+function SchedulePanel({ base, box, onChange }: { base: string; box: SavingsBox; onChange: () => void }) {
+  const sc = box.schedule
+  const [editing, setEditing] = useState(false)
+  const [amount, setAmount] = useState<string | null>(null)
+  const [day, setDay] = useState(sc?.day ?? 5)
+  const [error, setError] = useState('')
+  const save = useMutation({
+    mutationFn: () => api<SavingsBox>('PUT', `${base}/${box.id}/schedule`, { body: { amount, day } }),
+    onSuccess: () => { setEditing(false); setError(''); onChange() },
+    onError: (e) => setError(errorMessage(e)),
+  })
+  const remove = useMutation({
+    mutationFn: () => api<SavingsBox>('DELETE', `${base}/${box.id}/schedule`),
+    onSuccess: () => { setEditing(false); onChange() },
+    onError: (e) => setError(errorMessage(e)),
+  })
+  return (
+    <Panel title="Depósito programado" icon={CalendarClock}
+      action={sc && !editing && <Button variant="ghost" size="sm" icon={Pencil} onClick={() => setEditing(true)}>Alterar</Button>}>
+      {sc && !editing ? (
+        <div className="space-y-3">
+          <p className="text-sm text-fg-2">
+            <span className="tabular font-semibold text-fg">{formatBRL(sc.amount)}</span> todo dia {sc.day}, da conta para a caixinha.
+          </p>
+          <p className="text-xs text-muted">Próximo depósito em {dateBR(sc.next_run)}.</p>
+          {sc.last_failure && (
+            <Alert tone="amber">
+              O último depósito não foi feito{sc.last_failure === 'INSUFFICIENT_FUNDS' ? ': faltou saldo na conta' : ''}. O próximo segue programado.
+            </Alert>
+          )}
+        </div>
+      ) : !editing ? (
+        <div className="space-y-3">
+          <p className="text-sm text-fg-2">Guarde todo mês sem precisar lembrar: escolha o valor e o dia.</p>
+          <Button variant="secondary" icon={CalendarClock} onClick={() => setEditing(true)}>Programar depósito mensal</Button>
+        </div>
+      ) : (
+        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate() }}>
+          <MoneyField label="Quanto por mês" onValue={setAmount} />
+          <Select label="Todo dia" value={day} onChange={(e) => setDay(Number(e.target.value))}>
+            {days.map((d) => <option key={d} value={d}>{d}</option>)}
+          </Select>
+          <p className="text-xs text-muted">O primeiro depósito é no próximo dia {day}. Se faltar saldo nesse dia, o mês é pulado.</p>
+          <Alert>{error}</Alert>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" loading={save.isPending} disabled={!amount}>{sc ? 'Salvar' : 'Programar'}</Button>
+            <Button type="button" variant="ghost" onClick={() => { setEditing(false); setError('') }}>Cancelar</Button>
+            {sc && <Button type="button" variant="ghost" loading={remove.isPending} onClick={() => remove.mutate()}>Remover</Button>}
+          </div>
+        </form>
+      )}
+    </Panel>
+  )
+}
+
 function BoxCard({ box, selected, onSelect }: { box: SavingsBox; selected: boolean; onSelect: () => void }) {
   const pct = progress(box)
   return (
@@ -52,6 +110,11 @@ function BoxCard({ box, selected, onSelect }: { box: SavingsBox; selected: boole
         </div>
       </div>
       <p className="tabular mt-4 text-[26px] font-bold tracking-tight text-fg">{formatBRL(box.balance)}</p>
+      {box.schedule && (
+        <p className="mt-1 flex items-center gap-1 text-xs text-muted">
+          <CalendarClock className="size-3.5" /> {formatBRL(box.schedule.amount)} todo dia {box.schedule.day}
+        </p>
+      )}
       {pct !== null && (
         <>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
@@ -86,6 +149,11 @@ function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId:
     onSuccess: () => { refresh(); onClosed() },
     onError: (e) => setMessage({ tone: 'red', text: errorMessage(e) }),
   })
+  const runSchedule = useMutation({
+    mutationFn: () => api('POST', `/v1/sandbox/accounts/${accountId}/savings/${id}/schedule/run`),
+    onSuccess: refresh,
+    onError: (e) => { setMessage({ tone: 'red', text: errorMessage(e) }); refresh() },
+  })
   const simulate = useMutation({
     mutationFn: () => api('POST', `/v1/sandbox/accounts/${accountId}/savings/${id}/yield`, { body: { days: 30 } }),
     onSuccess: refresh,
@@ -112,6 +180,7 @@ function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId:
           {message && <Alert tone={message.tone}>{message.text}</Alert>}
         </form>
       </Panel>
+      <SchedulePanel base={base} box={b} onChange={refresh} />
       <Panel title="Histórico" icon={Target}>
         {!b.movements?.length ? <Empty icon={PiggyBank}>Nada guardado ainda.</Empty> : (
           <ul className="-my-2 divide-y divide-line">
@@ -131,7 +200,14 @@ function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId:
       </Panel>
       <Sandbox>
         <p className="mb-3 text-sm text-fg-2">Veja quanto a caixinha renderia em 30 dias, no saldo de hoje.</p>
-        <Button variant="secondary" icon={Sparkles} loading={simulate.isPending} onClick={() => simulate.mutate()}>Simular 30 dias de rendimento</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" icon={Sparkles} loading={simulate.isPending} onClick={() => simulate.mutate()}>Simular 30 dias de rendimento</Button>
+          {b.schedule && (
+            <Button variant="secondary" icon={CalendarClock} loading={runSchedule.isPending} onClick={() => { setMessage(null); runSchedule.mutate() }}>
+              Fazer o depósito programado agora
+            </Button>
+          )}
+        </div>
       </Sandbox>
       <Button variant="ghost" icon={X} onClick={() => setClosing(true)}>Encerrar caixinha</Button>
       <Modal open={editing} onClose={() => setEditing(false)} title="Editar caixinha">

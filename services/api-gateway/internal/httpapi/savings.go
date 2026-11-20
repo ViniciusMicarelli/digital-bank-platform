@@ -19,6 +19,10 @@ func boxJSON(b *savingsv1.Box) map[string]any {
 	if b.GetGoal().GetMinorUnits() > 0 {
 		out["goal"] = moneyJSON(b.GetGoal())
 	}
+	if sc := b.GetSchedule(); sc != nil {
+		out["schedule"] = map[string]any{"amount": moneyJSON(sc.GetAmount()), "day": sc.GetDay(), "next_run": sc.GetNextRun(),
+			"last_failure": sc.GetLastFailure()}
+	}
 	return out
 }
 
@@ -195,6 +199,47 @@ func (a *API) simulateYield(w http.ResponseWriter, r *http.Request, b *savingsv1
 	resp, err := a.c.Savings.SimulateYield(r.Context(), &savingsv1.SimulateYieldRequest{BoxId: b.GetId(), Days: req.Days})
 	if err != nil {
 		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"movement": movementJSON(resp.GetMovement()), "box": boxJSON(resp.GetBox())})
+}
+
+// setSchedule sets the monthly deposit {amount, day} (PUT) or removes it (DELETE).
+func (a *API) setSchedule(w http.ResponseWriter, r *http.Request, b *savingsv1.Box) {
+	req := &savingsv1.SetScheduleRequest{BoxId: b.GetId()}
+	if r.Method == http.MethodPut {
+		var body struct {
+			Amount string `json:"amount"`
+			Day    int32  `json:"day"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+		amount, ok := parseBRL(w, r, body.Amount)
+		if !ok {
+			return
+		}
+		req.Amount, req.Day = amount, body.Day
+	}
+	resp, err := a.c.Savings.SetSchedule(r.Context(), req)
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, boxJSON(resp.GetBox()))
+}
+
+// runSchedule (sandbox) makes the next monthly deposit now. A refusal
+// (INSUFFICIENT_FUNDS) answers 422 with the movement.
+func (a *API) runSchedule(w http.ResponseWriter, r *http.Request, b *savingsv1.Box) {
+	resp, err := a.c.Savings.RunSchedule(r.Context(), &savingsv1.RunScheduleRequest{BoxId: b.GetId()})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	if m := resp.GetMovement(); m.GetStatus() == "FAILED" {
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": map[string]string{"code": m.GetFailureReason(),
+			"message": "the money was not moved"}, "movement": movementJSON(m), "box": boxJSON(resp.GetBox())})
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"movement": movementJSON(resp.GetMovement()), "box": boxJSON(resp.GetBox())})

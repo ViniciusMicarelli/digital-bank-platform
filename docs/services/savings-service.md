@@ -14,8 +14,9 @@ Savings boxes (*caixinhas*): money a customer sets apart from the checking accou
 | No rounding loss: the fraction of a centavo is carried (in millionths) to the next day | ✅ |
 | Exactly once: each day's yield has a deterministic key (`yield:<day>`); a crash or outage between paying and recording replays the same movement; the loop catches up on missed days | ✅ |
 | Movements left `PENDING` by an outage are settled by the recovery loop | ✅ |
-| Sandbox: pay N days of yield at once on today's balance | ✅ |
-| Business-day CDI with the daily published rate, income tax (IOF / IR regressivo), scheduled deposits | planned |
+| Monthly scheduled deposit (*depósito programado*): an amount on a day 1–28, first run the next such day (setting it never moves money); runs once per month with a deterministic key (`schedule:<day>`), an outage keeps it due, a refusal for lack of funds skips the month and is kept on the box (`last_failure`); months missed while the service was down are not caught up | ✅ |
+| Sandbox: pay N days of yield at once on today's balance; make the next monthly deposit now | ✅ |
+| Business-day CDI with the daily published rate, income tax (IOF / IR regressivo) | planned |
 
 ## Money flow
 
@@ -32,7 +33,8 @@ flowchart LR
 |---|---|
 | `CreateBox` / `GetBox` / `ListBoxes` / `UpdateBox` / `CloseBox` | Boxes |
 | `Deposit` / `Withdraw` / `ListMovements` | Money in and out, history |
-| `SimulateYield` | Sandbox |
+| `SetSchedule` | Set or (zero amount) remove the monthly deposit |
+| `SimulateYield` / `RunSchedule` | Sandbox |
 
 ## Configuration
 
@@ -43,4 +45,4 @@ flowchart LR
 | `DATABASE_URL` | `postgres://bank:bank@localhost:54329/savings` |
 | `LEDGER_ADDR` / `TRANSACTION_ADDR` | `127.0.0.1:9001` / `127.0.0.1:9003` |
 | `SAVINGS_ANNUAL_RATE_BP` | `1065` |
-| `WORKER_INTERVAL` | `30s` (yield and recovery) |
+| `WORKER_INTERVAL` | `30s` (yield, monthly deposits and recovery) |

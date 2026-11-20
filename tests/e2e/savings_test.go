@@ -90,6 +90,34 @@ func TestSavingsBoxes(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 	}
 
+	// A monthly deposit: nothing moves when it is set; the sandbox runs it now.
+	if status, body := ana.call("PUT", boxBase+"/schedule", map[string]any{"amount": "150.00", "day": 31}, nil); status != 400 {
+		t.Fatalf("day 31: %d %v", status, body)
+	}
+	status, sched := ana.call("PUT", boxBase+"/schedule", map[string]any{"amount": "150.00", "day": 1}, nil)
+	sc, _ := sched["schedule"].(map[string]any)
+	if status != 200 || amountOf(sc["amount"]) != "150.00" || sc["day"] != float64(1) || sc["next_run"] == "" || available() != "500.00" {
+		t.Fatalf("schedule: %d %v", status, sched)
+	}
+	run := "/v1/sandbox/accounts/" + acc["id"].(string) + "/savings/" + box["id"].(string) + "/schedule/run"
+	status, r := ana.call("POST", run, nil, nil)
+	if after := r["box"].(map[string]any); status != 200 || amountOf(after["balance"]) != "703.24" ||
+		after["schedule"].(map[string]any)["next_run"] == sc["next_run"] || available() != "350.00" {
+		t.Fatalf("scheduled run: %d %v", status, r)
+	}
+	ana.call("PUT", boxBase+"/schedule", map[string]any{"amount": "400.00", "day": 1}, nil)
+	status, r = ana.call("POST", run, nil, nil)
+	if status != 422 || errCode(r) != "INSUFFICIENT_FUNDS" ||
+		r["box"].(map[string]any)["schedule"].(map[string]any)["last_failure"] != "INSUFFICIENT_FUNDS" {
+		t.Fatalf("run without the money: %d %v", status, r)
+	}
+	if status, b := ana.call("DELETE", boxBase+"/schedule", nil, nil); status != 200 || b["schedule"] != nil {
+		t.Fatalf("remove the schedule: %d %v", status, b)
+	}
+	if status, body := ana.call("POST", run, nil, nil); status != 422 || errCode(body) != "NO_SCHEDULE" {
+		t.Fatalf("run without a schedule: %d %v", status, body)
+	}
+
 	// Closing brings everything back.
 	if status, closed := ana.call("DELETE", boxBase, nil, idem()); status != 200 || closed["status"] != "CLOSED" {
 		t.Fatalf("close: %d %v", status, closed)

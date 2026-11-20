@@ -24,6 +24,12 @@ service SavingsService {
   // Deposits, withdrawals and yields, newest first.
   rpc ListMovements(ListMovementsRequest) returns (ListMovementsResponse);
 
+  // Sets (or, with a zero amount, removes) the monthly deposit from the
+  // checking account. The first run is the next such day after today.
+  rpc SetSchedule(SetScheduleRequest) returns (SetScheduleResponse);
+  // Sandbox: makes the next monthly deposit now.
+  rpc RunSchedule(RunScheduleRequest) returns (RunScheduleResponse);
+
   // Sandbox: pays the yield of `days` days at once, on today's balance.
   rpc SimulateYield(SimulateYieldRequest) returns (SimulateYieldResponse);
 }
@@ -42,6 +48,20 @@ message Box {
   google.protobuf.Timestamp created_at = 8;
   // Yearly rate paid, in basis points (e.g. 1065 = 10.65% a year).
   int32 annual_rate_bp = 9;
+  // Unset without a monthly deposit.
+  Schedule schedule = 10;
+}
+
+// A monthly deposit from the checking account into the box. A run refused
+// for lack of funds is skipped (not retried) and its reason kept.
+message Schedule {
+  bank.common.v1.Money amount = 1;
+  // 1..28 of every month.
+  int32 day = 2;
+  // The next run, YYYY-MM-DD (Brasília).
+  string next_run = 3;
+  // Why the last run moved nothing, e.g. INSUFFICIENT_FUNDS; empty if it ran.
+  string last_failure = 4;
 }
 
 message Movement {
@@ -140,6 +160,26 @@ message SimulateYieldRequest {
 }
 
 message SimulateYieldResponse {
+  Movement movement = 1;
+  Box box = 2;
+}
+
+message SetScheduleRequest {
+  string box_id = 1;
+  // Zero removes the schedule.
+  bank.common.v1.Money amount = 2;
+  int32 day = 3;
+}
+
+message SetScheduleResponse {
+  Box box = 1;
+}
+
+message RunScheduleRequest {
+  string box_id = 1;
+}
+
+message RunScheduleResponse {
   Movement movement = 1;
   Box box = 2;
 }

@@ -232,6 +232,11 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Single-use virtual cards for online purchases: valid for 24 hours, cancelled by their first approved purchase (claimed atomically), given back when that purchase is declined, never put in a wallet; at most three live.
 - Web and mobile: create one from the cards screen, its own look, and what state it is in; mobile now switches between cards.
 
+## Phase 34 — Scheduled deposits ✅
+
+- Savings boxes can take a monthly deposit from the checking account on a chosen day (1–28): exactly once per month, kept due through an outage, skipped (and shown) when the money is not there.
+- Web and mobile: set, change and remove it on the box; the box card shows it; the sandbox runs the next one now.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

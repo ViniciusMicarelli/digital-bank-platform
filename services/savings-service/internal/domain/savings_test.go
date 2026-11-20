@@ -60,3 +60,20 @@ func TestBoxRules(t *testing.T) {
 		t.Fatal(EndOfDay(b.LastAccrued))
 	}
 }
+
+func TestNextRun(t *testing.T) {
+	d := func(s string) time.Time { v, _ := time.Parse(time.DateOnly, s); return v }
+	for _, c := range []struct {
+		day         int
+		after, want string
+	}{
+		{5, "2026-11-04", "2026-11-05"},
+		{5, "2026-11-05", "2026-12-05"},
+		{28, "2026-12-30", "2027-01-28"},
+		{1, "2026-12-31", "2027-01-01"},
+	} {
+		if got := NextRun(c.day, d(c.after)); !got.Equal(d(c.want)) {
+			t.Errorf("NextRun(%d, %s) = %s, want %s", c.day, c.after, got.Format(time.DateOnly), c.want)
+		}
+	}
+}

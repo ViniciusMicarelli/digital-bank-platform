@@ -91,7 +91,7 @@ test('credit invoice and boleto', async ({ page }) => {
   await shot(page, '08-notifications')
 })
 
-test('savings box: create, save, withdraw, yield, close', async ({ page }) => {
+test('savings box: create, save, withdraw, yield, monthly deposit, close', async ({ page }) => {
   await onboard(page)
   await fund(page, '500,00')
   await page.goto('/caixinhas')
@@ -114,6 +114,16 @@ test('savings box: create, save, withdraw, yield, close', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Simular 30 dias de rendimento' }).click()
   await expect(page.getByText('Rendimento').first()).toBeVisible()
+
+  // A monthly deposit, run now through the sandbox.
+  await page.getByRole('button', { name: 'Programar depósito mensal' }).click()
+  await page.getByLabel('Quanto por mês').fill('100')
+  await page.getByLabel('Todo dia').selectOption('10')
+  await page.getByRole('button', { name: 'Programar', exact: true }).click()
+  await expect(page.getByText('todo dia 10, da conta para a caixinha.')).toBeVisible()
+  await expect(page.getByText('Guardado', { exact: true })).toHaveCount(1)
+  await page.getByRole('button', { name: 'Fazer o depósito programado agora' }).click()
+  await expect(page.getByText('Guardado', { exact: true })).toHaveCount(2)
   await shot(page, '13-savings')
 
   await page.getByRole('button', { name: 'Encerrar caixinha' }).click()

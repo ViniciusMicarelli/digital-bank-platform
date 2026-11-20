@@ -71,6 +71,7 @@ type Box struct {
 	Yielded         int64
 	YieldCarryMicro int64
 	LastAccrued     time.Time
+	Schedule        Schedule
 	CreatedAt       time.Time
 }
 
@@ -174,3 +175,53 @@ func Accrue(balance int64, annualBP, days int, carryMicro int64) (amount, carry 
 	micro := int64(math.Floor(float64(balance)*factor*1e6)) + carryMicro
 	return micro / 1_000_000, micro % 1_000_000
 }
+
+// MaxScheduleDay keeps every month's run on a day that exists.
+const MaxScheduleDay = 28
+
+// Schedule is a monthly deposit from the checking account into the box.
+type Schedule struct {
+	Amount int64
+	Day    int       // 1..28 of every month
+	Next   time.Time // the next run, a Brasília day (DATE)
+	// LastFailure is why the last run moved nothing (e.g. INSUFFICIENT_FUNDS).
+	LastFailure string
+}
+
+// Active reports whether the box has a monthly deposit.
+func (s Schedule) Active() bool { return s.Amount > 0 }
+
+// NextRun is the first day after `after` that falls on day of the month.
+func NextRun(day int, after time.Time) time.Time {
+	d := time.Date(after.Year(), after.Month(), day, 0, 0, 0, 0, time.UTC)
+	if !d.After(after) {
+		d = time.Date(after.Year(), after.Month()+1, day, 0, 0, 0, 0, time.UTC)
+	}
+	return d
+}
+
+// SetSchedule sets (or, with amount 0, removes) the monthly deposit. The
+// first run is the next such day after today: setting it never moves money
+// on the spot.
+func (b *Box) SetSchedule(amount int64, day int, now time.Time) error {
+	switch {
+	case b.Status != Active:
+		return Refuse("BOX_CLOSED", "this box is closed")
+	case amount < 0:
+		return invalid("the amount cannot be negative")
+	case amount == 0:
+		b.Schedule = Schedule{}
+		return nil
+	case day < 1 || day > MaxScheduleDay:
+		return invalid("the day is between 1 and %d", MaxScheduleDay)
+	}
+	next := NextRun(day, Day(now))
+	if b.Schedule.Active() && b.Schedule.Day == day && b.Schedule.Next.After(next) {
+		next = b.Schedule.Next // a run brought forward already happened
+	}
+	b.Schedule = Schedule{Amount: amount, Day: day, Next: next}
+	return nil
+}
+
+// ScheduleKey is the idempotency key of the run due on day.
+func ScheduleKey(day time.Time) string { return "schedule:" + day.Format(time.DateOnly) }
