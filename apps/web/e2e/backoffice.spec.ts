@@ -147,3 +147,38 @@ test('a limit increase goes to an analyst', async ({ page, browser }) => {
   await expect(page.getByText('R$ 1.000,00 → R$ 5.000,00')).toBeVisible()
   await expect(page.getByText('Limite atual de R$ 3.000,00.', { exact: false })).toBeVisible()
 })
+
+test('a limit above R$ 10.000 needs two analysts', async ({ page, browser }) => {
+  await onboard(page)
+  await page.goto('/credito')
+  await page.getByRole('button', { name: 'Ativar crédito' }).click()
+  await page.getByLabel('Novo limite').fill('15000')
+  await page.getByRole('button', { name: 'Pedir novo limite' }).click()
+  await expect(page.getByText('Pedido enviado para análise.', { exact: false })).toBeVisible()
+
+  // The first analyst approves: it goes to a second one.
+  const first = await browser.newContext()
+  const analyst = await first.newPage()
+  await staffLogin(analyst, ANALYST)
+  const item = analyst.getByRole('listitem').filter({ hasText: 'R$ 1.000,00 → R$ 15.000,00' }).first()
+  await item.getByRole('button', { name: 'Aprovar' }).click()
+  await expect(item.getByText('um segundo analista precisa confirmar')).toBeVisible()
+  await item.getByLabel('Justificativa para o segundo analista').fill('Renda de R$ 40 mil comprovada')
+  await item.getByRole('button', { name: 'Enviar para segundo analista' }).click()
+  await expect(item.getByText('aguardando um segundo analista')).toBeVisible()
+  await first.close()
+
+  // The second analyst confirms it.
+  const second = await browser.newContext()
+  const reviewer = await second.newPage()
+  await staffLogin(reviewer, REVIEWER)
+  const approval = reviewer.getByRole('listitem').filter({ hasText: 'Limite de R$ 15.000,00' }).first()
+  await expect(approval.getByText('Renda de R$ 40 mil comprovada')).toBeVisible()
+  await shot(reviewer, '20-four-eyes-limit')
+  await approval.getByRole('button', { name: 'Aprovar' }).click()
+  await expect(approval).toHaveCount(0)
+  await second.close()
+
+  await page.reload()
+  await expect(page.getByText('Limite atual de R$ 15.000,00.', { exact: false })).toBeVisible()
+})

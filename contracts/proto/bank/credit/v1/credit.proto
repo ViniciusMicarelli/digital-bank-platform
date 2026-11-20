@@ -43,7 +43,8 @@ service CreditService {
   rpc RequestLimit(RequestLimitRequest) returns (RequestLimitResponse);
   // By account, or every account (back office) by status.
   rpc ListLimitRequests(ListLimitRequestsRequest) returns (ListLimitRequestsResponse);
-  // An analyst's decision on a request in review (may grant less).
+  // An analyst's decision on a request in review (may grant less); above
+  // R$ 10.000,00 only with a second approver (four-eyes).
   rpc DecideLimitRequest(DecideLimitRequestRequest) returns (DecideLimitRequestResponse);
 
   // The bank's behaviour score (0..1000) for the account's card, with the
@@ -308,6 +309,8 @@ message LimitRequest {
   google.protobuf.Timestamp decided_at = 10;
   // The customer's score when the request was analyzed.
   int32 score = 11;
+  // The analyst who confirmed a grant above R$ 10.000,00.
+  string second_approver = 12;
 }
 
 message RequestLimitRequest {
@@ -336,6 +339,9 @@ message DecideLimitRequestRequest {
   // Optional: grant less than requested.
   bank.common.v1.Money granted = 4;
   string reason = 5;
+  // Required to grant more than R$ 10.000,00 (four-eyes): another analyst
+  // who confirmed it; otherwise FAILED_PRECONDITION FOUR_EYES_REQUIRED.
+  string second_approver_id = 6;
 }
 
 message DecideLimitRequestResponse {

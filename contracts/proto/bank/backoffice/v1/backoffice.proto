@@ -78,6 +78,9 @@ enum ApprovalKind {
   APPROVAL_KIND_UNSPECIFIED = 0;
   // Unblock an account blocked by an analyst or by fraud rules.
   APPROVAL_KIND_UNBLOCK_ACCOUNT = 1;
+  // Grant a credit limit above R$ 10.000,00. Target: the limit request;
+  // params: account_id, granted_minor.
+  APPROVAL_KIND_LIMIT_INCREASE = 2;
 }
 
 enum ApprovalStatus {
@@ -105,6 +108,7 @@ message Approval {
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp decided_at = 11;
   google.protobuf.Timestamp expires_at = 12;
+  map<string, string> params = 13;
 }
 
 message RequestApprovalRequest {
@@ -112,6 +116,8 @@ message RequestApprovalRequest {
   string target_id = 2;
   string reason = 3;
   string requested_by = 4;
+  // What the action needs besides its target (see ApprovalKind).
+  map<string, string> params = 5;
 }
 
 message RequestApprovalResponse {

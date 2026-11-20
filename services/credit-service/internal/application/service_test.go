@@ -492,14 +492,14 @@ func TestLimitRequests(t *testing.T) {
 	if list, _ := e.svc.LimitRequests(e.ctx, uuid.Nil, domain.LimitInReview); len(list) != 1 || list[0].ID != review.ID {
 		t.Fatalf("queue = %+v", list)
 	}
-	if _, err := e.svc.DecideLimit(e.ctx, review.ID, "analyst-1", true, 6_000_00, ""); !errors.Is(err, domain.ErrInvalidArgument) {
+	if _, err := e.svc.DecideLimit(e.ctx, review.ID, "analyst-1", "", true, 6_000_00, ""); !errors.Is(err, domain.ErrInvalidArgument) {
 		t.Fatal("cannot grant more than asked")
 	}
-	decided, err := e.svc.DecideLimit(e.ctx, review.ID, "analyst-1", true, 3_000_00, "Renda compatível com R$ 3 mil")
+	decided, err := e.svc.DecideLimit(e.ctx, review.ID, "analyst-1", "", true, 3_000_00, "Renda compatível com R$ 3 mil")
 	if err != nil || decided.Granted != 3_000_00 || e.line(t).Limit != 3_000_00 {
 		t.Fatalf("partial approval = %+v %v", decided, err)
 	}
-	if _, err := e.svc.DecideLimit(e.ctx, review.ID, "analyst-2", false, 0, "x"); reason(err) != "LIMIT_REQUEST_NOT_IN_REVIEW" {
+	if _, err := e.svc.DecideLimit(e.ctx, review.ID, "analyst-2", "", false, 0, "x"); reason(err) != "LIMIT_REQUEST_NOT_IN_REVIEW" {
 		t.Fatalf("decided twice: %v", err)
 	}
 
@@ -551,5 +551,29 @@ func TestCreditScore(t *testing.T) {
 	r, _ := e.svc.RequestLimit(e.ctx, "r1", e.account, 1_500_00)
 	if r.Score != s.Value || r.Status != domain.LimitApproved {
 		t.Fatalf("request = %+v", r)
+	}
+}
+
+func TestLargeLimitNeedsTwoAnalysts(t *testing.T) {
+	e := setup(t)
+	_, _ = e.svc.OpenLine(e.ctx, "k", e.account, 10) // R$ 1.000
+	r, _ := e.svc.RequestLimit(e.ctx, "r1", e.account, 15_000_00)
+	if r.Status != domain.LimitInReview {
+		t.Fatalf("request = %+v", r)
+	}
+	if _, err := e.svc.DecideLimit(e.ctx, r.ID, "analyst-1", "", true, 0, ""); reason(err) != "FOUR_EYES_REQUIRED" {
+		t.Fatalf("one analyst, R$ 15 mil: %v", err)
+	}
+	if _, err := e.svc.DecideLimit(e.ctx, r.ID, "analyst-1", "analyst-1", true, 0, ""); reason(err) != "SAME_ANALYST" {
+		t.Fatalf("the same analyst twice: %v", err)
+	}
+	// Up to R$ 10 mil, one analyst may grant it alone.
+	if got, err := e.svc.DecideLimit(e.ctx, r.ID, "analyst-1", "", true, 10_000_00, ""); err != nil || got.Granted != 10_000_00 {
+		t.Fatalf("R$ 10 mil alone = %+v %v", got, err)
+	}
+	r2, _ := e.svc.RequestLimit(e.ctx, "r2", e.account, 15_000_00)
+	got, err := e.svc.DecideLimit(e.ctx, r2.ID, "analyst-1", "analyst-2", true, 0, "Renda comprovada")
+	if err != nil || got.Granted != 15_000_00 || got.SecondApprover != "analyst-2" || e.line(t).Limit != 15_000_00 {
+		t.Fatalf("with a second analyst = %+v %v", got, err)
 	}
 }

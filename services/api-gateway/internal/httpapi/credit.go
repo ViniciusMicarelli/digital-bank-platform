@@ -1,12 +1,15 @@
 package httpapi
 
 import (
+	"cmp"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
+	backofficev1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/backoffice/v1"
 	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
 )
 
@@ -289,6 +292,30 @@ func (a *API) backofficeLimitRequests(w http.ResponseWriter, r *http.Request) {
 }
 
 // decideLimitRequest is the analyst's decision {approve, granted?, reason}; audited on the account.
+// fourEyesLimit is the largest limit one analyst may grant alone (credit-service enforces it too).
+const fourEyesLimit = 10_000_00
+
+// requestLimitApproval sends a large grant to a second analyst (202).
+func (a *API) requestLimitApproval(w http.ResponseWriter, r *http.Request, lr *creditv1.LimitRequest, amount int64, reason string) {
+	if strings.TrimSpace(reason) == "" {
+		writeError(w, r.Context(), http.StatusBadRequest, "REASON_REQUIRED", "a limit above R$ 10.000,00 needs a reason for the second analyst")
+		return
+	}
+	granted := strconv.FormatInt(amount, 10)
+	if !a.audit(w, r, "LIMIT_APPROVAL_REQUESTED", "account", lr.GetAccountId(), map[string]string{"request_id": lr.GetId(), "granted_minor": granted, "reason": reason}) {
+		return
+	}
+	resp, err := a.c.BackOffice.RequestApproval(r.Context(), &backofficev1.RequestApprovalRequest{
+		Kind: backofficev1.ApprovalKind_APPROVAL_KIND_LIMIT_INCREASE, TargetId: lr.GetId(), Reason: reason, RequestedBy: customerID(r.Context()),
+		Params: map[string]string{"account_id": lr.GetAccountId(), "granted_minor": granted}})
+	if err != nil {
+		a.auditFailure(r.Context(), "LIMIT_APPROVAL_REQUESTED", "account", lr.GetAccountId(), err)
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"status": "AWAITING_SECOND_ANALYST", "approval": approvalJSON(resp.GetApproval())})
+}
+
 func (a *API) decideLimitRequest(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Approve bool   `json:"approve"`
@@ -316,14 +343,20 @@ func (a *API) decideLimitRequest(w http.ResponseWriter, r *http.Request) {
 		writeGRPCError(w, r.Context(), err)
 		return
 	}
-	account := ""
-	for _, lr := range list.GetRequests() {
-		if lr.GetId() == id {
-			account = lr.GetAccountId()
+	var lr *creditv1.LimitRequest
+	for _, x := range list.GetRequests() {
+		if x.GetId() == id {
+			lr = x
 		}
 	}
-	if account == "" {
+	if lr == nil {
 		writeError(w, r.Context(), http.StatusUnprocessableEntity, "LIMIT_REQUEST_NOT_IN_REVIEW", "this request was decided already")
+		return
+	}
+	account := lr.GetAccountId()
+	// Above what one analyst may grant: a second analyst must confirm.
+	if amount := cmp.Or(granted.GetMinorUnits(), lr.GetRequested().GetMinorUnits()); req.Approve && amount > fourEyesLimit {
+		a.requestLimitApproval(w, r, lr, amount, req.Reason)
 		return
 	}
 	action := "LIMIT_APPROVE"

@@ -127,7 +127,7 @@ func (s *Server) PlanInvoice(ctx context.Context, req *creditv1.PlanInvoiceReque
 func limitPB(r domain.LimitRequest) *creditv1.LimitRequest {
 	out := &creditv1.LimitRequest{Id: r.ID.String(), AccountId: r.AccountID.String(), CurrentLimit: brl(r.CurrentLimit),
 		Requested: brl(r.Requested), Status: string(r.Status), Granted: brl(r.Granted), Reason: r.Reason, DecidedBy: r.DecidedBy,
-		CreatedAt: timestamppb.New(r.CreatedAt), Score: int32(r.Score)} //nolint:gosec // 0..1000
+		CreatedAt: timestamppb.New(r.CreatedAt), Score: int32(r.Score), SecondApprover: r.SecondApprover} //nolint:gosec // 0..1000
 	if r.DecidedAt != nil {
 		out.DecidedAt = timestamppb.New(*r.DecidedAt)
 	}
@@ -180,7 +180,7 @@ func (s *Server) DecideLimitRequest(ctx context.Context, req *creditv1.DecideLim
 			return nil, err
 		}
 	}
-	r, err := s.app.DecideLimit(ctx, id, req.GetAnalystId(), req.GetApprove(), granted, req.GetReason())
+	r, err := s.app.DecideLimit(ctx, id, req.GetAnalystId(), req.GetSecondApproverId(), req.GetApprove(), granted, req.GetReason())
 	if err != nil {
 		return nil, toStatus(err)
 	}

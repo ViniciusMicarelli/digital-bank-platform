@@ -682,7 +682,7 @@ func (s *Service) LimitRequests(ctx context.Context, account uuid.UUID, status d
 }
 
 // DecideLimit is an analyst's decision on a request in review.
-func (s *Service) DecideLimit(ctx context.Context, id uuid.UUID, analyst string, approve bool, granted int64, reason string) (domain.LimitRequest, error) {
+func (s *Service) DecideLimit(ctx context.Context, id uuid.UUID, analyst, second string, approve bool, granted int64, reason string) (domain.LimitRequest, error) {
 	r, err := s.store.LimitRequest(ctx, id)
 	if err != nil {
 		return r, err
@@ -695,7 +695,7 @@ func (s *Service) DecideLimit(ctx context.Context, id uuid.UUID, analyst string,
 		if r, err = tx.LockLimitRequest(id); err != nil {
 			return err
 		}
-		if err := r.Decide(analyst, approve, granted, reason, s.now()); err != nil {
+		if err := r.Decide(analyst, second, approve, granted, reason, s.now()); err != nil {
 			return err
 		}
 		if err := tx.SaveLimitRequest(r); err != nil {

@@ -100,7 +100,7 @@ services:
   credit-service:
     port: 9009
     metricsPort: 9109
-    callers: [api-gateway, card-service]
+    callers: [api-gateway, card-service, backoffice-service]
     env:
       ACCOUNT_ADDR: account-service:9002
       TRANSACTION_ADDR: transaction-service:9003
@@ -135,6 +135,7 @@ services:
     callers: [api-gateway]
     env:
       ACCOUNT_ADDR: account-service:9002
+      CREDIT_ADDR: credit-service:9009
   kms-service:
     port: 9008
     metricsPort: 9108
@@ -146,6 +147,8 @@ services:
     http: true
     callers: []
     env:
+      # CIDRs of the ingress / load balancer whose X-Forwarded-For is believed.
+      TRUSTED_PROXIES: ""
       IDENTITY_ADDR: identity-service:9006
       ACCOUNT_ADDR: account-service:9002
       TRANSACTION_ADDR: transaction-service:9003

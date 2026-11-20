@@ -37,10 +37,10 @@ func TestChain(t *testing.T) {
 
 func TestDecide(t *testing.T) {
 	now := time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)
-	if _, err := NewApproval(KindUnblockAccount, "acc", " ", "a1", now); err == nil {
+	if _, err := NewApproval(KindUnblockAccount, "acc", " ", "a1", nil, now); err == nil {
 		t.Fatal("a reason is required")
 	}
-	a, err := NewApproval(KindUnblockAccount, "acc", "cliente confirmou a identidade", "a1", now)
+	a, err := NewApproval(KindUnblockAccount, "acc", "cliente confirmou a identidade", "a1", nil, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,5 +63,16 @@ func TestDecide(t *testing.T) {
 	a.Settle("ACCOUNT_NOT_BLOCKED")
 	if a.Status != StatusFailed || a.FailureReason != "ACCOUNT_NOT_BLOCKED" {
 		t.Fatalf("settle = %+v", a)
+	}
+}
+
+func TestLimitIncreaseApproval(t *testing.T) {
+	now := time.Now()
+	if _, err := NewApproval(KindLimitIncrease, "req-1", "renda comprovada", "a1", map[string]string{"account_id": "acc"}, now); err == nil {
+		t.Fatal("a limit increase needs the amount")
+	}
+	a, err := NewApproval(KindLimitIncrease, "req-1", "renda comprovada", "a1", map[string]string{"account_id": "acc", "granted_minor": "1500000"}, now)
+	if err != nil || a.Params["granted_minor"] != "1500000" {
+		t.Fatalf("approval = %+v %v", a, err)
 	}
 }

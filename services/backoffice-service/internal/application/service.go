@@ -77,8 +77,8 @@ func approvalEvent(actor, action string, a domain.Approval, extra map[string]str
 }
 
 // Request opens a four-eyes approval; the request is audited with it.
-func (s *Service) Request(ctx context.Context, kind domain.Kind, target, reason, requestedBy string) (domain.Approval, error) {
-	a, err := domain.NewApproval(kind, target, reason, requestedBy, s.now())
+func (s *Service) Request(ctx context.Context, kind domain.Kind, target, reason, requestedBy string, params map[string]string) (domain.Approval, error) {
+	a, err := domain.NewApproval(kind, target, reason, requestedBy, params, s.now())
 	if err != nil {
 		return a, err
 	}
@@ -86,7 +86,11 @@ func (s *Service) Request(ctx context.Context, kind domain.Kind, target, reason,
 		if err := tx.InsertApproval(ctx, a); err != nil {
 			return err
 		}
-		_, err := tx.AppendAudit(ctx, approvalEvent(requestedBy, "APPROVAL_REQUESTED", a, map[string]string{"reason": a.Reason}), s.now())
+		details := map[string]string{"reason": a.Reason}
+		for k, v := range a.Params {
+			details[k] = v
+		}
+		_, err := tx.AppendAudit(ctx, approvalEvent(requestedBy, "APPROVAL_REQUESTED", a, details), s.now())
 		return err
 	})
 	return a, err

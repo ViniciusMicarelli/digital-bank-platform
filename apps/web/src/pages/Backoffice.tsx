@@ -15,11 +15,18 @@ import { TOTP } from './Settings'
 interface Review extends Profile { customer_id: string; reviewed_by: string; updated_at: string }
 interface CustomerFile { customer_id: string; profile?: Review; accounts: { account: Account; available?: Money }[] }
 interface Approval {
-  id: string; kind: 'UNBLOCK_ACCOUNT'; target_id: string; reason: string; requested_by: string
+  id: string; kind: 'UNBLOCK_ACCOUNT' | 'LIMIT_INCREASE'; target_id: string; reason: string; requested_by: string
+  params: Record<string, string>
   status: 'PENDING' | 'APPROVED' | 'EXECUTED' | 'REJECTED' | 'FAILED' | 'EXPIRED'
   decided_by: string; decision_reason: string; failure_reason: string; created_at: string; expires_at: string
   customer_id?: string; account?: Account
+  // LIMIT_INCREASE: where the line stands now.
+  current_limit?: Money; used?: Money; score?: number
 }
+
+/** The largest limit one analyst may grant alone (credit-service enforces it). */
+const FOUR_EYES_LIMIT = 10_000
+const centsToBRL = (minor?: string) => (Number(minor ?? 0) / 100).toFixed(2)
 interface AuditEvent { seq: number; actor_id: string; action: string; target_type: string; target_id: string; details: Record<string, string>; at: string }
 
 const actionLabels: Record<string, string> = {
@@ -176,7 +183,7 @@ function ApprovalItem({ item, me, onOpen }: { item: Approval; me?: string; onOpe
   const decide = useMutation({
     mutationFn: (approve: boolean) => api<Approval>('POST', `/v1/backoffice/approvals/${item.id}/${approve ? 'approve' : 'reject'}`, { body: { reason } }),
     onSuccess: (a) => {
-      setError(a.status === 'FAILED' ? `Aprovado, mas o desbloqueio falhou: ${a.failure_reason}` : '')
+      setError(a.status === 'FAILED' ? `Aprovado, mas a ação falhou: ${a.failure_reason}` : '')
       qc.invalidateQueries({ queryKey: ['backoffice'] })
     },
     onError: (e) => setError(errorMessage(e)),
@@ -185,11 +192,22 @@ function ApprovalItem({ item, me, onOpen }: { item: Approval; me?: string; onOpe
   return (
     <li className="space-y-3 rounded-2xl px-3 py-3 hover:bg-surface-2">
       <div className="flex items-start gap-3">
-        <IconTile icon={LockOpen} tone="credit" />
+        <IconTile icon={item.kind === 'LIMIT_INCREASE' ? Gauge : LockOpen} tone="credit" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-fg">
-            Desbloquear {item.account ? `${item.account.holder_name} · conta ${item.account.number}` : `conta ${short(item.target_id)}`}
-          </p>
+          {item.kind === 'LIMIT_INCREASE' ? (
+            <>
+              <p className="text-sm font-semibold text-fg">
+                Limite de {formatBRL(centsToBRL(item.params.granted_minor))} para {item.account?.holder_name ?? 'o cliente'}
+              </p>
+              <p className="text-xs text-muted">
+                Hoje {formatBRL(item.current_limit)} · usado {formatBRL(item.used)}{item.score ? ` · score ${item.score}` : ''}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm font-semibold text-fg">
+              Desbloquear {item.account ? `${item.account.holder_name} · conta ${item.account.number}` : `conta ${short(item.target_id)}`}
+            </p>
+          )}
           <p className="text-xs text-muted">{item.reason} · por {mine ? 'você' : `analista ${short(item.requested_by)}`} · expira {dateTimeBR(item.expires_at)}</p>
         </div>
       </div>
@@ -265,7 +283,7 @@ function DisputeItem({ item, onOpen }: { item: Dispute & { customer_id?: string;
   )
 }
 
-function LimitItem({ item, onOpen }: { item: LimitRequest; onOpen: () => void }) {
+function LimitItem({ item, waiting, onOpen }: { item: LimitRequest; waiting: boolean; onOpen: () => void }) {
   const qc = useQueryClient()
   const [mode, setMode] = useState<'idle' | 'approve' | 'reject'>('idle')
   const [granted, setGranted] = useState<string | null>(null)
@@ -273,9 +291,11 @@ function LimitItem({ item, onOpen }: { item: LimitRequest; onOpen: () => void })
   const [error, setError] = useState('')
   const decide = useMutation({
     mutationFn: (approve: boolean) => api('POST', `/v1/backoffice/limit-requests/${item.id}/decide`, { body: { approve, granted: approve ? granted ?? '' : '', reason } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['backoffice'] }),
+    onSuccess: () => { setMode('idle'); setError(''); qc.invalidateQueries({ queryKey: ['backoffice'] }) },
     onError: (e) => setError(errorMessage(e)),
   })
+  const effective = Number(granted ?? item.requested.amount)
+  const fourEyes = mode === 'approve' && effective > FOUR_EYES_LIMIT
   return (
     <li className="space-y-3 rounded-2xl px-3 py-3 hover:bg-surface-2">
       <div className="flex items-start gap-3">
@@ -285,7 +305,8 @@ function LimitItem({ item, onOpen }: { item: LimitRequest; onOpen: () => void })
           <p className="text-xs text-muted">Usado {formatBRL(item.used)}{item.score ? ` · score ${item.score}` : ''} · pedido em {dateTimeBR(item.created_at)}</p>
         </div>
       </div>
-      {mode === 'idle' && (
+      {waiting && <p className="text-xs text-subtle">Aprovação enviada: aguardando um segundo analista (quatro olhos).</p>}
+      {mode === 'idle' && !waiting && (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" icon={Check} onClick={() => setMode('approve')}>Aprovar</Button>
           <Button size="sm" variant="secondary" icon={X} onClick={() => setMode('reject')}>Recusar</Button>
@@ -295,10 +316,12 @@ function LimitItem({ item, onOpen }: { item: LimitRequest; onOpen: () => void })
       {mode !== 'idle' && (
         <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); decide.mutate(mode === 'approve') }}>
           {mode === 'approve' && <MoneyField label="Limite concedido" optional hint={`Em branco: ${formatBRL(item.requested)}`} onValue={setGranted} />}
-          <Field label={mode === 'approve' ? 'Observação (opcional)' : 'Motivo da recusa'} value={reason} onChange={(e) => setReason(e.target.value)} />
+          {fourEyes && <Alert tone="amber">Acima de {formatBRL(String(FOUR_EYES_LIMIT))}: um segundo analista precisa confirmar.</Alert>}
+          <Field label={mode === 'reject' ? 'Motivo da recusa' : fourEyes ? 'Justificativa para o segundo analista' : 'Observação (opcional)'}
+            value={reason} onChange={(e) => setReason(e.target.value)} />
           <div className="flex gap-2">
-            <Button type="submit" size="sm" variant={mode === 'approve' ? 'primary' : 'danger'} disabled={mode === 'reject' && !reason.trim()} loading={decide.isPending}>
-              {mode === 'approve' ? 'Confirmar aprovação' : 'Recusar'}
+            <Button type="submit" size="sm" variant={mode === 'approve' ? 'primary' : 'danger'} disabled={(mode === 'reject' || fourEyes) && !reason.trim()} loading={decide.isPending}>
+              {mode === 'reject' ? 'Recusar' : fourEyes ? 'Enviar para segundo analista' : 'Confirmar aprovação'}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => setMode('idle')}>Voltar</Button>
           </div>
@@ -315,11 +338,17 @@ function LimitsPanel({ onOpenCustomer }: { onOpenCustomer: (customerId: string) 
     queryFn: async () => (await api<{ requests: LimitRequest[] }>('GET', '/v1/backoffice/limit-requests')).requests,
     refetchInterval: 15_000,
   })
+  const approvals = useQuery({
+    queryKey: ['backoffice', 'approvals'],
+    queryFn: async () => (await api<{ approvals: Approval[] }>('GET', '/v1/backoffice/approvals')).approvals,
+    refetchInterval: 15_000,
+  })
+  const waiting = new Set((approvals.data ?? []).filter((a) => a.kind === 'LIMIT_INCREASE').map((a) => a.target_id))
   const list = requests.data ?? []
   return (
     <Panel title={`Limites · ${list.length}`} icon={Gauge}>
       {requests.isLoading ? <Loading /> : !list.length ? <Empty icon={Gauge}>Nenhum pedido de limite esperando análise.</Empty> : (
-        <ul className="-mx-2 space-y-1">{list.map((r) => <LimitItem key={r.id} item={r} onOpen={() => r.customer_id && onOpenCustomer(r.customer_id)} />)}</ul>
+        <ul className="-mx-2 space-y-1">{list.map((r) => <LimitItem key={r.id} item={r} waiting={waiting.has(r.id)} onOpen={() => r.customer_id && onOpenCustomer(r.customer_id)} />)}</ul>
       )}
     </Panel>
   )

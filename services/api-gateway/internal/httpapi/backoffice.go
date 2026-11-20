@@ -10,6 +10,7 @@ import (
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	backofficev1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/backoffice/v1"
+	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
 	userv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/user/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 )
@@ -189,12 +190,19 @@ func (a *API) unblockAccount(w http.ResponseWriter, r *http.Request) {
 
 func enumName(s, prefix string) string { return strings.TrimPrefix(s, prefix) }
 
+func paramsJSON(m map[string]string) map[string]string {
+	if m == nil {
+		return map[string]string{}
+	}
+	return m
+}
+
 func approvalJSON(p *backofficev1.Approval) map[string]any {
 	out := map[string]any{
 		"id": p.GetId(), "kind": enumName(p.GetKind().String(), "APPROVAL_KIND_"), "target_id": p.GetTargetId(),
 		"reason": p.GetReason(), "requested_by": p.GetRequestedBy(), "status": enumName(p.GetStatus().String(), "APPROVAL_STATUS_"),
 		"decided_by": p.GetDecidedBy(), "decision_reason": p.GetDecisionReason(), "failure_reason": p.GetFailureReason(),
-		"created_at": ts(p.GetCreatedAt()), "expires_at": ts(p.GetExpiresAt()),
+		"created_at": ts(p.GetCreatedAt()), "expires_at": ts(p.GetExpiresAt()), "params": paramsJSON(p.GetParams()),
 	}
 	if p.GetDecidedAt() != nil {
 		out["decided_at"] = ts(p.GetDecidedAt())
@@ -226,7 +234,17 @@ func (a *API) approvals(w http.ResponseWriter, r *http.Request) {
 	for _, p := range resp.GetApprovals() {
 		item := approvalJSON(p)
 		// What the second analyst needs to judge the request: whose account it is.
-		if acc, err := a.c.Accounts.GetAccount(r.Context(), &accountv1.GetAccountRequest{Id: p.GetTargetId()}); err == nil {
+		accountID := p.GetTargetId()
+		if p.GetKind() == backofficev1.ApprovalKind_APPROVAL_KIND_LIMIT_INCREASE {
+			accountID = p.GetParams()["account_id"]
+			if line, err := a.c.Credit.GetCreditLine(r.Context(), &creditv1.GetCreditLineRequest{AccountId: accountID}); err == nil {
+				item["current_limit"], item["used"] = moneyJSON(line.GetLine().GetLimit()), moneyJSON(line.GetLine().GetUsed())
+			}
+			if sc, err := a.c.Credit.GetCreditScore(r.Context(), &creditv1.GetCreditScoreRequest{AccountId: accountID}); err == nil {
+				item["score"] = sc.GetScore()
+			}
+		}
+		if acc, err := a.c.Accounts.GetAccount(r.Context(), &accountv1.GetAccountRequest{Id: accountID}); err == nil {
 			item["customer_id"] = acc.GetAccount().GetCustomerId()
 			item["account"] = accountJSON(acc.GetAccount())
 		}

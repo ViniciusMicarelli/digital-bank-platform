@@ -443,7 +443,7 @@ func (s *Store) MarkPlanInterestPosted(ctx context.Context, id uuid.UUID) error 
 
 // ---- limit requests ----
 
-const limitCols = `id, idempotency_key, line_id, account_id, current_limit, requested, status, granted, reason, decided_by, created_at, decided_at, score`
+const limitCols = `id, idempotency_key, line_id, account_id, current_limit, requested, status, granted, reason, decided_by, created_at, decided_at, score, second_approver`
 
 func scanLimit(row pgx.Row) (domain.LimitRequest, error) {
 	var (
@@ -451,7 +451,7 @@ func scanLimit(row pgx.Row) (domain.LimitRequest, error) {
 		status string
 	)
 	err := row.Scan(&r.ID, &r.IdempotencyKey, &r.LineID, &r.AccountID, &r.CurrentLimit, &r.Requested, &status, &r.Granted,
-		&r.Reason, &r.DecidedBy, &r.CreatedAt, &r.DecidedAt, &r.Score)
+		&r.Reason, &r.DecidedBy, &r.CreatedAt, &r.DecidedAt, &r.Score, &r.SecondApprover)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return r, fmt.Errorf("%w: limit request", domain.ErrNotFound)
 	}
@@ -460,9 +460,9 @@ func scanLimit(row pgx.Row) (domain.LimitRequest, error) {
 }
 
 func (u *unit) InsertLimitRequest(r domain.LimitRequest) error {
-	err := u.exec(`INSERT INTO limit_requests (`+limitCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+	err := u.exec(`INSERT INTO limit_requests (`+limitCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
 		r.ID, r.IdempotencyKey, r.LineID, r.AccountID, r.CurrentLimit, r.Requested, r.Status, r.Granted, r.Reason, r.DecidedBy,
-		r.CreatedAt, r.DecidedAt, r.Score)
+		r.CreatedAt, r.DecidedAt, r.Score, r.SecondApprover)
 	if pg.IsUniqueViolation(err, "limit_requests_one_open") {
 		return domain.Refuse("LIMIT_REQUEST_IN_REVIEW", "a request is already being analyzed")
 	}
@@ -474,8 +474,8 @@ func (u *unit) LockLimitRequest(id uuid.UUID) (domain.LimitRequest, error) {
 }
 
 func (u *unit) SaveLimitRequest(r domain.LimitRequest) error {
-	return u.exec(`UPDATE limit_requests SET status = $2, granted = $3, reason = $4, decided_by = $5, decided_at = $6 WHERE id = $1`,
-		r.ID, r.Status, r.Granted, r.Reason, r.DecidedBy, r.DecidedAt)
+	return u.exec(`UPDATE limit_requests SET status = $2, granted = $3, reason = $4, decided_by = $5, decided_at = $6, second_approver = $7
+		WHERE id = $1`, r.ID, r.Status, r.Granted, r.Reason, r.DecidedBy, r.DecidedAt, r.SecondApprover)
 }
 
 func (s *Store) LimitRequestByKey(ctx context.Context, key string) (*domain.LimitRequest, error) {

@@ -28,6 +28,9 @@ const (
 	ApprovalKind_APPROVAL_KIND_UNSPECIFIED ApprovalKind = 0
 	// Unblock an account blocked by an analyst or by fraud rules.
 	ApprovalKind_APPROVAL_KIND_UNBLOCK_ACCOUNT ApprovalKind = 1
+	// Grant a credit limit above R$ 10.000,00. Target: the limit request;
+	// params: account_id, granted_minor.
+	ApprovalKind_APPROVAL_KIND_LIMIT_INCREASE ApprovalKind = 2
 )
 
 // Enum value maps for ApprovalKind.
@@ -35,10 +38,12 @@ var (
 	ApprovalKind_name = map[int32]string{
 		0: "APPROVAL_KIND_UNSPECIFIED",
 		1: "APPROVAL_KIND_UNBLOCK_ACCOUNT",
+		2: "APPROVAL_KIND_LIMIT_INCREASE",
 	}
 	ApprovalKind_value = map[string]int32{
 		"APPROVAL_KIND_UNSPECIFIED":     0,
 		"APPROVAL_KIND_UNBLOCK_ACCOUNT": 1,
+		"APPROVAL_KIND_LIMIT_INCREASE":  2,
 	}
 )
 
@@ -579,6 +584,7 @@ type Approval struct {
 	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	DecidedAt      *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=decided_at,json=decidedAt,proto3" json:"decided_at,omitempty"`
 	ExpiresAt      *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	Params         map[string]string      `protobuf:"bytes,13,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -697,12 +703,21 @@ func (x *Approval) GetExpiresAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Approval) GetParams() map[string]string {
+	if x != nil {
+		return x.Params
+	}
+	return nil
+}
+
 type RequestApprovalRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Kind          ApprovalKind           `protobuf:"varint,1,opt,name=kind,proto3,enum=bank.backoffice.v1.ApprovalKind" json:"kind,omitempty"`
-	TargetId      string                 `protobuf:"bytes,2,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
-	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
-	RequestedBy   string                 `protobuf:"bytes,4,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Kind        ApprovalKind           `protobuf:"varint,1,opt,name=kind,proto3,enum=bank.backoffice.v1.ApprovalKind" json:"kind,omitempty"`
+	TargetId    string                 `protobuf:"bytes,2,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
+	Reason      string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	RequestedBy string                 `protobuf:"bytes,4,opt,name=requested_by,json=requestedBy,proto3" json:"requested_by,omitempty"`
+	// What the action needs besides its target (see ApprovalKind).
+	Params        map[string]string `protobuf:"bytes,5,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -763,6 +778,13 @@ func (x *RequestApprovalRequest) GetRequestedBy() string {
 		return x.RequestedBy
 	}
 	return ""
+}
+
+func (x *RequestApprovalRequest) GetParams() map[string]string {
+	if x != nil {
+		return x.Params
+	}
+	return nil
 }
 
 type RequestApprovalResponse struct {
@@ -1060,7 +1082,7 @@ const file_bank_backoffice_v1_backoffice_proto_rawDesc = "" +
 	"\x13VerifyAuditResponse\x12\x16\n" +
 	"\x06intact\x18\x01 \x01(\bR\x06intact\x12\x16\n" +
 	"\x06events\x18\x02 \x01(\x03R\x06events\x12\x1b\n" +
-	"\tbroken_at\x18\x03 \x01(\x03R\bbrokenAt\"\x84\x04\n" +
+	"\tbroken_at\x18\x03 \x01(\x03R\bbrokenAt\"\x81\x05\n" +
 	"\bApproval\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x124\n" +
 	"\x04kind\x18\x02 \x01(\x0e2 .bank.backoffice.v1.ApprovalKindR\x04kind\x12\x1b\n" +
@@ -1078,12 +1100,20 @@ const file_bank_backoffice_v1_backoffice_proto_rawDesc = "" +
 	"\n" +
 	"decided_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tdecidedAt\x129\n" +
 	"\n" +
-	"expires_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xa6\x01\n" +
+	"expires_at\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x12@\n" +
+	"\x06params\x18\r \x03(\v2(.bank.backoffice.v1.Approval.ParamsEntryR\x06params\x1a9\n" +
+	"\vParamsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb1\x02\n" +
 	"\x16RequestApprovalRequest\x124\n" +
 	"\x04kind\x18\x01 \x01(\x0e2 .bank.backoffice.v1.ApprovalKindR\x04kind\x12\x1b\n" +
 	"\ttarget_id\x18\x02 \x01(\tR\btargetId\x12\x16\n" +
 	"\x06reason\x18\x03 \x01(\tR\x06reason\x12!\n" +
-	"\frequested_by\x18\x04 \x01(\tR\vrequestedBy\"S\n" +
+	"\frequested_by\x18\x04 \x01(\tR\vrequestedBy\x12N\n" +
+	"\x06params\x18\x05 \x03(\v26.bank.backoffice.v1.RequestApprovalRequest.ParamsEntryR\x06params\x1a9\n" +
+	"\vParamsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"S\n" +
 	"\x17RequestApprovalResponse\x128\n" +
 	"\bapproval\x18\x01 \x01(\v2\x1c.bank.backoffice.v1.ApprovalR\bapproval\"h\n" +
 	"\x14ListApprovalsRequest\x12:\n" +
@@ -1098,10 +1128,11 @@ const file_bank_backoffice_v1_backoffice_proto_rawDesc = "" +
 	"\aapprove\x18\x03 \x01(\bR\aapprove\x12\x16\n" +
 	"\x06reason\x18\x04 \x01(\tR\x06reason\"R\n" +
 	"\x16DecideApprovalResponse\x128\n" +
-	"\bapproval\x18\x01 \x01(\v2\x1c.bank.backoffice.v1.ApprovalR\bapproval*P\n" +
+	"\bapproval\x18\x01 \x01(\v2\x1c.bank.backoffice.v1.ApprovalR\bapproval*r\n" +
 	"\fApprovalKind\x12\x1d\n" +
 	"\x19APPROVAL_KIND_UNSPECIFIED\x10\x00\x12!\n" +
-	"\x1dAPPROVAL_KIND_UNBLOCK_ACCOUNT\x10\x01*\xe1\x01\n" +
+	"\x1dAPPROVAL_KIND_UNBLOCK_ACCOUNT\x10\x01\x12 \n" +
+	"\x1cAPPROVAL_KIND_LIMIT_INCREASE\x10\x02*\xe1\x01\n" +
 	"\x0eApprovalStatus\x12\x1f\n" +
 	"\x1bAPPROVAL_STATUS_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17APPROVAL_STATUS_PENDING\x10\x01\x12\x1c\n" +
@@ -1132,7 +1163,7 @@ func file_bank_backoffice_v1_backoffice_proto_rawDescGZIP() []byte {
 }
 
 var file_bank_backoffice_v1_backoffice_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_bank_backoffice_v1_backoffice_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_bank_backoffice_v1_backoffice_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_bank_backoffice_v1_backoffice_proto_goTypes = []any{
 	(ApprovalKind)(0),               // 0: bank.backoffice.v1.ApprovalKind
 	(ApprovalStatus)(0),             // 1: bank.backoffice.v1.ApprovalStatus
@@ -1152,41 +1183,45 @@ var file_bank_backoffice_v1_backoffice_proto_goTypes = []any{
 	(*DecideApprovalResponse)(nil),  // 15: bank.backoffice.v1.DecideApprovalResponse
 	nil,                             // 16: bank.backoffice.v1.AuditEvent.DetailsEntry
 	nil,                             // 17: bank.backoffice.v1.RecordAuditRequest.DetailsEntry
-	(*timestamppb.Timestamp)(nil),   // 18: google.protobuf.Timestamp
+	nil,                             // 18: bank.backoffice.v1.Approval.ParamsEntry
+	nil,                             // 19: bank.backoffice.v1.RequestApprovalRequest.ParamsEntry
+	(*timestamppb.Timestamp)(nil),   // 20: google.protobuf.Timestamp
 }
 var file_bank_backoffice_v1_backoffice_proto_depIdxs = []int32{
 	16, // 0: bank.backoffice.v1.AuditEvent.details:type_name -> bank.backoffice.v1.AuditEvent.DetailsEntry
-	18, // 1: bank.backoffice.v1.AuditEvent.at:type_name -> google.protobuf.Timestamp
+	20, // 1: bank.backoffice.v1.AuditEvent.at:type_name -> google.protobuf.Timestamp
 	17, // 2: bank.backoffice.v1.RecordAuditRequest.details:type_name -> bank.backoffice.v1.RecordAuditRequest.DetailsEntry
 	2,  // 3: bank.backoffice.v1.RecordAuditResponse.event:type_name -> bank.backoffice.v1.AuditEvent
 	2,  // 4: bank.backoffice.v1.ListAuditResponse.events:type_name -> bank.backoffice.v1.AuditEvent
 	0,  // 5: bank.backoffice.v1.Approval.kind:type_name -> bank.backoffice.v1.ApprovalKind
 	1,  // 6: bank.backoffice.v1.Approval.status:type_name -> bank.backoffice.v1.ApprovalStatus
-	18, // 7: bank.backoffice.v1.Approval.created_at:type_name -> google.protobuf.Timestamp
-	18, // 8: bank.backoffice.v1.Approval.decided_at:type_name -> google.protobuf.Timestamp
-	18, // 9: bank.backoffice.v1.Approval.expires_at:type_name -> google.protobuf.Timestamp
-	0,  // 10: bank.backoffice.v1.RequestApprovalRequest.kind:type_name -> bank.backoffice.v1.ApprovalKind
-	9,  // 11: bank.backoffice.v1.RequestApprovalResponse.approval:type_name -> bank.backoffice.v1.Approval
-	1,  // 12: bank.backoffice.v1.ListApprovalsRequest.status:type_name -> bank.backoffice.v1.ApprovalStatus
-	9,  // 13: bank.backoffice.v1.ListApprovalsResponse.approvals:type_name -> bank.backoffice.v1.Approval
-	9,  // 14: bank.backoffice.v1.DecideApprovalResponse.approval:type_name -> bank.backoffice.v1.Approval
-	3,  // 15: bank.backoffice.v1.BackOfficeService.RecordAudit:input_type -> bank.backoffice.v1.RecordAuditRequest
-	5,  // 16: bank.backoffice.v1.BackOfficeService.ListAudit:input_type -> bank.backoffice.v1.ListAuditRequest
-	7,  // 17: bank.backoffice.v1.BackOfficeService.VerifyAudit:input_type -> bank.backoffice.v1.VerifyAuditRequest
-	10, // 18: bank.backoffice.v1.BackOfficeService.RequestApproval:input_type -> bank.backoffice.v1.RequestApprovalRequest
-	12, // 19: bank.backoffice.v1.BackOfficeService.ListApprovals:input_type -> bank.backoffice.v1.ListApprovalsRequest
-	14, // 20: bank.backoffice.v1.BackOfficeService.DecideApproval:input_type -> bank.backoffice.v1.DecideApprovalRequest
-	4,  // 21: bank.backoffice.v1.BackOfficeService.RecordAudit:output_type -> bank.backoffice.v1.RecordAuditResponse
-	6,  // 22: bank.backoffice.v1.BackOfficeService.ListAudit:output_type -> bank.backoffice.v1.ListAuditResponse
-	8,  // 23: bank.backoffice.v1.BackOfficeService.VerifyAudit:output_type -> bank.backoffice.v1.VerifyAuditResponse
-	11, // 24: bank.backoffice.v1.BackOfficeService.RequestApproval:output_type -> bank.backoffice.v1.RequestApprovalResponse
-	13, // 25: bank.backoffice.v1.BackOfficeService.ListApprovals:output_type -> bank.backoffice.v1.ListApprovalsResponse
-	15, // 26: bank.backoffice.v1.BackOfficeService.DecideApproval:output_type -> bank.backoffice.v1.DecideApprovalResponse
-	21, // [21:27] is the sub-list for method output_type
-	15, // [15:21] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	20, // 7: bank.backoffice.v1.Approval.created_at:type_name -> google.protobuf.Timestamp
+	20, // 8: bank.backoffice.v1.Approval.decided_at:type_name -> google.protobuf.Timestamp
+	20, // 9: bank.backoffice.v1.Approval.expires_at:type_name -> google.protobuf.Timestamp
+	18, // 10: bank.backoffice.v1.Approval.params:type_name -> bank.backoffice.v1.Approval.ParamsEntry
+	0,  // 11: bank.backoffice.v1.RequestApprovalRequest.kind:type_name -> bank.backoffice.v1.ApprovalKind
+	19, // 12: bank.backoffice.v1.RequestApprovalRequest.params:type_name -> bank.backoffice.v1.RequestApprovalRequest.ParamsEntry
+	9,  // 13: bank.backoffice.v1.RequestApprovalResponse.approval:type_name -> bank.backoffice.v1.Approval
+	1,  // 14: bank.backoffice.v1.ListApprovalsRequest.status:type_name -> bank.backoffice.v1.ApprovalStatus
+	9,  // 15: bank.backoffice.v1.ListApprovalsResponse.approvals:type_name -> bank.backoffice.v1.Approval
+	9,  // 16: bank.backoffice.v1.DecideApprovalResponse.approval:type_name -> bank.backoffice.v1.Approval
+	3,  // 17: bank.backoffice.v1.BackOfficeService.RecordAudit:input_type -> bank.backoffice.v1.RecordAuditRequest
+	5,  // 18: bank.backoffice.v1.BackOfficeService.ListAudit:input_type -> bank.backoffice.v1.ListAuditRequest
+	7,  // 19: bank.backoffice.v1.BackOfficeService.VerifyAudit:input_type -> bank.backoffice.v1.VerifyAuditRequest
+	10, // 20: bank.backoffice.v1.BackOfficeService.RequestApproval:input_type -> bank.backoffice.v1.RequestApprovalRequest
+	12, // 21: bank.backoffice.v1.BackOfficeService.ListApprovals:input_type -> bank.backoffice.v1.ListApprovalsRequest
+	14, // 22: bank.backoffice.v1.BackOfficeService.DecideApproval:input_type -> bank.backoffice.v1.DecideApprovalRequest
+	4,  // 23: bank.backoffice.v1.BackOfficeService.RecordAudit:output_type -> bank.backoffice.v1.RecordAuditResponse
+	6,  // 24: bank.backoffice.v1.BackOfficeService.ListAudit:output_type -> bank.backoffice.v1.ListAuditResponse
+	8,  // 25: bank.backoffice.v1.BackOfficeService.VerifyAudit:output_type -> bank.backoffice.v1.VerifyAuditResponse
+	11, // 26: bank.backoffice.v1.BackOfficeService.RequestApproval:output_type -> bank.backoffice.v1.RequestApprovalResponse
+	13, // 27: bank.backoffice.v1.BackOfficeService.ListApprovals:output_type -> bank.backoffice.v1.ListApprovalsResponse
+	15, // 28: bank.backoffice.v1.BackOfficeService.DecideApproval:output_type -> bank.backoffice.v1.DecideApprovalResponse
+	23, // [23:29] is the sub-list for method output_type
+	17, // [17:23] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_bank_backoffice_v1_backoffice_proto_init() }
@@ -1200,7 +1235,7 @@ func file_bank_backoffice_v1_backoffice_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_backoffice_v1_backoffice_proto_rawDesc), len(file_bank_backoffice_v1_backoffice_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   16,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

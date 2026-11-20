@@ -480,6 +480,8 @@ type LimitRequest struct {
 	Granted        int64
 	Reason         string
 	DecidedBy      string
+	// SecondApprover confirmed a grant above FourEyesLimit (four-eyes).
+	SecondApprover string
 	// Score is the customer's score when the request was analyzed.
 	Score     int
 	CreatedAt time.Time
@@ -488,8 +490,8 @@ type LimitRequest struct {
 
 // AnalyzeLimit decides a request at once when it can: a decrease (never
 // below what is used), a refusal (an overdue invoice, a very low score), or
-// an increase up to what the score allows (+50%, or +100% from 750);
-// anything larger goes to an analyst.
+// an increase up to what the score allows (+50%, or +100% from 750) and
+// never above FourEyesLimit; anything larger goes to an analyst.
 func AnalyzeLimit(l Line, requested int64, overdue bool, score int) (LimitStatus, string, error) {
 	switch {
 	case requested <= 0 || requested%100 != 0:
@@ -508,18 +510,25 @@ func AnalyzeLimit(l Line, requested int64, overdue bool, score int) (LimitStatus
 		return LimitRejected, "HAS_OVERDUE_INVOICE", nil
 	case score < MinScore:
 		return LimitRejected, "LOW_SCORE", nil
-	case AutoIncreaseFor(score) > 0 && requested <= percent(l.Limit, AutoIncreaseFor(score)):
-		return LimitApproved, "", nil
+	case AutoIncreaseFor(score) > 0 && requested <= percent(l.Limit, AutoIncreaseFor(score)) && requested <= FourEyesLimit:
+		return LimitApproved, "", nil // above FourEyesLimit, people decide
 	}
 	return LimitInReview, "", nil
 }
 
+// FourEyesLimit is the largest limit one analyst may grant alone; above it a
+// second analyst must confirm.
+const FourEyesLimit = 10_000_00
+
 // Decide is an analyst's decision on a request in review: approve (the
-// requested amount, or less) or reject with a reason.
-func (r *LimitRequest) Decide(analyst string, approve bool, granted int64, reason string, now time.Time) error {
+// requested amount, or less) or reject with a reason. Granting more than
+// FourEyesLimit needs a second, different approver.
+func (r *LimitRequest) Decide(analyst, second string, approve bool, granted int64, reason string, now time.Time) error {
 	switch {
 	case analyst == "":
 		return fmt.Errorf("%w: analyst is required", ErrInvalidArgument)
+	case second != "" && second == analyst:
+		return Refuse("SAME_ANALYST", "the second approver must be another analyst")
 	case r.Status != LimitInReview:
 		return Refuse("LIMIT_REQUEST_NOT_IN_REVIEW", "this request was decided already")
 	case !approve && reason == "":
@@ -536,6 +545,9 @@ func (r *LimitRequest) Decide(analyst string, approve bool, granted int64, reaso
 	if granted <= r.CurrentLimit || granted > r.Requested || granted%100 != 0 {
 		return fmt.Errorf("%w: grant more than the current limit and at most what was asked", ErrInvalidArgument)
 	}
-	r.Status, r.Granted, r.Reason = LimitApproved, granted, reason
+	if granted > FourEyesLimit && second == "" {
+		return Refuse("FOUR_EYES_REQUIRED", "a limit above R$ 10.000,00 needs a second analyst")
+	}
+	r.Status, r.Granted, r.Reason, r.SecondApprover = LimitApproved, granted, reason, second
 	return nil
 }

@@ -254,7 +254,12 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - The gateway resolves the real client address behind trusted proxies (`TRUSTED_PROXIES`), which also fixes per-IP rate limits behind the web app's nginx.
 - Web: devices in Settings; mobile: a "Dispositivos conectados" screen.
 
+## Phase 38 — Four-eyes on large limits ✅
+
+- A credit limit above R$ 10.000,00 needs two analysts: the first one's approval becomes a request in the approvals queue (with the current limit, usage and score), and only a different analyst's approval grants it.
+- Enforced in credit-service too (`FOUR_EYES_REQUIRED`); the automatic analysis no longer grants above that line on its own.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.
-- Back office: staff SSO (OIDC) with WebAuthn, more four-eyes actions; card representment and arbitration.
+- Back office: staff SSO (OIDC) with WebAuthn, four-eyes on manual credits and account closing; card representment and arbitration.

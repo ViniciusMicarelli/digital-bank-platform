@@ -143,4 +143,20 @@ func TestAnalyzeLimitByScore(t *testing.T) {
 			t.Errorf("AnalyzeLimit(%d, score %d) = %s %q %v, want %s %q", c.requested, c.score, status, reason, err, c.status, c.reason)
 		}
 	}
+	// Never automatic above the four-eyes limit, whatever the score.
+	big := Line{Status: LineActive, Limit: 9_000_00}
+	for _, c := range []struct {
+		requested int64
+		score     int
+		status    LimitStatus
+		reason    string
+	}{
+		{10_000_00, 900, LimitApproved, ""},
+		{10_100_00, 900, LimitInReview, ""},
+	} {
+		status, reason, err := AnalyzeLimit(big, c.requested, false, c.score)
+		if err != nil || status != c.status || reason != c.reason {
+			t.Errorf("AnalyzeLimit(%d, score %d) = %s %q %v, want %s %q", c.requested, c.score, status, reason, err, c.status, c.reason)
+		}
+	}
 }

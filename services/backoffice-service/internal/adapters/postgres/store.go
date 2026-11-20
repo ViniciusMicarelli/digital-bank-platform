@@ -110,7 +110,7 @@ func (s *Store) ScanAudit(ctx context.Context, visit func(domain.Event) error) e
 }
 
 const approvalCols = `id, kind, target_id, reason, requested_by, status, decided_by, decision_reason, failure_reason,
-	created_at, decided_at, expires_at`
+	created_at, decided_at, expires_at, params`
 
 func scanApproval(row pgx.Row) (domain.Approval, error) {
 	var (
@@ -118,7 +118,7 @@ func scanApproval(row pgx.Row) (domain.Approval, error) {
 		kind, status string
 	)
 	err := row.Scan(&a.ID, &kind, &a.TargetID, &a.Reason, &a.RequestedBy, &status, &a.DecidedBy, &a.DecisionReason,
-		&a.FailureReason, &a.CreatedAt, &a.DecidedAt, &a.ExpiresAt)
+		&a.FailureReason, &a.CreatedAt, &a.DecidedAt, &a.ExpiresAt, &a.Params)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return a, fmt.Errorf("%w: approval", domain.ErrNotFound)
 	}
@@ -143,9 +143,9 @@ func collect(rows pgx.Rows, err error) ([]domain.Approval, error) {
 }
 
 func (t *txStore) InsertApproval(ctx context.Context, a domain.Approval) error {
-	_, err := t.tx.Exec(ctx, `INSERT INTO approvals (`+approvalCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+	_, err := t.tx.Exec(ctx, `INSERT INTO approvals (`+approvalCols+`) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		a.ID, a.Kind, a.TargetID, a.Reason, a.RequestedBy, a.Status, a.DecidedBy, a.DecisionReason, a.FailureReason,
-		a.CreatedAt, a.DecidedAt, a.ExpiresAt)
+		a.CreatedAt, a.DecidedAt, a.ExpiresAt, a.Params)
 	if pg.IsUniqueViolation(err, "approvals_one_open") {
 		return domain.Refuse("APPROVAL_ALREADY_PENDING", "this action is already waiting for a second analyst")
 	}

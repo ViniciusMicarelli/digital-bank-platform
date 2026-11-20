@@ -10,9 +10,15 @@ import (
 // Kind is a sensitive action that needs a second analyst.
 type Kind string
 
-const KindUnblockAccount Kind = "UNBLOCK_ACCOUNT"
+const (
+	KindUnblockAccount Kind = "UNBLOCK_ACCOUNT"
+	// KindLimitIncrease grants a credit limit above what one analyst may
+	// grant alone. Target: the limit request; params: account_id,
+	// granted_minor (the limit to grant, in centavos).
+	KindLimitIncrease Kind = "LIMIT_INCREASE"
+)
 
-func (k Kind) Valid() bool { return k == KindUnblockAccount }
+func (k Kind) Valid() bool { return k == KindUnblockAccount || k == KindLimitIncrease }
 
 // Status of an approval.
 type Status string
@@ -31,11 +37,13 @@ const ApprovalTTL = 24 * time.Hour
 
 // Approval is a four-eyes request.
 type Approval struct {
-	ID             uuid.UUID
-	Kind           Kind
-	TargetID       string
-	Reason         string
-	RequestedBy    string
+	ID          uuid.UUID
+	Kind        Kind
+	TargetID    string
+	Reason      string
+	RequestedBy string
+	// Params are what the action needs besides its target.
+	Params         map[string]string
 	Status         Status
 	DecidedBy      string
 	DecisionReason string
@@ -46,7 +54,7 @@ type Approval struct {
 }
 
 // NewApproval opens a pending request.
-func NewApproval(kind Kind, target, reason, requestedBy string, now time.Time) (Approval, error) {
+func NewApproval(kind Kind, target, reason, requestedBy string, params map[string]string, now time.Time) (Approval, error) {
 	switch {
 	case !kind.Valid():
 		return Approval{}, invalid("unknown approval kind")
@@ -56,9 +64,14 @@ func NewApproval(kind Kind, target, reason, requestedBy string, now time.Time) (
 		return Approval{}, invalid("a reason is required")
 	case strings.TrimSpace(requestedBy) == "":
 		return Approval{}, invalid("requested_by is required")
+	case kind == KindLimitIncrease && (params["account_id"] == "" || params["granted_minor"] == ""):
+		return Approval{}, invalid("a limit increase needs account_id and granted_minor")
+	}
+	if params == nil {
+		params = map[string]string{}
 	}
 	return Approval{ID: uuid.Must(uuid.NewV7()), Kind: kind, TargetID: target, Reason: strings.TrimSpace(reason),
-		RequestedBy: requestedBy, Status: StatusPending, CreatedAt: now, ExpiresAt: now.Add(ApprovalTTL)}, nil
+		RequestedBy: requestedBy, Params: params, Status: StatusPending, CreatedAt: now, ExpiresAt: now.Add(ApprovalTTL)}, nil
 }
 
 // Expired reports whether a pending request ran out of time.

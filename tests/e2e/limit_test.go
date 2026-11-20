@@ -66,4 +66,40 @@ func TestCreditLimitRequests(t *testing.T) {
 	if n := len(mine["requests"].([]any)); n != 3 {
 		t.Fatalf("customer's requests = %v", mine)
 	}
+
+	// Above R$ 10.000: the analyst's approval waits for a second analyst.
+	_, big := ana.call("POST", base+"/credit/limit", map[string]string{"amount": "15000.00"}, idem())
+	decide = "/v1/backoffice/limit-requests/" + big["id"].(string) + "/decide"
+	if status, body := staff.call("POST", decide, map[string]any{"approve": true}, nil); status != 400 || errCode(body) != "REASON_REQUIRED" {
+		t.Fatalf("four-eyes without a reason: %d %v", status, body)
+	}
+	status, pending := staff.call("POST", decide, map[string]any{"approve": true, "reason": "Renda de R$ 40 mil comprovada"}, nil)
+	if status != 202 || pending["status"] != "AWAITING_SECOND_ANALYST" || limit() != "3000.00" {
+		t.Fatalf("large approval: %d %v", status, pending)
+	}
+	approval := pending["approval"].(map[string]any)
+	if approval["kind"] != "LIMIT_INCREASE" || approval["params"].(map[string]any)["granted_minor"] != "1500000" {
+		t.Fatalf("approval = %v", approval)
+	}
+	approve := "/v1/backoffice/approvals/" + approval["id"].(string) + "/approve"
+	if status, body := staff.call("POST", approve, map[string]string{}, nil); status != 422 || errCode(body) != "SAME_ANALYST" {
+		t.Fatalf("the same analyst confirming: %d %v", status, body)
+	}
+	reviewer := analyst(t, reviewerEmail, reviewerSecret)
+	_, list := reviewer.call("GET", "/v1/backoffice/approvals", nil, nil)
+	var seen map[string]any
+	for _, x := range list["approvals"].([]any) {
+		if x.(map[string]any)["id"] == approval["id"] {
+			seen = x.(map[string]any)
+		}
+	}
+	if seen == nil || amountOf(seen["current_limit"]) != "3000.00" || seen["account"] == nil {
+		t.Fatalf("the reviewer's queue = %v", seen)
+	}
+	if status, done := reviewer.call("POST", approve, map[string]string{}, nil); status != 200 || done["status"] != "EXECUTED" {
+		t.Fatalf("second analyst: %d %v", status, done)
+	}
+	if limit() != "15000.00" {
+		t.Fatalf("limit after four-eyes = %s", limit())
+	}
 }

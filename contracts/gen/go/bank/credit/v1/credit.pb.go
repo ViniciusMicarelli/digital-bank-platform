@@ -2179,9 +2179,11 @@ type LimitRequest struct {
 	CreatedAt *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	DecidedAt *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=decided_at,json=decidedAt,proto3" json:"decided_at,omitempty"`
 	// The customer's score when the request was analyzed.
-	Score         int32 `protobuf:"varint,11,opt,name=score,proto3" json:"score,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Score int32 `protobuf:"varint,11,opt,name=score,proto3" json:"score,omitempty"`
+	// The analyst who confirmed a grant above R$ 10.000,00.
+	SecondApprover string `protobuf:"bytes,12,opt,name=second_approver,json=secondApprover,proto3" json:"second_approver,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *LimitRequest) Reset() {
@@ -2289,6 +2291,13 @@ func (x *LimitRequest) GetScore() int32 {
 		return x.Score
 	}
 	return 0
+}
+
+func (x *LimitRequest) GetSecondApprover() string {
+	if x != nil {
+		return x.SecondApprover
+	}
+	return ""
 }
 
 type RequestLimitRequest struct {
@@ -2497,10 +2506,13 @@ type DecideLimitRequestRequest struct {
 	AnalystId string                 `protobuf:"bytes,2,opt,name=analyst_id,json=analystId,proto3" json:"analyst_id,omitempty"`
 	Approve   bool                   `protobuf:"varint,3,opt,name=approve,proto3" json:"approve,omitempty"`
 	// Optional: grant less than requested.
-	Granted       *v1.Money `protobuf:"bytes,4,opt,name=granted,proto3" json:"granted,omitempty"`
-	Reason        string    `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Granted *v1.Money `protobuf:"bytes,4,opt,name=granted,proto3" json:"granted,omitempty"`
+	Reason  string    `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	// Required to grant more than R$ 10.000,00 (four-eyes): another analyst
+	// who confirmed it; otherwise FAILED_PRECONDITION FOUR_EYES_REQUIRED.
+	SecondApproverId string `protobuf:"bytes,6,opt,name=second_approver_id,json=secondApproverId,proto3" json:"second_approver_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *DecideLimitRequestRequest) Reset() {
@@ -2564,6 +2576,13 @@ func (x *DecideLimitRequestRequest) GetGranted() *v1.Money {
 func (x *DecideLimitRequestRequest) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *DecideLimitRequestRequest) GetSecondApproverId() string {
+	if x != nil {
+		return x.SecondApproverId
 	}
 	return ""
 }
@@ -2968,7 +2987,7 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"\binterest\x18\x06 \x01(\v2\x15.bank.common.v1.MoneyR\binterest\x12&\n" +
 	"\x0fmonthly_rate_bp\x18\a \x01(\x05R\rmonthlyRateBp\"F\n" +
 	"\x13PlanInvoiceResponse\x12/\n" +
-	"\x04plan\x18\x01 \x01(\v2\x1b.bank.credit.v1.InvoicePlanR\x04plan\"\xba\x03\n" +
+	"\x04plan\x18\x01 \x01(\v2\x1b.bank.credit.v1.InvoicePlanR\x04plan\"\xe3\x03\n" +
 	"\fLimitRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -2985,7 +3004,8 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"\n" +
 	"decided_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tdecidedAt\x12\x14\n" +
-	"\x05score\x18\v \x01(\x05R\x05score\"\x8c\x01\n" +
+	"\x05score\x18\v \x01(\x05R\x05score\x12'\n" +
+	"\x0fsecond_approver\x18\f \x01(\tR\x0esecondApprover\"\x8c\x01\n" +
 	"\x13RequestLimitRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
@@ -2998,14 +3018,15 @@ const file_bank_credit_v1_credit_proto_rawDesc = "" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\"U\n" +
 	"\x19ListLimitRequestsResponse\x128\n" +
-	"\brequests\x18\x01 \x03(\v2\x1c.bank.credit.v1.LimitRequestR\brequests\"\xad\x01\n" +
+	"\brequests\x18\x01 \x03(\v2\x1c.bank.credit.v1.LimitRequestR\brequests\"\xdb\x01\n" +
 	"\x19DecideLimitRequestRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
 	"analyst_id\x18\x02 \x01(\tR\tanalystId\x12\x18\n" +
 	"\aapprove\x18\x03 \x01(\bR\aapprove\x12/\n" +
 	"\agranted\x18\x04 \x01(\v2\x15.bank.common.v1.MoneyR\agranted\x12\x16\n" +
-	"\x06reason\x18\x05 \x01(\tR\x06reason\"T\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\x12,\n" +
+	"\x12second_approver_id\x18\x06 \x01(\tR\x10secondApproverId\"T\n" +
 	"\x1aDecideLimitRequestResponse\x126\n" +
 	"\arequest\x18\x01 \x01(\v2\x1c.bank.credit.v1.LimitRequestR\arequest\"6\n" +
 	"\x15GetCreditScoreRequest\x12\x1d\n" +

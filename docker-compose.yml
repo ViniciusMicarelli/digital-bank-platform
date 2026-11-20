@@ -169,10 +169,12 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
       GRPC_ADDR: ":9013"
       ACCOUNT_ADDR: account-service:9002
+      CREDIT_ADDR: credit-service:9009
     ports: ["9013:9013"]
     depends_on:
       postgres: { condition: service_healthy }
       account-service: { condition: service_healthy }
+      credit-service: { condition: service_healthy }
 
   savings-service:
     build: { context: ., args: { SERVICE: savings-service } }
@@ -356,7 +358,7 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/credit-service.pem
       TLS_KEY: /certs/credit-service-key.pem
-      ALLOWED_CALLERS: api-gateway,card-service,dev-client
+      ALLOWED_CALLERS: api-gateway,card-service,backoffice-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/credit?sslmode=disable
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317

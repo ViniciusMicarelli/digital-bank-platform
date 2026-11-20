@@ -29,7 +29,7 @@ Bank staff sign in through the same identity-service with role `ANALYST`, carrie
 
 - **MFA is mandatory.** The gateway's `/v1/backoffice/*` routes refuse any other role (403 `STAFF_ONLY`) and analyst sessions without a second factor (403 `MFA_REQUIRED`); the web app walks such an analyst through TOTP enrollment.
 - **Audit trail, fail closed.** Every action (and every look at a customer's file) is written to the backoffice-service trail before it runs; if the trail is unavailable the action is refused (503 `AUDIT_UNAVAILABLE`). The trail is append-only (database triggers) and hash-chained, so even someone able to bypass the triggers breaks the chain, and `GET /v1/backoffice/audit/verify` finds where.
-- **Four-eyes.** Unblocking an account is a request that a *different* analyst must approve; the requester cannot (checked in the domain and by a database constraint).
+- **Four-eyes.** Unblocking an account, and granting a credit limit above R$ 10.000,00, are requests that a *different* analyst must approve; the requester cannot (checked in the domain and by database constraints). For limits the rule also lives in credit-service itself, so no path (gateway, automatic analysis) can grant that much with one person.
 - KYC decisions also store the analyst (`reviewed_by`) and account blocks carry the analyst in their reason.
 
 Planned: staff from the bank's SSO (OIDC) with phishing-resistant MFA (WebAuthn).

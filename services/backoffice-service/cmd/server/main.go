@@ -1,5 +1,6 @@
 // Command server runs the backoffice-service: the staff audit trail and
-// four-eyes approvals (gRPC), and the loop that settles approved actions.
+// four-eyes approvals (gRPC), and the loop that settles approved actions
+// (account-service, credit-service).
 package main
 
 import (
@@ -11,11 +12,12 @@ import (
 
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	backofficev1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/backoffice/v1"
+	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
-	"github.com/ViniciusMicarelli/digital-bank-platform/services/backoffice-service/internal/adapters/accounts"
+	"github.com/ViniciusMicarelli/digital-bank-platform/services/backoffice-service/internal/adapters/actions"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/backoffice-service/internal/adapters/grpcapi"
 	pgstore "github.com/ViniciusMicarelli/digital-bank-platform/services/backoffice-service/internal/adapters/postgres"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/backoffice-service/internal/application"
@@ -47,8 +49,15 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = accountConn.Close() }()
+	creditConn, err := grpcserver.Dial(config.String("CREDIT_ADDR", "127.0.0.1:9009"))
+	if err != nil {
+		log.Error("dial credit-service", "error", err)
+		os.Exit(1)
+	}
+	defer func() { _ = creditConn.Close() }()
 
-	app := application.New(pgstore.NewStore(pool), accounts.New(accountv1.NewAccountServiceClient(accountConn)), log)
+	app := application.New(pgstore.NewStore(pool),
+		actions.New(accountv1.NewAccountServiceClient(accountConn), creditv1.NewCreditServiceClient(creditConn)), log)
 	go app.RunRecovery(ctx, config.Duration("RECOVERY_INTERVAL", 30*time.Second))
 
 	srvOpts, err := grpcserver.OptionsFromEnv()

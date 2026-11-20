@@ -77,7 +77,8 @@ type CreditServiceClient interface {
 	RequestLimit(ctx context.Context, in *RequestLimitRequest, opts ...grpc.CallOption) (*RequestLimitResponse, error)
 	// By account, or every account (back office) by status.
 	ListLimitRequests(ctx context.Context, in *ListLimitRequestsRequest, opts ...grpc.CallOption) (*ListLimitRequestsResponse, error)
-	// An analyst's decision on a request in review (may grant less).
+	// An analyst's decision on a request in review (may grant less); above
+	// R$ 10.000,00 only with a second approver (four-eyes).
 	DecideLimitRequest(ctx context.Context, in *DecideLimitRequestRequest, opts ...grpc.CallOption) (*DecideLimitRequestResponse, error)
 	// The bank's behaviour score (0..1000) for the account's card, with the
 	// factors behind it.
@@ -305,7 +306,8 @@ type CreditServiceServer interface {
 	RequestLimit(context.Context, *RequestLimitRequest) (*RequestLimitResponse, error)
 	// By account, or every account (back office) by status.
 	ListLimitRequests(context.Context, *ListLimitRequestsRequest) (*ListLimitRequestsResponse, error)
-	// An analyst's decision on a request in review (may grant less).
+	// An analyst's decision on a request in review (may grant less); above
+	// R$ 10.000,00 only with a second approver (four-eyes).
 	DecideLimitRequest(context.Context, *DecideLimitRequestRequest) (*DecideLimitRequestResponse, error)
 	// The bank's behaviour score (0..1000) for the account's card, with the
 	// factors behind it.

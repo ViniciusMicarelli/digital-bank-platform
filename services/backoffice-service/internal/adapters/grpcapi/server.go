@@ -29,7 +29,10 @@ func eventPB(e domain.Event) *backofficev1.AuditEvent {
 }
 
 var (
-	kindToPB   = map[domain.Kind]backofficev1.ApprovalKind{domain.KindUnblockAccount: backofficev1.ApprovalKind_APPROVAL_KIND_UNBLOCK_ACCOUNT}
+	kindToPB = map[domain.Kind]backofficev1.ApprovalKind{
+		domain.KindUnblockAccount: backofficev1.ApprovalKind_APPROVAL_KIND_UNBLOCK_ACCOUNT,
+		domain.KindLimitIncrease:  backofficev1.ApprovalKind_APPROVAL_KIND_LIMIT_INCREASE,
+	}
 	statusToPB = map[domain.Status]backofficev1.ApprovalStatus{
 		domain.StatusPending:  backofficev1.ApprovalStatus_APPROVAL_STATUS_PENDING,
 		domain.StatusApproved: backofficev1.ApprovalStatus_APPROVAL_STATUS_APPROVED,
@@ -42,7 +45,7 @@ var (
 
 func approvalPB(a domain.Approval) *backofficev1.Approval {
 	out := &backofficev1.Approval{Id: a.ID.String(), Kind: kindToPB[a.Kind], TargetId: a.TargetID, Reason: a.Reason,
-		RequestedBy: a.RequestedBy, Status: statusToPB[a.Status], DecidedBy: a.DecidedBy, DecisionReason: a.DecisionReason,
+		RequestedBy: a.RequestedBy, Params: a.Params, Status: statusToPB[a.Status], DecidedBy: a.DecidedBy, DecisionReason: a.DecisionReason,
 		FailureReason: a.FailureReason, CreatedAt: timestamppb.New(a.CreatedAt), ExpiresAt: timestamppb.New(a.ExpiresAt)}
 	if a.DecidedAt != nil {
 		out.DecidedAt = timestamppb.New(*a.DecidedAt)
@@ -99,7 +102,7 @@ func (s *Server) RequestApproval(ctx context.Context, req *backofficev1.RequestA
 			kind = k
 		}
 	}
-	a, err := s.app.Request(ctx, kind, req.GetTargetId(), req.GetReason(), req.GetRequestedBy())
+	a, err := s.app.Request(ctx, kind, req.GetTargetId(), req.GetReason(), req.GetRequestedBy(), req.GetParams())
 	if err != nil {
 		return nil, toStatus(err)
 	}

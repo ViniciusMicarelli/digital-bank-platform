@@ -111,11 +111,11 @@ func TestAuditChain(t *testing.T) {
 
 func TestFourEyes(t *testing.T) {
 	e := setup(t)
-	a, err := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-1", "cliente confirmou a identidade", "a1")
+	a, err := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-1", "cliente confirmou a identidade", "a1", nil)
 	if err != nil || a.Status != domain.StatusPending {
 		t.Fatalf("request = %+v %v", a, err)
 	}
-	if _, err := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-1", "de novo", "a2"); reason(err) != "APPROVAL_ALREADY_PENDING" {
+	if _, err := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-1", "de novo", "a2", nil); reason(err) != "APPROVAL_ALREADY_PENDING" {
 		t.Fatalf("second request: %v", err)
 	}
 	if _, err := e.svc.Decide(e.ctx, a.ID, "a1", true, ""); reason(err) != "SAME_ANALYST" {
@@ -130,7 +130,7 @@ func TestFourEyes(t *testing.T) {
 	}
 
 	// Rejected: nothing runs.
-	r, _ := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-2", "pedido do cliente", "a1")
+	r, _ := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-2", "pedido do cliente", "a1", nil)
 	if _, err := e.svc.Decide(e.ctx, r.ID, "a2", false, ""); !errors.Is(err, domain.ErrInvalidArgument) {
 		t.Fatal("a rejection needs a reason")
 	}
@@ -140,7 +140,7 @@ func TestFourEyes(t *testing.T) {
 
 	// The action itself refuses: FAILED with the reason.
 	e.exec.refuse = "ACCOUNT_NOT_BLOCKED"
-	f, _ := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-3", "pedido", "a1")
+	f, _ := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-3", "pedido", "a1", nil)
 	if f, _ := e.svc.Decide(e.ctx, f.ID, "a2", true, ""); f.Status != domain.StatusFailed || f.FailureReason != "ACCOUNT_NOT_BLOCKED" {
 		t.Fatalf("refused action = %+v", f)
 	}
@@ -166,7 +166,7 @@ func TestFourEyes(t *testing.T) {
 
 func TestRecoveryAndExpiry(t *testing.T) {
 	e := setup(t)
-	a, _ := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-1", "pedido", "a1")
+	a, _ := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-1", "pedido", "a1", nil)
 	e.exec.down = true
 	if a, err := e.svc.Decide(e.ctx, a.ID, "a2", true, ""); err != nil || a.Status != domain.StatusApproved {
 		t.Fatalf("approved during an outage = %+v %v", a, err)
@@ -178,8 +178,8 @@ func TestRecoveryAndExpiry(t *testing.T) {
 		t.Fatalf("recovered = %+v", a)
 	}
 
-	old, _ := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-2", "pedido", "a1")
-	late, _ := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-3", "pedido", "a1")
+	old, _ := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-2", "pedido", "a1", nil)
+	late, _ := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-3", "pedido", "a1", nil)
 	e.now = e.now.Add(domain.ApprovalTTL)
 	if _, err := e.svc.Decide(e.ctx, late.ID, "a2", true, ""); reason(err) != "APPROVAL_EXPIRED" {
 		t.Fatalf("late decision: %v", err)
@@ -192,7 +192,7 @@ func TestRecoveryAndExpiry(t *testing.T) {
 		t.Fatalf("late request = %+v", a)
 	}
 	// An expired request no longer blocks a new one.
-	if _, err := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-2", "pedido", "a1"); err != nil {
+	if _, err := e.svc.Request(e.ctx, domain.KindUnblockAccount, "acc-2", "pedido", "a1", nil); err != nil {
 		t.Fatal(err)
 	}
 	if list, _ := e.svc.Approvals(e.ctx, domain.StatusPending, 10); len(list) != 1 {
