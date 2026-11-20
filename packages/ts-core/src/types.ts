@@ -299,3 +299,13 @@ export interface LimitRequest {
   customer_id?: string
   used?: Money
 }
+
+export interface PixContact {
+  key: string
+  name: string
+  bank_name: string
+  nickname: string
+  favorite: boolean
+  last_sent_at?: string
+  times_sent: number
+}

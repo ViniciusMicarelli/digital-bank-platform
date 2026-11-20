@@ -642,3 +642,43 @@ func TestDynamicQRCode(t *testing.T) {
 		}
 	}
 }
+
+func TestContacts(t *testing.T) {
+	e := setup(t)
+	bob, _ := e.svc.RegisterKey(e.ctx, e.bruno, domain.KeyEmail, "bruno@example.com")
+	mine, _ := e.svc.RegisterKey(e.ctx, e.ana, domain.KeyEmail, "ana@example.com")
+	for i, key := range []string{"+5511987654321", "bruno@example.com", "+55 11 98765-4321"} {
+		if tr, err := e.svc.Send(e.ctx, fmt.Sprintf("c-%d", i), e.ana, key, brl("5"), ""); err != nil || tr.Status != domain.StatusCompleted {
+			t.Fatalf("send %d = %+v %v", i, tr, err)
+		}
+	}
+	list, err := e.svc.Contacts(e.ctx, e.ana)
+	if err != nil || len(list) != 2 || list[0].Key != "+5511987654321" || list[0].TimesSent != 2 || list[1].Name != "Bruno Lima" {
+		t.Fatalf("recent = %+v %v", list, err)
+	}
+	if _, err := e.svc.SaveFavorite(e.ctx, e.ana, mine.Value, ""); !errorsReason(err, "OWN_KEY") {
+		t.Fatalf("own key: %v", err)
+	}
+	if _, err := e.svc.SaveFavorite(e.ctx, e.ana, bob.Value, "  Irmão  "); err != nil {
+		t.Fatal(err)
+	}
+	// A favorite never paid shows too (name from the lookup).
+	if _, err := e.svc.SaveFavorite(e.ctx, e.ana, "maria@outrobanco.com.br", "Mãe"); err != nil {
+		t.Fatal(err)
+	}
+	list, _ = e.svc.Contacts(e.ctx, e.ana)
+	if len(list) != 3 || !list[0].Favorite || list[0].Nickname != "Irmão" || !list[1].Favorite || list[1].TimesSent != 0 || list[2].Favorite {
+		t.Fatalf("with favorites = %+v", list)
+	}
+	if err := e.svc.RemoveFavorite(e.ctx, e.ana, "maria@outrobanco.com.br"); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ = e.svc.Contacts(e.ctx, e.ana); len(list) != 2 {
+		t.Fatalf("after removing = %+v", list)
+	}
+}
+
+func errorsReason(err error, reason string) bool {
+	var r *domain.RejectedError
+	return errors.As(err, &r) && r.Reason == reason
+}

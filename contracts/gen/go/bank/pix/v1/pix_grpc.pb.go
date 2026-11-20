@@ -22,6 +22,9 @@ const (
 	PixService_RegisterKey_FullMethodName         = "/bank.pix.v1.PixService/RegisterKey"
 	PixService_DeleteKey_FullMethodName           = "/bank.pix.v1.PixService/DeleteKey"
 	PixService_ListKeys_FullMethodName            = "/bank.pix.v1.PixService/ListKeys"
+	PixService_ListContacts_FullMethodName        = "/bank.pix.v1.PixService/ListContacts"
+	PixService_SaveFavorite_FullMethodName        = "/bank.pix.v1.PixService/SaveFavorite"
+	PixService_RemoveFavorite_FullMethodName      = "/bank.pix.v1.PixService/RemoveFavorite"
 	PixService_LookupKey_FullMethodName           = "/bank.pix.v1.PixService/LookupKey"
 	PixService_CreateTransfer_FullMethodName      = "/bank.pix.v1.PixService/CreateTransfer"
 	PixService_GetTransfer_FullMethodName         = "/bank.pix.v1.PixService/GetTransfer"
@@ -54,6 +57,14 @@ type PixServiceClient interface {
 	RegisterKey(ctx context.Context, in *RegisterKeyRequest, opts ...grpc.CallOption) (*RegisterKeyResponse, error)
 	DeleteKey(ctx context.Context, in *DeleteKeyRequest, opts ...grpc.CallOption) (*DeleteKeyResponse, error)
 	ListKeys(ctx context.Context, in *ListKeysRequest, opts ...grpc.CallOption) (*ListKeysResponse, error)
+	// Who the account sends Pix to: favorites first, then the most recent
+	// receivers (from completed outgoing transfers).
+	ListContacts(ctx context.Context, in *ListContactsRequest, opts ...grpc.CallOption) (*ListContactsResponse, error)
+	// Saves a key as a favorite, with an optional nickname (the name comes
+	// from the key's lookup). Fails with FAILED_PRECONDITION and reason
+	// OWN_KEY or TOO_MANY_FAVORITES.
+	SaveFavorite(ctx context.Context, in *SaveFavoriteRequest, opts ...grpc.CallOption) (*SaveFavoriteResponse, error)
+	RemoveFavorite(ctx context.Context, in *RemoveFavoriteRequest, opts ...grpc.CallOption) (*RemoveFavoriteResponse, error)
 	// Resolves a key to the receiver before the customer confirms a transfer.
 	LookupKey(ctx context.Context, in *LookupKeyRequest, opts ...grpc.CallOption) (*LookupKeyResponse, error)
 	// Sends a Pix. Idempotent on idempotency_key.
@@ -120,6 +131,36 @@ func (c *pixServiceClient) ListKeys(ctx context.Context, in *ListKeysRequest, op
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListKeysResponse)
 	err := c.cc.Invoke(ctx, PixService_ListKeys_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) ListContacts(ctx context.Context, in *ListContactsRequest, opts ...grpc.CallOption) (*ListContactsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListContactsResponse)
+	err := c.cc.Invoke(ctx, PixService_ListContacts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) SaveFavorite(ctx context.Context, in *SaveFavoriteRequest, opts ...grpc.CallOption) (*SaveFavoriteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SaveFavoriteResponse)
+	err := c.cc.Invoke(ctx, PixService_SaveFavorite_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *pixServiceClient) RemoveFavorite(ctx context.Context, in *RemoveFavoriteRequest, opts ...grpc.CallOption) (*RemoveFavoriteResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveFavoriteResponse)
+	err := c.cc.Invoke(ctx, PixService_RemoveFavorite_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -336,6 +377,14 @@ type PixServiceServer interface {
 	RegisterKey(context.Context, *RegisterKeyRequest) (*RegisterKeyResponse, error)
 	DeleteKey(context.Context, *DeleteKeyRequest) (*DeleteKeyResponse, error)
 	ListKeys(context.Context, *ListKeysRequest) (*ListKeysResponse, error)
+	// Who the account sends Pix to: favorites first, then the most recent
+	// receivers (from completed outgoing transfers).
+	ListContacts(context.Context, *ListContactsRequest) (*ListContactsResponse, error)
+	// Saves a key as a favorite, with an optional nickname (the name comes
+	// from the key's lookup). Fails with FAILED_PRECONDITION and reason
+	// OWN_KEY or TOO_MANY_FAVORITES.
+	SaveFavorite(context.Context, *SaveFavoriteRequest) (*SaveFavoriteResponse, error)
+	RemoveFavorite(context.Context, *RemoveFavoriteRequest) (*RemoveFavoriteResponse, error)
 	// Resolves a key to the receiver before the customer confirms a transfer.
 	LookupKey(context.Context, *LookupKeyRequest) (*LookupKeyResponse, error)
 	// Sends a Pix. Idempotent on idempotency_key.
@@ -386,6 +435,15 @@ func (UnimplementedPixServiceServer) DeleteKey(context.Context, *DeleteKeyReques
 }
 func (UnimplementedPixServiceServer) ListKeys(context.Context, *ListKeysRequest) (*ListKeysResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListKeys not implemented")
+}
+func (UnimplementedPixServiceServer) ListContacts(context.Context, *ListContactsRequest) (*ListContactsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListContacts not implemented")
+}
+func (UnimplementedPixServiceServer) SaveFavorite(context.Context, *SaveFavoriteRequest) (*SaveFavoriteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SaveFavorite not implemented")
+}
+func (UnimplementedPixServiceServer) RemoveFavorite(context.Context, *RemoveFavoriteRequest) (*RemoveFavoriteResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveFavorite not implemented")
 }
 func (UnimplementedPixServiceServer) LookupKey(context.Context, *LookupKeyRequest) (*LookupKeyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method LookupKey not implemented")
@@ -518,6 +576,60 @@ func _PixService_ListKeys_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(PixServiceServer).ListKeys(ctx, req.(*ListKeysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_ListContacts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListContactsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).ListContacts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_ListContacts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).ListContacts(ctx, req.(*ListContactsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_SaveFavorite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveFavoriteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).SaveFavorite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_SaveFavorite_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).SaveFavorite(ctx, req.(*SaveFavoriteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PixService_RemoveFavorite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveFavoriteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PixServiceServer).RemoveFavorite(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PixService_RemoveFavorite_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PixServiceServer).RemoveFavorite(ctx, req.(*RemoveFavoriteRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -900,6 +1012,18 @@ var PixService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListKeys",
 			Handler:    _PixService_ListKeys_Handler,
+		},
+		{
+			MethodName: "ListContacts",
+			Handler:    _PixService_ListContacts_Handler,
+		},
+		{
+			MethodName: "SaveFavorite",
+			Handler:    _PixService_SaveFavorite_Handler,
+		},
+		{
+			MethodName: "RemoveFavorite",
+			Handler:    _PixService_RemoveFavorite_Handler,
 		},
 		{
 			MethodName: "LookupKey",

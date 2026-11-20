@@ -44,6 +44,12 @@ type Store interface {
 	// receiver's incoming record, in one transaction (idempotent).
 	CompleteInternal(ctx context.Context, t, incoming domain.Transfer, events ...outbox.Message) error
 	Unfinished(ctx context.Context, before time.Time, limit int) ([]uuid.UUID, error)
+
+	// Contacts: favorites first, then recent receivers, at most limit.
+	Contacts(ctx context.Context, account uuid.UUID, limit int) ([]domain.Contact, error)
+	// SaveFavorite upserts a favorite; a refusal (TOO_MANY_FAVORITES) past the maximum.
+	SaveFavorite(ctx context.Context, account uuid.UUID, c domain.Contact) error
+	RemoveFavorite(ctx context.Context, account uuid.UUID, key string) error
 }
 
 // ScheduleRun records one execution of a schedule.

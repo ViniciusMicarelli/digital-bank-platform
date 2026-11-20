@@ -55,6 +55,8 @@
 | `GET` / `POST` | `/v1/accounts/{id}/pix/keys` | List / register `{type: CPF\|EMAIL\|PHONE\|EVP, value}` |
 | `DELETE` | `/v1/accounts/{id}/pix/keys/{keyID}` | Delete a key |
 | `GET` | `/v1/pix/keys/{key}` | Look up a key before paying |
+| `GET` | `/v1/accounts/{id}/pix/contacts` | Favorites first, then recent receivers: `{key, name, bank_name, nickname, favorite, times_sent, last_sent_at}` |
+| `PUT` · `DELETE` | `/v1/accounts/{id}/pix/contacts/favorites` | Save a favorite `{key, nickname?}` (`OWN_KEY`, `TOO_MANY_FAVORITES`) / remove one `?key=` |
 | `GET` | `/v1/accounts/{id}/pix/transfers?direction=incoming\|outgoing` | Pix sent / received (use a received one's `id` to refund it) |
 | `POST` | `/v1/accounts/{id}/pix/transfers` | `{key, amount, description}` · Idempotency-Key |
 | `POST` | `/v1/accounts/{id}/pix/qr-codes` | Issue a BR Code `{key, amount?, description, one_time, dynamic, expires_in_seconds}` → `{txid, payload}` |

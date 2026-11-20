@@ -11,6 +11,15 @@ service PixService {
   rpc RegisterKey(RegisterKeyRequest) returns (RegisterKeyResponse);
   rpc DeleteKey(DeleteKeyRequest) returns (DeleteKeyResponse);
   rpc ListKeys(ListKeysRequest) returns (ListKeysResponse);
+
+  // Who the account sends Pix to: favorites first, then the most recent
+  // receivers (from completed outgoing transfers).
+  rpc ListContacts(ListContactsRequest) returns (ListContactsResponse);
+  // Saves a key as a favorite, with an optional nickname (the name comes
+  // from the key's lookup). Fails with FAILED_PRECONDITION and reason
+  // OWN_KEY or TOO_MANY_FAVORITES.
+  rpc SaveFavorite(SaveFavoriteRequest) returns (SaveFavoriteResponse);
+  rpc RemoveFavorite(RemoveFavoriteRequest) returns (RemoveFavoriteResponse);
   // Resolves a key to the receiver before the customer confirms a transfer.
   rpc LookupKey(LookupKeyRequest) returns (LookupKeyResponse);
 
@@ -416,3 +425,39 @@ message ChargeMandateRequest {
 message ChargeMandateResponse {
   Schedule schedule = 1;
 }
+
+message Contact {
+  string key = 1;
+  string name = 2;
+  string bank_name = 3;
+  string nickname = 4;
+  bool favorite = 5;
+  // Unset when nothing was sent to it yet.
+  google.protobuf.Timestamp last_sent_at = 6;
+  int32 times_sent = 7;
+}
+
+message ListContactsRequest {
+  string account_id = 1;
+}
+
+message ListContactsResponse {
+  repeated Contact contacts = 1;
+}
+
+message SaveFavoriteRequest {
+  string account_id = 1;
+  string key = 2;
+  string nickname = 3;
+}
+
+message SaveFavoriteResponse {
+  Contact contact = 1;
+}
+
+message RemoveFavoriteRequest {
+  string account_id = 1;
+  string key = 2;
+}
+
+message RemoveFavoriteResponse {}

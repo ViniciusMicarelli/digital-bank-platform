@@ -3365,6 +3365,379 @@ func (x *ChargeMandateResponse) GetSchedule() *Schedule {
 	return nil
 }
 
+type Contact struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Key      string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Name     string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	BankName string                 `protobuf:"bytes,3,opt,name=bank_name,json=bankName,proto3" json:"bank_name,omitempty"`
+	Nickname string                 `protobuf:"bytes,4,opt,name=nickname,proto3" json:"nickname,omitempty"`
+	Favorite bool                   `protobuf:"varint,5,opt,name=favorite,proto3" json:"favorite,omitempty"`
+	// Unset when nothing was sent to it yet.
+	LastSentAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_sent_at,json=lastSentAt,proto3" json:"last_sent_at,omitempty"`
+	TimesSent     int32                  `protobuf:"varint,7,opt,name=times_sent,json=timesSent,proto3" json:"times_sent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Contact) Reset() {
+	*x = Contact{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Contact) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Contact) ProtoMessage() {}
+
+func (x *Contact) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Contact.ProtoReflect.Descriptor instead.
+func (*Contact) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *Contact) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *Contact) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Contact) GetBankName() string {
+	if x != nil {
+		return x.BankName
+	}
+	return ""
+}
+
+func (x *Contact) GetNickname() string {
+	if x != nil {
+		return x.Nickname
+	}
+	return ""
+}
+
+func (x *Contact) GetFavorite() bool {
+	if x != nil {
+		return x.Favorite
+	}
+	return false
+}
+
+func (x *Contact) GetLastSentAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastSentAt
+	}
+	return nil
+}
+
+func (x *Contact) GetTimesSent() int32 {
+	if x != nil {
+		return x.TimesSent
+	}
+	return 0
+}
+
+type ListContactsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListContactsRequest) Reset() {
+	*x = ListContactsRequest{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListContactsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListContactsRequest) ProtoMessage() {}
+
+func (x *ListContactsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListContactsRequest.ProtoReflect.Descriptor instead.
+func (*ListContactsRequest) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *ListContactsRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type ListContactsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Contacts      []*Contact             `protobuf:"bytes,1,rep,name=contacts,proto3" json:"contacts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListContactsResponse) Reset() {
+	*x = ListContactsResponse{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListContactsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListContactsResponse) ProtoMessage() {}
+
+func (x *ListContactsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListContactsResponse.ProtoReflect.Descriptor instead.
+func (*ListContactsResponse) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *ListContactsResponse) GetContacts() []*Contact {
+	if x != nil {
+		return x.Contacts
+	}
+	return nil
+}
+
+type SaveFavoriteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Nickname      string                 `protobuf:"bytes,3,opt,name=nickname,proto3" json:"nickname,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SaveFavoriteRequest) Reset() {
+	*x = SaveFavoriteRequest{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SaveFavoriteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SaveFavoriteRequest) ProtoMessage() {}
+
+func (x *SaveFavoriteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SaveFavoriteRequest.ProtoReflect.Descriptor instead.
+func (*SaveFavoriteRequest) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *SaveFavoriteRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SaveFavoriteRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *SaveFavoriteRequest) GetNickname() string {
+	if x != nil {
+		return x.Nickname
+	}
+	return ""
+}
+
+type SaveFavoriteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Contact       *Contact               `protobuf:"bytes,1,opt,name=contact,proto3" json:"contact,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SaveFavoriteResponse) Reset() {
+	*x = SaveFavoriteResponse{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SaveFavoriteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SaveFavoriteResponse) ProtoMessage() {}
+
+func (x *SaveFavoriteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SaveFavoriteResponse.ProtoReflect.Descriptor instead.
+func (*SaveFavoriteResponse) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *SaveFavoriteResponse) GetContact() *Contact {
+	if x != nil {
+		return x.Contact
+	}
+	return nil
+}
+
+type RemoveFavoriteRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveFavoriteRequest) Reset() {
+	*x = RemoveFavoriteRequest{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveFavoriteRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveFavoriteRequest) ProtoMessage() {}
+
+func (x *RemoveFavoriteRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveFavoriteRequest.ProtoReflect.Descriptor instead.
+func (*RemoveFavoriteRequest) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *RemoveFavoriteRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *RemoveFavoriteRequest) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+type RemoveFavoriteResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveFavoriteResponse) Reset() {
+	*x = RemoveFavoriteResponse{}
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveFavoriteResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveFavoriteResponse) ProtoMessage() {}
+
+func (x *RemoveFavoriteResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_pix_v1_pix_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveFavoriteResponse.ProtoReflect.Descriptor instead.
+func (*RemoveFavoriteResponse) Descriptor() ([]byte, []int) {
+	return file_bank_pix_v1_pix_proto_rawDescGZIP(), []int{58}
+}
+
 var File_bank_pix_v1_pix_proto protoreflect.FileDescriptor
 
 const file_bank_pix_v1_pix_proto_rawDesc = "" +
@@ -3608,7 +3981,34 @@ const file_bank_pix_v1_pix_proto_rawDesc = "" +
 	"\x06amount\x18\x04 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\x12\x19\n" +
 	"\bdue_date\x18\x05 \x01(\tR\adueDate\"J\n" +
 	"\x15ChargeMandateResponse\x121\n" +
-	"\bschedule\x18\x01 \x01(\v2\x15.bank.pix.v1.ScheduleR\bschedule*o\n" +
+	"\bschedule\x18\x01 \x01(\v2\x15.bank.pix.v1.ScheduleR\bschedule\"\xe1\x01\n" +
+	"\aContact\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
+	"\tbank_name\x18\x03 \x01(\tR\bbankName\x12\x1a\n" +
+	"\bnickname\x18\x04 \x01(\tR\bnickname\x12\x1a\n" +
+	"\bfavorite\x18\x05 \x01(\bR\bfavorite\x12<\n" +
+	"\flast_sent_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"lastSentAt\x12\x1d\n" +
+	"\n" +
+	"times_sent\x18\a \x01(\x05R\ttimesSent\"4\n" +
+	"\x13ListContactsRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"H\n" +
+	"\x14ListContactsResponse\x120\n" +
+	"\bcontacts\x18\x01 \x03(\v2\x14.bank.pix.v1.ContactR\bcontacts\"b\n" +
+	"\x13SaveFavoriteRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\x12\x1a\n" +
+	"\bnickname\x18\x03 \x01(\tR\bnickname\"F\n" +
+	"\x14SaveFavoriteResponse\x12.\n" +
+	"\acontact\x18\x01 \x01(\v2\x14.bank.pix.v1.ContactR\acontact\"H\n" +
+	"\x15RemoveFavoriteRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\"\x18\n" +
+	"\x16RemoveFavoriteResponse*o\n" +
 	"\aKeyType\x12\x18\n" +
 	"\x14KEY_TYPE_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fKEY_TYPE_CPF\x10\x01\x12\x12\n" +
@@ -3631,12 +4031,15 @@ const file_bank_pix_v1_pix_proto_rawDesc = "" +
 	"\x15FREQUENCY_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eFREQUENCY_ONCE\x10\x01\x12\x14\n" +
 	"\x10FREQUENCY_WEEKLY\x10\x02\x12\x15\n" +
-	"\x11FREQUENCY_MONTHLY\x10\x032\xd0\x0f\n" +
+	"\x11FREQUENCY_MONTHLY\x10\x032\xd5\x11\n" +
 	"\n" +
 	"PixService\x12P\n" +
 	"\vRegisterKey\x12\x1f.bank.pix.v1.RegisterKeyRequest\x1a .bank.pix.v1.RegisterKeyResponse\x12J\n" +
 	"\tDeleteKey\x12\x1d.bank.pix.v1.DeleteKeyRequest\x1a\x1e.bank.pix.v1.DeleteKeyResponse\x12G\n" +
-	"\bListKeys\x12\x1c.bank.pix.v1.ListKeysRequest\x1a\x1d.bank.pix.v1.ListKeysResponse\x12J\n" +
+	"\bListKeys\x12\x1c.bank.pix.v1.ListKeysRequest\x1a\x1d.bank.pix.v1.ListKeysResponse\x12S\n" +
+	"\fListContacts\x12 .bank.pix.v1.ListContactsRequest\x1a!.bank.pix.v1.ListContactsResponse\x12S\n" +
+	"\fSaveFavorite\x12 .bank.pix.v1.SaveFavoriteRequest\x1a!.bank.pix.v1.SaveFavoriteResponse\x12Y\n" +
+	"\x0eRemoveFavorite\x12\".bank.pix.v1.RemoveFavoriteRequest\x1a#.bank.pix.v1.RemoveFavoriteResponse\x12J\n" +
 	"\tLookupKey\x12\x1d.bank.pix.v1.LookupKeyRequest\x1a\x1e.bank.pix.v1.LookupKeyResponse\x12Y\n" +
 	"\x0eCreateTransfer\x12\".bank.pix.v1.CreateTransferRequest\x1a#.bank.pix.v1.CreateTransferResponse\x12P\n" +
 	"\vGetTransfer\x12\x1f.bank.pix.v1.GetTransferRequest\x1a .bank.pix.v1.GetTransferResponse\x12V\n" +
@@ -3672,7 +4075,7 @@ func file_bank_pix_v1_pix_proto_rawDescGZIP() []byte {
 }
 
 var file_bank_pix_v1_pix_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_bank_pix_v1_pix_proto_msgTypes = make([]protoimpl.MessageInfo, 52)
+var file_bank_pix_v1_pix_proto_msgTypes = make([]protoimpl.MessageInfo, 59)
 var file_bank_pix_v1_pix_proto_goTypes = []any{
 	(KeyType)(0),                        // 0: bank.pix.v1.KeyType
 	(TransferDirection)(0),              // 1: bank.pix.v1.TransferDirection
@@ -3730,109 +4133,125 @@ var file_bank_pix_v1_pix_proto_goTypes = []any{
 	(*ListMandatesResponse)(nil),        // 53: bank.pix.v1.ListMandatesResponse
 	(*ChargeMandateRequest)(nil),        // 54: bank.pix.v1.ChargeMandateRequest
 	(*ChargeMandateResponse)(nil),       // 55: bank.pix.v1.ChargeMandateResponse
-	(*timestamppb.Timestamp)(nil),       // 56: google.protobuf.Timestamp
-	(*v1.Money)(nil),                    // 57: bank.common.v1.Money
+	(*Contact)(nil),                     // 56: bank.pix.v1.Contact
+	(*ListContactsRequest)(nil),         // 57: bank.pix.v1.ListContactsRequest
+	(*ListContactsResponse)(nil),        // 58: bank.pix.v1.ListContactsResponse
+	(*SaveFavoriteRequest)(nil),         // 59: bank.pix.v1.SaveFavoriteRequest
+	(*SaveFavoriteResponse)(nil),        // 60: bank.pix.v1.SaveFavoriteResponse
+	(*RemoveFavoriteRequest)(nil),       // 61: bank.pix.v1.RemoveFavoriteRequest
+	(*RemoveFavoriteResponse)(nil),      // 62: bank.pix.v1.RemoveFavoriteResponse
+	(*timestamppb.Timestamp)(nil),       // 63: google.protobuf.Timestamp
+	(*v1.Money)(nil),                    // 64: bank.common.v1.Money
 }
 var file_bank_pix_v1_pix_proto_depIdxs = []int32{
 	0,  // 0: bank.pix.v1.PixKey.type:type_name -> bank.pix.v1.KeyType
-	56, // 1: bank.pix.v1.PixKey.created_at:type_name -> google.protobuf.Timestamp
+	63, // 1: bank.pix.v1.PixKey.created_at:type_name -> google.protobuf.Timestamp
 	1,  // 2: bank.pix.v1.Transfer.direction:type_name -> bank.pix.v1.TransferDirection
 	2,  // 3: bank.pix.v1.Transfer.status:type_name -> bank.pix.v1.TransferStatus
 	5,  // 4: bank.pix.v1.Transfer.counterparty:type_name -> bank.pix.v1.Party
-	57, // 5: bank.pix.v1.Transfer.amount:type_name -> bank.common.v1.Money
-	56, // 6: bank.pix.v1.Transfer.created_at:type_name -> google.protobuf.Timestamp
-	56, // 7: bank.pix.v1.Transfer.updated_at:type_name -> google.protobuf.Timestamp
-	57, // 8: bank.pix.v1.Transfer.refunded:type_name -> bank.common.v1.Money
+	64, // 5: bank.pix.v1.Transfer.amount:type_name -> bank.common.v1.Money
+	63, // 6: bank.pix.v1.Transfer.created_at:type_name -> google.protobuf.Timestamp
+	63, // 7: bank.pix.v1.Transfer.updated_at:type_name -> google.protobuf.Timestamp
+	64, // 8: bank.pix.v1.Transfer.refunded:type_name -> bank.common.v1.Money
 	0,  // 9: bank.pix.v1.RegisterKeyRequest.type:type_name -> bank.pix.v1.KeyType
 	4,  // 10: bank.pix.v1.RegisterKeyResponse.key:type_name -> bank.pix.v1.PixKey
 	4,  // 11: bank.pix.v1.ListKeysResponse.keys:type_name -> bank.pix.v1.PixKey
 	0,  // 12: bank.pix.v1.LookupKeyResponse.type:type_name -> bank.pix.v1.KeyType
 	5,  // 13: bank.pix.v1.LookupKeyResponse.owner:type_name -> bank.pix.v1.Party
-	57, // 14: bank.pix.v1.CreateTransferRequest.amount:type_name -> bank.common.v1.Money
+	64, // 14: bank.pix.v1.CreateTransferRequest.amount:type_name -> bank.common.v1.Money
 	6,  // 15: bank.pix.v1.CreateTransferResponse.transfer:type_name -> bank.pix.v1.Transfer
 	6,  // 16: bank.pix.v1.GetTransferResponse.transfer:type_name -> bank.pix.v1.Transfer
-	57, // 17: bank.pix.v1.SimulateIncomingRequest.amount:type_name -> bank.common.v1.Money
+	64, // 17: bank.pix.v1.SimulateIncomingRequest.amount:type_name -> bank.common.v1.Money
 	5,  // 18: bank.pix.v1.SimulateIncomingRequest.payer:type_name -> bank.pix.v1.Party
 	6,  // 19: bank.pix.v1.SimulateIncomingResponse.transfer:type_name -> bank.pix.v1.Transfer
-	57, // 20: bank.pix.v1.CreateQrCodeRequest.amount:type_name -> bank.common.v1.Money
-	56, // 21: bank.pix.v1.CreateQrCodeResponse.expires_at:type_name -> google.protobuf.Timestamp
+	64, // 20: bank.pix.v1.CreateQrCodeRequest.amount:type_name -> bank.common.v1.Money
+	63, // 21: bank.pix.v1.CreateQrCodeResponse.expires_at:type_name -> google.protobuf.Timestamp
 	5,  // 22: bank.pix.v1.DecodeQrCodeResponse.receiver:type_name -> bank.pix.v1.Party
-	57, // 23: bank.pix.v1.DecodeQrCodeResponse.amount:type_name -> bank.common.v1.Money
-	57, // 24: bank.pix.v1.PayQrCodeRequest.amount:type_name -> bank.common.v1.Money
+	64, // 23: bank.pix.v1.DecodeQrCodeResponse.amount:type_name -> bank.common.v1.Money
+	64, // 24: bank.pix.v1.PayQrCodeRequest.amount:type_name -> bank.common.v1.Money
 	6,  // 25: bank.pix.v1.PayQrCodeResponse.transfer:type_name -> bank.pix.v1.Transfer
-	57, // 26: bank.pix.v1.RefundTransferRequest.amount:type_name -> bank.common.v1.Money
+	64, // 26: bank.pix.v1.RefundTransferRequest.amount:type_name -> bank.common.v1.Money
 	6,  // 27: bank.pix.v1.RefundTransferResponse.transfer:type_name -> bank.pix.v1.Transfer
 	1,  // 28: bank.pix.v1.ListTransfersRequest.direction:type_name -> bank.pix.v1.TransferDirection
 	6,  // 29: bank.pix.v1.ListTransfersResponse.transfers:type_name -> bank.pix.v1.Transfer
 	34, // 30: bank.pix.v1.GetQrJwksResponse.keys:type_name -> bank.pix.v1.Jwk
-	57, // 31: bank.pix.v1.Schedule.amount:type_name -> bank.common.v1.Money
+	64, // 31: bank.pix.v1.Schedule.amount:type_name -> bank.common.v1.Money
 	3,  // 32: bank.pix.v1.Schedule.frequency:type_name -> bank.pix.v1.Frequency
-	57, // 33: bank.pix.v1.CreateScheduleRequest.amount:type_name -> bank.common.v1.Money
+	64, // 33: bank.pix.v1.CreateScheduleRequest.amount:type_name -> bank.common.v1.Money
 	3,  // 34: bank.pix.v1.CreateScheduleRequest.frequency:type_name -> bank.pix.v1.Frequency
 	36, // 35: bank.pix.v1.CreateScheduleResponse.schedule:type_name -> bank.pix.v1.Schedule
 	36, // 36: bank.pix.v1.ListSchedulesResponse.schedules:type_name -> bank.pix.v1.Schedule
 	36, // 37: bank.pix.v1.CancelScheduleResponse.schedule:type_name -> bank.pix.v1.Schedule
-	57, // 38: bank.pix.v1.Mandate.max_amount:type_name -> bank.common.v1.Money
+	64, // 38: bank.pix.v1.Mandate.max_amount:type_name -> bank.common.v1.Money
 	3,  // 39: bank.pix.v1.Mandate.frequency:type_name -> bank.pix.v1.Frequency
-	57, // 40: bank.pix.v1.RequestMandateRequest.max_amount:type_name -> bank.common.v1.Money
+	64, // 40: bank.pix.v1.RequestMandateRequest.max_amount:type_name -> bank.common.v1.Money
 	3,  // 41: bank.pix.v1.RequestMandateRequest.frequency:type_name -> bank.pix.v1.Frequency
 	45, // 42: bank.pix.v1.RequestMandateResponse.mandate:type_name -> bank.pix.v1.Mandate
 	45, // 43: bank.pix.v1.DecideMandateResponse.mandate:type_name -> bank.pix.v1.Mandate
 	45, // 44: bank.pix.v1.RevokeMandateResponse.mandate:type_name -> bank.pix.v1.Mandate
 	45, // 45: bank.pix.v1.ListMandatesResponse.mandates:type_name -> bank.pix.v1.Mandate
-	57, // 46: bank.pix.v1.ChargeMandateRequest.amount:type_name -> bank.common.v1.Money
+	64, // 46: bank.pix.v1.ChargeMandateRequest.amount:type_name -> bank.common.v1.Money
 	36, // 47: bank.pix.v1.ChargeMandateResponse.schedule:type_name -> bank.pix.v1.Schedule
-	7,  // 48: bank.pix.v1.PixService.RegisterKey:input_type -> bank.pix.v1.RegisterKeyRequest
-	9,  // 49: bank.pix.v1.PixService.DeleteKey:input_type -> bank.pix.v1.DeleteKeyRequest
-	11, // 50: bank.pix.v1.PixService.ListKeys:input_type -> bank.pix.v1.ListKeysRequest
-	13, // 51: bank.pix.v1.PixService.LookupKey:input_type -> bank.pix.v1.LookupKeyRequest
-	15, // 52: bank.pix.v1.PixService.CreateTransfer:input_type -> bank.pix.v1.CreateTransferRequest
-	17, // 53: bank.pix.v1.PixService.GetTransfer:input_type -> bank.pix.v1.GetTransferRequest
-	29, // 54: bank.pix.v1.PixService.ListTransfers:input_type -> bank.pix.v1.ListTransfersRequest
-	19, // 55: bank.pix.v1.PixService.SimulateIncoming:input_type -> bank.pix.v1.SimulateIncomingRequest
-	21, // 56: bank.pix.v1.PixService.CreateQrCode:input_type -> bank.pix.v1.CreateQrCodeRequest
-	23, // 57: bank.pix.v1.PixService.DecodeQrCode:input_type -> bank.pix.v1.DecodeQrCodeRequest
-	25, // 58: bank.pix.v1.PixService.PayQrCode:input_type -> bank.pix.v1.PayQrCodeRequest
-	27, // 59: bank.pix.v1.PixService.RefundTransfer:input_type -> bank.pix.v1.RefundTransferRequest
-	31, // 60: bank.pix.v1.PixService.GetDynamicQrPayload:input_type -> bank.pix.v1.GetDynamicQrPayloadRequest
-	33, // 61: bank.pix.v1.PixService.GetQrJwks:input_type -> bank.pix.v1.GetQrJwksRequest
-	37, // 62: bank.pix.v1.PixService.CreateSchedule:input_type -> bank.pix.v1.CreateScheduleRequest
-	39, // 63: bank.pix.v1.PixService.ListSchedules:input_type -> bank.pix.v1.ListSchedulesRequest
-	41, // 64: bank.pix.v1.PixService.CancelSchedule:input_type -> bank.pix.v1.CancelScheduleRequest
-	43, // 65: bank.pix.v1.PixService.RunDueSchedules:input_type -> bank.pix.v1.RunDueSchedulesRequest
-	46, // 66: bank.pix.v1.PixService.RequestMandate:input_type -> bank.pix.v1.RequestMandateRequest
-	48, // 67: bank.pix.v1.PixService.DecideMandate:input_type -> bank.pix.v1.DecideMandateRequest
-	50, // 68: bank.pix.v1.PixService.RevokeMandate:input_type -> bank.pix.v1.RevokeMandateRequest
-	52, // 69: bank.pix.v1.PixService.ListMandates:input_type -> bank.pix.v1.ListMandatesRequest
-	54, // 70: bank.pix.v1.PixService.ChargeMandate:input_type -> bank.pix.v1.ChargeMandateRequest
-	8,  // 71: bank.pix.v1.PixService.RegisterKey:output_type -> bank.pix.v1.RegisterKeyResponse
-	10, // 72: bank.pix.v1.PixService.DeleteKey:output_type -> bank.pix.v1.DeleteKeyResponse
-	12, // 73: bank.pix.v1.PixService.ListKeys:output_type -> bank.pix.v1.ListKeysResponse
-	14, // 74: bank.pix.v1.PixService.LookupKey:output_type -> bank.pix.v1.LookupKeyResponse
-	16, // 75: bank.pix.v1.PixService.CreateTransfer:output_type -> bank.pix.v1.CreateTransferResponse
-	18, // 76: bank.pix.v1.PixService.GetTransfer:output_type -> bank.pix.v1.GetTransferResponse
-	30, // 77: bank.pix.v1.PixService.ListTransfers:output_type -> bank.pix.v1.ListTransfersResponse
-	20, // 78: bank.pix.v1.PixService.SimulateIncoming:output_type -> bank.pix.v1.SimulateIncomingResponse
-	22, // 79: bank.pix.v1.PixService.CreateQrCode:output_type -> bank.pix.v1.CreateQrCodeResponse
-	24, // 80: bank.pix.v1.PixService.DecodeQrCode:output_type -> bank.pix.v1.DecodeQrCodeResponse
-	26, // 81: bank.pix.v1.PixService.PayQrCode:output_type -> bank.pix.v1.PayQrCodeResponse
-	28, // 82: bank.pix.v1.PixService.RefundTransfer:output_type -> bank.pix.v1.RefundTransferResponse
-	32, // 83: bank.pix.v1.PixService.GetDynamicQrPayload:output_type -> bank.pix.v1.GetDynamicQrPayloadResponse
-	35, // 84: bank.pix.v1.PixService.GetQrJwks:output_type -> bank.pix.v1.GetQrJwksResponse
-	38, // 85: bank.pix.v1.PixService.CreateSchedule:output_type -> bank.pix.v1.CreateScheduleResponse
-	40, // 86: bank.pix.v1.PixService.ListSchedules:output_type -> bank.pix.v1.ListSchedulesResponse
-	42, // 87: bank.pix.v1.PixService.CancelSchedule:output_type -> bank.pix.v1.CancelScheduleResponse
-	44, // 88: bank.pix.v1.PixService.RunDueSchedules:output_type -> bank.pix.v1.RunDueSchedulesResponse
-	47, // 89: bank.pix.v1.PixService.RequestMandate:output_type -> bank.pix.v1.RequestMandateResponse
-	49, // 90: bank.pix.v1.PixService.DecideMandate:output_type -> bank.pix.v1.DecideMandateResponse
-	51, // 91: bank.pix.v1.PixService.RevokeMandate:output_type -> bank.pix.v1.RevokeMandateResponse
-	53, // 92: bank.pix.v1.PixService.ListMandates:output_type -> bank.pix.v1.ListMandatesResponse
-	55, // 93: bank.pix.v1.PixService.ChargeMandate:output_type -> bank.pix.v1.ChargeMandateResponse
-	71, // [71:94] is the sub-list for method output_type
-	48, // [48:71] is the sub-list for method input_type
-	48, // [48:48] is the sub-list for extension type_name
-	48, // [48:48] is the sub-list for extension extendee
-	0,  // [0:48] is the sub-list for field type_name
+	63, // 48: bank.pix.v1.Contact.last_sent_at:type_name -> google.protobuf.Timestamp
+	56, // 49: bank.pix.v1.ListContactsResponse.contacts:type_name -> bank.pix.v1.Contact
+	56, // 50: bank.pix.v1.SaveFavoriteResponse.contact:type_name -> bank.pix.v1.Contact
+	7,  // 51: bank.pix.v1.PixService.RegisterKey:input_type -> bank.pix.v1.RegisterKeyRequest
+	9,  // 52: bank.pix.v1.PixService.DeleteKey:input_type -> bank.pix.v1.DeleteKeyRequest
+	11, // 53: bank.pix.v1.PixService.ListKeys:input_type -> bank.pix.v1.ListKeysRequest
+	57, // 54: bank.pix.v1.PixService.ListContacts:input_type -> bank.pix.v1.ListContactsRequest
+	59, // 55: bank.pix.v1.PixService.SaveFavorite:input_type -> bank.pix.v1.SaveFavoriteRequest
+	61, // 56: bank.pix.v1.PixService.RemoveFavorite:input_type -> bank.pix.v1.RemoveFavoriteRequest
+	13, // 57: bank.pix.v1.PixService.LookupKey:input_type -> bank.pix.v1.LookupKeyRequest
+	15, // 58: bank.pix.v1.PixService.CreateTransfer:input_type -> bank.pix.v1.CreateTransferRequest
+	17, // 59: bank.pix.v1.PixService.GetTransfer:input_type -> bank.pix.v1.GetTransferRequest
+	29, // 60: bank.pix.v1.PixService.ListTransfers:input_type -> bank.pix.v1.ListTransfersRequest
+	19, // 61: bank.pix.v1.PixService.SimulateIncoming:input_type -> bank.pix.v1.SimulateIncomingRequest
+	21, // 62: bank.pix.v1.PixService.CreateQrCode:input_type -> bank.pix.v1.CreateQrCodeRequest
+	23, // 63: bank.pix.v1.PixService.DecodeQrCode:input_type -> bank.pix.v1.DecodeQrCodeRequest
+	25, // 64: bank.pix.v1.PixService.PayQrCode:input_type -> bank.pix.v1.PayQrCodeRequest
+	27, // 65: bank.pix.v1.PixService.RefundTransfer:input_type -> bank.pix.v1.RefundTransferRequest
+	31, // 66: bank.pix.v1.PixService.GetDynamicQrPayload:input_type -> bank.pix.v1.GetDynamicQrPayloadRequest
+	33, // 67: bank.pix.v1.PixService.GetQrJwks:input_type -> bank.pix.v1.GetQrJwksRequest
+	37, // 68: bank.pix.v1.PixService.CreateSchedule:input_type -> bank.pix.v1.CreateScheduleRequest
+	39, // 69: bank.pix.v1.PixService.ListSchedules:input_type -> bank.pix.v1.ListSchedulesRequest
+	41, // 70: bank.pix.v1.PixService.CancelSchedule:input_type -> bank.pix.v1.CancelScheduleRequest
+	43, // 71: bank.pix.v1.PixService.RunDueSchedules:input_type -> bank.pix.v1.RunDueSchedulesRequest
+	46, // 72: bank.pix.v1.PixService.RequestMandate:input_type -> bank.pix.v1.RequestMandateRequest
+	48, // 73: bank.pix.v1.PixService.DecideMandate:input_type -> bank.pix.v1.DecideMandateRequest
+	50, // 74: bank.pix.v1.PixService.RevokeMandate:input_type -> bank.pix.v1.RevokeMandateRequest
+	52, // 75: bank.pix.v1.PixService.ListMandates:input_type -> bank.pix.v1.ListMandatesRequest
+	54, // 76: bank.pix.v1.PixService.ChargeMandate:input_type -> bank.pix.v1.ChargeMandateRequest
+	8,  // 77: bank.pix.v1.PixService.RegisterKey:output_type -> bank.pix.v1.RegisterKeyResponse
+	10, // 78: bank.pix.v1.PixService.DeleteKey:output_type -> bank.pix.v1.DeleteKeyResponse
+	12, // 79: bank.pix.v1.PixService.ListKeys:output_type -> bank.pix.v1.ListKeysResponse
+	58, // 80: bank.pix.v1.PixService.ListContacts:output_type -> bank.pix.v1.ListContactsResponse
+	60, // 81: bank.pix.v1.PixService.SaveFavorite:output_type -> bank.pix.v1.SaveFavoriteResponse
+	62, // 82: bank.pix.v1.PixService.RemoveFavorite:output_type -> bank.pix.v1.RemoveFavoriteResponse
+	14, // 83: bank.pix.v1.PixService.LookupKey:output_type -> bank.pix.v1.LookupKeyResponse
+	16, // 84: bank.pix.v1.PixService.CreateTransfer:output_type -> bank.pix.v1.CreateTransferResponse
+	18, // 85: bank.pix.v1.PixService.GetTransfer:output_type -> bank.pix.v1.GetTransferResponse
+	30, // 86: bank.pix.v1.PixService.ListTransfers:output_type -> bank.pix.v1.ListTransfersResponse
+	20, // 87: bank.pix.v1.PixService.SimulateIncoming:output_type -> bank.pix.v1.SimulateIncomingResponse
+	22, // 88: bank.pix.v1.PixService.CreateQrCode:output_type -> bank.pix.v1.CreateQrCodeResponse
+	24, // 89: bank.pix.v1.PixService.DecodeQrCode:output_type -> bank.pix.v1.DecodeQrCodeResponse
+	26, // 90: bank.pix.v1.PixService.PayQrCode:output_type -> bank.pix.v1.PayQrCodeResponse
+	28, // 91: bank.pix.v1.PixService.RefundTransfer:output_type -> bank.pix.v1.RefundTransferResponse
+	32, // 92: bank.pix.v1.PixService.GetDynamicQrPayload:output_type -> bank.pix.v1.GetDynamicQrPayloadResponse
+	35, // 93: bank.pix.v1.PixService.GetQrJwks:output_type -> bank.pix.v1.GetQrJwksResponse
+	38, // 94: bank.pix.v1.PixService.CreateSchedule:output_type -> bank.pix.v1.CreateScheduleResponse
+	40, // 95: bank.pix.v1.PixService.ListSchedules:output_type -> bank.pix.v1.ListSchedulesResponse
+	42, // 96: bank.pix.v1.PixService.CancelSchedule:output_type -> bank.pix.v1.CancelScheduleResponse
+	44, // 97: bank.pix.v1.PixService.RunDueSchedules:output_type -> bank.pix.v1.RunDueSchedulesResponse
+	47, // 98: bank.pix.v1.PixService.RequestMandate:output_type -> bank.pix.v1.RequestMandateResponse
+	49, // 99: bank.pix.v1.PixService.DecideMandate:output_type -> bank.pix.v1.DecideMandateResponse
+	51, // 100: bank.pix.v1.PixService.RevokeMandate:output_type -> bank.pix.v1.RevokeMandateResponse
+	53, // 101: bank.pix.v1.PixService.ListMandates:output_type -> bank.pix.v1.ListMandatesResponse
+	55, // 102: bank.pix.v1.PixService.ChargeMandate:output_type -> bank.pix.v1.ChargeMandateResponse
+	77, // [77:103] is the sub-list for method output_type
+	51, // [51:77] is the sub-list for method input_type
+	51, // [51:51] is the sub-list for extension type_name
+	51, // [51:51] is the sub-list for extension extendee
+	0,  // [0:51] is the sub-list for field type_name
 }
 
 func init() { file_bank_pix_v1_pix_proto_init() }
@@ -3846,7 +4265,7 @@ func file_bank_pix_v1_pix_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_pix_v1_pix_proto_rawDesc), len(file_bank_pix_v1_pix_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   52,
+			NumMessages:   59,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

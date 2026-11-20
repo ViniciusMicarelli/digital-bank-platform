@@ -72,6 +72,54 @@ func (s *Server) DeleteKey(ctx context.Context, req *pixv1.DeleteKeyRequest) (*p
 	return &pixv1.DeleteKeyResponse{}, nil
 }
 
+func contactPB(c domain.Contact) *pixv1.Contact {
+	out := &pixv1.Contact{Key: c.Key, Name: c.Name, BankName: c.BankName, Nickname: c.Nickname, Favorite: c.Favorite,
+		TimesSent: int32(c.TimesSent)} //nolint:gosec // counts
+	if c.LastSentAt != nil {
+		out.LastSentAt = timestamppb.New(*c.LastSentAt)
+	}
+	return out
+}
+
+func (s *Server) ListContacts(ctx context.Context, req *pixv1.ListContactsRequest) (*pixv1.ListContactsResponse, error) {
+	account, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	list, err := s.app.Contacts(ctx, account)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	out := &pixv1.ListContactsResponse{}
+	for _, c := range list {
+		out.Contacts = append(out.Contacts, contactPB(c))
+	}
+	return out, nil
+}
+
+func (s *Server) SaveFavorite(ctx context.Context, req *pixv1.SaveFavoriteRequest) (*pixv1.SaveFavoriteResponse, error) {
+	account, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	c, err := s.app.SaveFavorite(ctx, account, req.GetKey(), req.GetNickname())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &pixv1.SaveFavoriteResponse{Contact: contactPB(c)}, nil
+}
+
+func (s *Server) RemoveFavorite(ctx context.Context, req *pixv1.RemoveFavoriteRequest) (*pixv1.RemoveFavoriteResponse, error) {
+	account, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	if err := s.app.RemoveFavorite(ctx, account, req.GetKey()); err != nil {
+		return nil, toStatus(err)
+	}
+	return &pixv1.RemoveFavoriteResponse{}, nil
+}
+
 func (s *Server) ListKeys(ctx context.Context, req *pixv1.ListKeysRequest) (*pixv1.ListKeysResponse, error) {
 	account, err := parseID(req.GetAccountId())
 	if err != nil {
@@ -349,6 +397,10 @@ func toStatus(err error) error {
 		return grpcserver.Error(codes.FailedPrecondition, "CHARGE_NOT_ALLOWED", err.Error())
 	case errors.Is(err, application.ErrDynamicQRDisabled):
 		return grpcserver.Error(codes.FailedPrecondition, "DYNAMIC_QR_DISABLED", err.Error())
+	case errors.As(err, new(*domain.RejectedError)):
+		var r *domain.RejectedError
+		errors.As(err, &r)
+		return grpcserver.Error(codes.FailedPrecondition, r.Reason, r.Msg)
 	case errors.Is(err, domain.ErrBusy):
 		return grpcserver.Error(codes.Aborted, "IN_PROGRESS", err.Error())
 	}

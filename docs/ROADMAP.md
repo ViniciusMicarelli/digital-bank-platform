@@ -222,6 +222,11 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - CSV export of a month (or any period up to a year) for spreadsheets in Portuguese.
 - Web: tap any movement for its receipt, *Exportar CSV* on the statement, public check page. Mobile: receipt screen with the system share sheet.
 
+## Phase 32 — Pix contacts ✅
+
+- Recent receivers come from the account's completed Pix (nothing copied); favorites with a nickname on top; one tap fills the key and looks it up.
+- Web and mobile: contacts row on *Enviar Pix* and a star to favorite the receiver.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

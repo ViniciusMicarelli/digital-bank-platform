@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -110,6 +112,36 @@ func (s *Service) Lookup(ctx context.Context, raw string) (domain.KeyType, strin
 	default:
 		return "", "", domain.Party{}, uuid.Nil, err
 	}
+}
+
+// Contacts are favorites first, then the most recent receivers.
+func (s *Service) Contacts(ctx context.Context, account uuid.UUID) ([]domain.Contact, error) {
+	return s.store.Contacts(ctx, account, 30)
+}
+
+// SaveFavorite stores a key as a favorite: it must resolve (our customer or
+// the DICT) and not be one of the account's own keys.
+func (s *Service) SaveFavorite(ctx context.Context, account uuid.UUID, key, nickname string) (domain.Contact, error) {
+	nickname = strings.TrimSpace(nickname)
+	if utf8.RuneCountInString(nickname) > 30 {
+		return domain.Contact{}, fmt.Errorf("%w: nickname longer than 30 characters", domain.ErrInvalidArgument)
+	}
+	_, value, party, owner, err := s.Lookup(ctx, key)
+	if err != nil {
+		return domain.Contact{}, err
+	}
+	if owner == account {
+		return domain.Contact{}, domain.Reject("OWN_KEY", "this key is yours")
+	}
+	c := domain.Contact{Key: value, Name: party.Name, BankName: party.BankName, Nickname: nickname, Favorite: true}
+	return c, s.store.SaveFavorite(ctx, account, c)
+}
+
+func (s *Service) RemoveFavorite(ctx context.Context, account uuid.UUID, key string) error {
+	if _, value, err := domain.DetectKeyType(key); err == nil {
+		key = value
+	}
+	return s.store.RemoveFavorite(ctx, account, key)
 }
 
 // Send creates an outgoing Pix and drives it as far as it can go.

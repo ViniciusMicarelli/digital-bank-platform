@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
-import { Check, Copy, IdCard, KeyRound, Mail, QrCode, Smartphone, Trash2, type LucideIcon } from 'lucide-react'
+import { Check, Copy, IdCard, KeyRound, Mail, QrCode, Smartphone, Star, Trash2, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { gsap, reducedMotion, useGSAP } from '../lib/motion'
 import { useSearchParams } from 'react-router'
@@ -9,7 +9,7 @@ import { MoneyField } from '../components/MoneyField'
 import { Alert, Amount, Badge, Button, Empty, Field, IconTile, Loading, Modal, PageTitle, Panel, Sandbox, Select, Tabs, Toggle } from '../components/ui'
 import { dateTimeBR } from '../lib/format'
 import { api, newIdempotencyKey } from '../lib/api'
-import { errorMessage, formatBRL, type Money, type Party, type PixKey, type PixTransfer } from '@bank/core'
+import { errorMessage, formatBRL, type Money, type Party, type PixContact, type PixKey, type PixTransfer } from '@bank/core'
 
 type Tab = 'enviar' | 'cobrar' | 'pagar' | 'chaves' | 'historico'
 
@@ -47,6 +47,64 @@ function Receipt({ t, title }: { t: PixTransfer; title: string }) {
   )
 }
 
+function useContacts(accountId: string) {
+  return useQuery({
+    queryKey: ['pix', accountId, 'contacts'],
+    queryFn: async () => (await api<{ contacts: PixContact[] }>('GET', `/v1/accounts/${accountId}/pix/contacts`)).contacts,
+  })
+}
+
+/** Favorites and recent receivers, one tap to send again. */
+function Contacts({ accountId, onPick }: { accountId: string; onPick: (key: string) => void }) {
+  const contacts = useContacts(accountId)
+  if (!contacts.data?.length) return null
+  return (
+    <div className="mb-5">
+      <p className="mb-2 text-xs font-medium text-muted">Contatos</p>
+      <ul className="no-scrollbar -mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
+        {contacts.data.map((c) => (
+          <li key={c.key}>
+            <button type="button" onClick={() => onPick(c.key)} title={c.key}
+              className="flex w-20 flex-col items-center gap-1.5 rounded-2xl py-2 text-center transition hover:bg-surface-2">
+              <span className="relative">
+                <Avatar name={c.nickname || c.name || c.key} />
+                {c.favorite && <Star className="absolute -right-1 -bottom-1 size-4 fill-warning text-warning" />}
+              </span>
+              <span className="w-full truncate text-xs font-medium text-fg">{c.nickname || c.name.split(' ')[0] || c.key}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function FavoriteToggle({ accountId, pixKey }: { accountId: string; pixKey: string }) {
+  const qc = useQueryClient()
+  const contacts = useContacts(accountId)
+  const [naming, setNaming] = useState(false)
+  const [nickname, setNickname] = useState('')
+  const norm = (k: string) => k.toLowerCase().replace(/[^a-z0-9@.]/g, '')
+  const favorite = contacts.data?.find((c) => norm(c.key) === norm(pixKey))?.favorite
+  const refresh = () => qc.invalidateQueries({ queryKey: ['pix', accountId, 'contacts'] })
+  const save = useMutation({
+    mutationFn: () => api('PUT', `/v1/accounts/${accountId}/pix/contacts/favorites`, { body: { key: pixKey, nickname } }),
+    onSuccess: () => { setNaming(false); refresh() },
+  })
+  const remove = useMutation({
+    mutationFn: () => api('DELETE', `/v1/accounts/${accountId}/pix/contacts/favorites?key=${encodeURIComponent(pixKey)}`),
+    onSuccess: refresh,
+  })
+  if (favorite) return <Button type="button" variant="ghost" size="sm" icon={Star} loading={remove.isPending} onClick={() => remove.mutate()}>Remover dos favoritos</Button>
+  if (!naming) return <Button type="button" variant="ghost" size="sm" icon={Star} onClick={() => setNaming(true)}>Favoritar</Button>
+  return (
+    <div className="flex items-end gap-2">
+      <div className="flex-1"><Field label="Apelido (opcional)" maxLength={30} value={nickname} onChange={(e) => setNickname(e.target.value)} /></div>
+      <Button type="button" size="sm" loading={save.isPending} onClick={() => save.mutate()}>Salvar</Button>
+    </div>
+  )
+}
+
 function SendPix({ accountId }: { accountId: string }) {
   const qc = useQueryClient()
   const [key, setKey] = useState('')
@@ -58,13 +116,13 @@ function SendPix({ accountId }: { accountId: string }) {
   const [idem, setIdem] = useState(newIdempotencyKey)
 
   const lookup = useMutation({
-    mutationFn: () => api<{ owner: Party }>('GET', `/v1/pix/keys/${encodeURIComponent(key.trim())}`),
+    mutationFn: (k: string = key) => api<{ owner: Party }>('GET', `/v1/pix/keys/${encodeURIComponent(k.trim())}`),
     onSuccess: (r) => { setOwner(r.owner); setError('') },
     onError: (e) => setError(errorMessage(e)),
   })
   const send = useMutation({
     mutationFn: () => api<PixTransfer>('POST', `/v1/accounts/${accountId}/pix/transfers`, { body: { key: key.trim(), amount, description }, idempotent: idem }),
-    onSuccess: (t) => { setDone(t); qc.invalidateQueries({ queryKey: ['balance'] }); qc.invalidateQueries({ queryKey: ['statement'] }) },
+    onSuccess: (t) => { setDone(t); for (const k of ['balance', 'statement', 'pix']) qc.invalidateQueries({ queryKey: [k] }) },
     onError: (e) => setError(errorMessage(e)),
   })
   const reset = () => { setKey(''); setOwner(null); setDone(null); setError(''); setIdem(newIdempotencyKey()) }
@@ -74,7 +132,8 @@ function SendPix({ accountId }: { accountId: string }) {
   return (
     <Panel title="Enviar Pix">
       {!owner ? (
-        <form onSubmit={(e) => { e.preventDefault(); lookup.mutate() }} className="space-y-4">
+        <form onSubmit={(e) => { e.preventDefault(); lookup.mutate(key) }} className="space-y-4">
+          <Contacts accountId={accountId} onPick={(k) => { setKey(k); lookup.mutate(k) }} />
           <Field label="Chave Pix" placeholder="CPF, e-mail, celular ou chave aleatória" required value={key} onChange={(e) => setKey(e.target.value)} />
           <Alert>{error}</Alert>
           <Button type="submit" loading={lookup.isPending}>Continuar</Button>
@@ -85,6 +144,7 @@ function SendPix({ accountId }: { accountId: string }) {
             <Avatar name={owner.name} />
             <div className="min-w-0"><p className="truncate font-semibold text-fg">{owner.name}</p><p className="text-muted">{owner.document} · {owner.bank}</p></div>
           </div>
+          <FavoriteToggle accountId={accountId} pixKey={key.trim()} />
           <MoneyField label="Valor" onValue={setAmount} />
           <Field label="Mensagem (opcional)" maxLength={140} value={description} onChange={(e) => setDescription(e.target.value)} />
           <Alert>{error}</Alert>

@@ -20,6 +20,7 @@ Pix, the Brazilian instant payment system. Integrations with the Central Bank (*
 | Dynamic QR codes: the BR Code carries a URL; the charge is served as a JWS signed by the bank and verified by the payer | ✅ |
 | Scheduled Pix (a future date) and recurring Pix (weekly / monthly), cancellable | ✅ |
 | Pix Automático: receiver-requested, payer-approved mandates with a maximum and a frequency; charges paid on their due dates | ✅ |
+| Contacts: recent receivers derived from completed outgoing transfers (no copy kept), plus up to 50 favorites with a nickname (the key must resolve and not be the account's own) | ✅ |
 
 ## Outgoing Transfer Flow
 

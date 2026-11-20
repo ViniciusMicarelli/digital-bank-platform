@@ -13,7 +13,7 @@ test('onboarding, Pix in and out with live notifications', async ({ page }) => {
   await page.goto('/pix?aba=enviar')
   await page.getByLabel('Chave Pix').fill('maria@outrobanco.com.br')
   await page.getByRole('button', { name: 'Continuar' }).click()
-  await expect(page.getByText('Maria Oliveira')).toBeVisible()
+  await expect(page.getByText('Maria Oliveira', { exact: true })).toBeVisible()
   await page.getByLabel('Valor').fill('120,50')
   await shot(page, '02-pix-send')
   await page.getByRole('button', { name: /^Enviar R\$ 120,50/ }).click()
@@ -220,4 +220,24 @@ test('receipt, public check and CSV export', async ({ page, browser }) => {
   await page.getByRole('button', { name: 'Exportar CSV' }).click()
   const file = await download
   expect(file.suggestedFilename()).toMatch(/^extrato-\d{4}-\d{2}\.csv$/)
+})
+
+test('pix contacts: recent, favorite, send again', async ({ page }) => {
+  await onboard(page)
+  await fund(page, '100,00')
+  await page.goto('/pix')
+  await page.getByLabel('Chave Pix').fill('maria@outrobanco.com.br')
+  await page.getByRole('button', { name: 'Continuar' }).click()
+  await page.getByRole('button', { name: 'Favoritar' }).click()
+  await page.getByLabel('Apelido (opcional)').fill('Mãe')
+  await page.getByRole('button', { name: 'Salvar' }).click()
+  await expect(page.getByRole('button', { name: 'Remover dos favoritos' })).toBeVisible()
+  await page.getByLabel('Valor').fill('10')
+  await page.getByRole('button', { name: /^Enviar/ }).click()
+  await page.getByRole('button', { name: 'Novo Pix' }).click()
+
+  // One tap on the contact fills the key and looks it up.
+  await page.getByRole('button', { name: 'Mãe' }).click()
+  await expect(page.getByText('Maria Oliveira', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Valor')).toBeVisible()
 })

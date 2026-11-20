@@ -218,3 +218,52 @@ func (a *API) chargeMandate(w http.ResponseWriter, r *http.Request, acc *account
 	}
 	writeJSON(w, http.StatusCreated, scheduleJSON(resp.GetSchedule()))
 }
+
+func contactJSON(c *pixv1.Contact) map[string]any {
+	out := map[string]any{"key": c.GetKey(), "name": c.GetName(), "bank_name": c.GetBankName(), "nickname": c.GetNickname(),
+		"favorite": c.GetFavorite(), "times_sent": c.GetTimesSent()}
+	if c.GetLastSentAt() != nil {
+		out["last_sent_at"] = ts(c.GetLastSentAt())
+	}
+	return out
+}
+
+// pixContacts lists favorites first, then recent receivers.
+func (a *API) pixContacts(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	resp, err := a.c.Pix.ListContacts(r.Context(), &pixv1.ListContactsRequest{AccountId: acc.GetId()})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	out := []map[string]any{}
+	for _, c := range resp.GetContacts() {
+		out = append(out, contactJSON(c))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"contacts": out})
+}
+
+// saveFavorite marks a key as a favorite {key, nickname?}.
+func (a *API) saveFavorite(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	var req struct {
+		Key      string `json:"key"`
+		Nickname string `json:"nickname"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	resp, err := a.c.Pix.SaveFavorite(r.Context(), &pixv1.SaveFavoriteRequest{AccountId: acc.GetId(), Key: req.Key, Nickname: req.Nickname})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, contactJSON(resp.GetContact()))
+}
+
+// removeFavorite unmarks a favorite (?key=).
+func (a *API) removeFavorite(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
+	if _, err := a.c.Pix.RemoveFavorite(r.Context(), &pixv1.RemoveFavoriteRequest{AccountId: acc.GetId(), Key: r.URL.Query().Get("key")}); err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

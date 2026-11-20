@@ -1,12 +1,12 @@
-import { errorMessage, formatBRL, type Party, type PixKey } from '@bank/core'
+import { errorMessage, formatBRL, type Party, type PixContact, type PixKey } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, IdCard, KeyRound, Mail, QrCode, Send, Share2, Smartphone, type LucideIcon } from 'lucide-react-native'
+import { Check, IdCard, KeyRound, Mail, QrCode, Send, Share2, Smartphone, Star, type LucideIcon } from 'lucide-react-native'
 import QRCode from 'qrcode'
 import { useState } from 'react'
-import { Share, View } from 'react-native'
+import { ScrollView, Share, View } from 'react-native'
 import Animated, { ZoomIn } from 'react-native-reanimated'
 import { SvgXml } from 'react-native-svg'
-import { Button, Card, Field, MoneyField, Muted, Notice, Row, Sandbox, Screen, Segmented, Txt } from '../../components/ui'
+import { Button, Card, Field, MoneyField, Muted, Notice, Press, Row, Sandbox, Screen, Segmented, Txt } from '../../components/ui'
 import { api } from '../../lib/client'
 import { useAccount } from '../../lib/queries'
 import { font, useTheme } from '../../lib/theme'
@@ -40,6 +40,8 @@ function Success({ title, detail, onAgain }: { title: string; detail: string; on
   )
 }
 
+const norm = (k: string) => k.toLowerCase().replace(/[^a-z0-9@.]/g, '')
+
 function SendPix({ accountId }: { accountId: string }) {
   const { c } = useTheme()
   const qc = useQueryClient()
@@ -49,13 +51,24 @@ function SendPix({ accountId }: { accountId: string }) {
   const [done, setDone] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [idem, setIdem] = useState(() => crypto.randomUUID())
+  const contacts = useQuery({
+    queryKey: ['pix', accountId, 'contacts'],
+    queryFn: async () => (await api<{ contacts: PixContact[] }>('GET', `/v1/accounts/${accountId}/pix/contacts`)).contacts,
+  })
+  const favorite = contacts.data?.find((x) => norm(x.key) === norm(key))?.favorite
+  const toggleFavorite = useMutation({
+    mutationFn: () => favorite
+      ? api('DELETE', `/v1/accounts/${accountId}/pix/contacts/favorites?key=${encodeURIComponent(key.trim())}`)
+      : api('PUT', `/v1/accounts/${accountId}/pix/contacts/favorites`, { body: { key: key.trim() } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['pix', accountId, 'contacts'] }),
+  })
   const lookup = useMutation({
-    mutationFn: () => api<{ owner: Party }>('GET', `/v1/pix/keys/${encodeURIComponent(key.trim())}`),
+    mutationFn: (k: string = key) => api<{ owner: Party }>('GET', `/v1/pix/keys/${encodeURIComponent(k.trim())}`),
     onSuccess: (r) => { setOwner(r.owner); setError('') }, onError: (e) => setError(errorMessage(e)),
   })
   const send = useMutation({
     mutationFn: () => api('POST', `/v1/accounts/${accountId}/pix/transfers`, { body: { key: key.trim(), amount, description: '' }, idempotent: idem }),
-    onSuccess: () => { setDone(`${formatBRL(amount!)} para ${owner!.name}`); qc.invalidateQueries({ queryKey: ['balance'] }) },
+    onSuccess: () => { setDone(`${formatBRL(amount!)} para ${owner!.name}`); for (const k of ['balance', 'pix']) qc.invalidateQueries({ queryKey: [k] }) },
     onError: (e) => setError(errorMessage(e)),
   })
   const reset = () => { setKey(''); setOwner(null); setDone(null); setError(''); setIdem(crypto.randomUUID()) }
@@ -64,9 +77,23 @@ function SendPix({ accountId }: { accountId: string }) {
     <Card title="Enviar Pix" icon={Send}>
       {!owner ? (
         <>
+          {!!contacts.data?.length && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+              {contacts.data.map((x) => (
+                <Press key={x.key} accessibilityLabel={`Pix para ${x.nickname || x.name}`} onPress={() => { setKey(x.key); lookup.mutate(x.key) }}
+                  style={{ alignItems: 'center', gap: 6, width: 68 }}>
+                  <View>
+                    <Avatar name={x.nickname || x.name || x.key} />
+                    {x.favorite && <Star size={14} color={c.warning} fill={c.warning} style={{ position: 'absolute', right: -2, bottom: -2 }} />}
+                  </View>
+                  <Txt variant="caption" numberOfLines={1}>{x.nickname || x.name.split(' ')[0] || x.key}</Txt>
+                </Press>
+              ))}
+            </ScrollView>
+          )}
           <Field label="Chave Pix" autoCapitalize="none" placeholder="CPF, e-mail, celular ou aleatória" value={key} onChangeText={setKey} />
           <Notice>{error}</Notice>
-          <Button title="Continuar" loading={lookup.isPending} onPress={() => lookup.mutate()} />
+          <Button title="Continuar" loading={lookup.isPending} onPress={() => lookup.mutate(key)} />
         </>
       ) : (
         <>
@@ -76,6 +103,9 @@ function SendPix({ accountId }: { accountId: string }) {
               <Txt variant="label" style={{ fontFamily: font.semibold }}>{owner.name}</Txt>
               <Txt variant="caption" tone="muted">{owner.document} · {owner.bank}</Txt>
             </View>
+            <Press accessibilityLabel={favorite ? 'Remover dos favoritos' : 'Favoritar'} onPress={() => toggleFavorite.mutate()}>
+              <Star size={22} color={favorite ? c.warning : c.subtle} fill={favorite ? c.warning : 'transparent'} />
+            </Press>
           </View>
           <MoneyField label="Valor" onValue={setAmount} />
           <Notice>{error}</Notice>

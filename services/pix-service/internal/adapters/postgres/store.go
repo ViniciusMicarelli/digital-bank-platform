@@ -375,3 +375,60 @@ func (s *Store) HandleAccountEvent(ctx context.Context, ev outbox.Event) error {
 		return err
 	})
 }
+
+// ---- contacts ----
+
+func (s *Store) Contacts(ctx context.Context, account uuid.UUID, limit int) ([]domain.Contact, error) {
+	rows, err := s.pool.Query(ctx, `
+		WITH recent AS (
+			SELECT key, (array_agg(counterparty_name ORDER BY created_at DESC))[1] AS name,
+			       (array_agg(counterparty_bank ORDER BY created_at DESC))[1] AS bank,
+			       max(created_at) AS last_at, count(*) AS times
+			  FROM pix_transfers
+			 WHERE account_id = $1 AND direction = 'OUTGOING' AND status = 'COMPLETED' AND refund_of IS NULL
+			 GROUP BY key),
+		fav AS (SELECT * FROM pix_favorites WHERE account_id = $1)
+		SELECT COALESCE(r.key, f.key), COALESCE(NULLIF(r.name, ''), f.name, ''), COALESCE(NULLIF(r.bank, ''), f.bank_name, ''),
+		       COALESCE(f.nickname, ''), f.key IS NOT NULL, r.last_at, COALESCE(r.times, 0)
+		  FROM recent r FULL JOIN fav f ON f.key = r.key
+		 ORDER BY f.key IS NOT NULL DESC, r.last_at DESC NULLS LAST, COALESCE(f.nickname, r.name)
+		 LIMIT $2`, account, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.Contact
+	for rows.Next() {
+		var c domain.Contact
+		if err := rows.Scan(&c.Key, &c.Name, &c.BankName, &c.Nickname, &c.Favorite, &c.LastSentAt, &c.TimesSent); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) SaveFavorite(ctx context.Context, account uuid.UUID, c domain.Contact) error {
+	return pg.InTx(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, "pix-favorites:"+account.String()); err != nil {
+			return err
+		}
+		var n int
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT count(*), COALESCE(bool_or(key = $2), false) FROM pix_favorites WHERE account_id = $1`, account, c.Key).Scan(&n, &exists); err != nil {
+			return err
+		}
+		if !exists && n >= domain.MaxFavorites {
+			return domain.Reject("TOO_MANY_FAVORITES", "at most 50 favorites")
+		}
+		_, err := tx.Exec(ctx, `INSERT INTO pix_favorites (account_id, key, name, bank_name, nickname) VALUES ($1, $2, $3, $4, $5)
+			ON CONFLICT (account_id, key) DO UPDATE SET name = EXCLUDED.name, bank_name = EXCLUDED.bank_name, nickname = EXCLUDED.nickname`,
+			account, c.Key, c.Name, c.BankName, c.Nickname)
+		return err
+	})
+}
+
+func (s *Store) RemoveFavorite(ctx context.Context, account uuid.UUID, key string) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM pix_favorites WHERE account_id = $1 AND key = $2`, account, key)
+	return err
+}

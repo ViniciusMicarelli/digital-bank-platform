@@ -348,3 +348,17 @@ func (t Transfer) Fingerprint() []byte {
 	}
 	return h.Sum(nil)
 }
+
+// Contact is someone the account sends Pix to: a favorite and/or a recent receiver.
+type Contact struct {
+	Key        string
+	Name       string
+	BankName   string
+	Nickname   string
+	Favorite   bool
+	LastSentAt *time.Time
+	TimesSent  int
+}
+
+// MaxFavorites per account.
+const MaxFavorites = 50
