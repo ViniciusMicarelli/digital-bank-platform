@@ -41,8 +41,11 @@ func TestSpending(t *testing.T) {
 		}
 		return at(event(t, "card.purchase.cleared", payload), when)
 	}
-	shoes := uuid.NewString()
+	shoes, tv := uuid.NewString(), uuid.NewString()
 	for _, ev := range []outbox.Event{
+		// A refund that arrives before its purchase (another partition).
+		at(event(t, "card.purchase.refunded", map[string]any{"refund_id": uuid.NewString(), "authorization_id": tv, "amount_minor": 40_00}), nov.Add(3*time.Hour)),
+		cleared(tv, 150_00, "LOJA DE TV", "5732", nov, true),
 		event(t, "card.issued", map[string]any{"card_id": card.String(), "account_id": ana.String()}),
 		// An old event without the account: resolved through the card.
 		cleared(uuid.NewString(), 40_00, "PADARIA", "5462", nov, false),
@@ -66,14 +69,14 @@ func TestSpending(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 100 food + 200 shopping (300 - 100 refund) + 80 Pix + 120 bills.
-	if s.Total != 500_00 || s.PreviousTotal != 500_00 || len(s.Categories) != 4 {
+	// 100 food + 310 shopping (300 - 100 + 150 - 40 refunds) + 80 Pix + 120 bills.
+	if s.Total != 610_00 || s.PreviousTotal != 500_00 || len(s.Categories) != 4 {
 		t.Fatalf("spending = %+v", s)
 	}
-	if c := s.Categories[0]; c.Category != projection.Shopping || c.Amount != 200_00 || c.Count != 1 {
+	if c := s.Categories[0]; c.Category != projection.Shopping || c.Amount != 310_00 || c.Count != 2 {
 		t.Fatalf("largest = %+v", c)
 	}
-	if len(s.Merchants) != 3 || s.Merchants[0].Name != "LOJA DE CALCADOS" || s.Merchants[2].Name != "PADARIA" || s.Merchants[2].Count != 2 {
+	if len(s.Merchants) != 4 || s.Merchants[0].Name != "LOJA DE CALCADOS" || s.Merchants[3].Name != "PADARIA" || s.Merchants[3].Count != 2 {
 		t.Fatalf("merchants = %+v", s.Merchants)
 	}
 	if _, err := projection.ParseMonth("11/2026", time.Now()); err == nil {

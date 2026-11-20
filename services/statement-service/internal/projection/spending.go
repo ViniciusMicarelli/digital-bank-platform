@@ -94,13 +94,41 @@ func (p *Projector) card(ctx context.Context, ev outbox.Event) error {
 			if err != nil || account == "" {
 				return err // a card this read model never saw: nothing to place
 			}
-			return insertSpending(ctx, tx, account, "card:"+c.AuthorizationID, Category(c.MCC), c.MerchantName, c.ClearedMinor, ev.OccurredAt)
+			category := Category(c.MCC)
+			if err := insertSpending(ctx, tx, account, "card:"+c.AuthorizationID, category, c.MerchantName, c.ClearedMinor, ev.OccurredAt); err != nil {
+				return err
+			}
+			// Refunds that arrived first.
+			rows, err := tx.Query(ctx, `DELETE FROM pending_refunds WHERE authorization_id = $1 RETURNING refund_id, amount, occurred_at`, c.AuthorizationID)
+			if err != nil {
+				return err
+			}
+			type pending struct {
+				id     string
+				amount int64
+				at     time.Time
+			}
+			list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (pending, error) {
+				var p pending
+				return p, r.Scan(&p.id, &p.amount, &p.at)
+			})
+			if err != nil {
+				return err
+			}
+			for _, p := range list {
+				if err := insertSpending(ctx, tx, account, "refund:"+p.id, category, c.MerchantName, -p.amount, p.at); err != nil {
+					return err
+				}
+			}
+			return nil
 		case "card.purchase.refunded":
 			var account, category, merchant string
 			err := tx.QueryRow(ctx, `SELECT account_id, category, merchant FROM spending WHERE ref = $1`, "card:"+c.AuthorizationID).
 				Scan(&account, &category, &merchant)
-			if err == pgx.ErrNoRows {
-				return nil
+			if err == pgx.ErrNoRows { // the purchase is not projected yet: keep the refund for it
+				_, err := tx.Exec(ctx, `INSERT INTO pending_refunds (refund_id, authorization_id, amount, occurred_at)
+					VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`, c.RefundID, c.AuthorizationID, c.AmountMinor, ev.OccurredAt)
+				return err
 			}
 			if err != nil {
 				return err
