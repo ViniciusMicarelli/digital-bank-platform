@@ -23,6 +23,17 @@ export interface FeedItem {
   counterparty_name: string
   description: string
   occurred_at: string
+  end_to_end_id?: string
+}
+
+export interface Receipt {
+  item: FeedItem
+  holder_name: string
+  branch: string
+  number: string
+  counterparty_branch: string
+  counterparty_number: string
+  authentication_code: string
 }
 
 export interface Profile {

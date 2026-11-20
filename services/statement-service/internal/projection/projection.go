@@ -26,9 +26,16 @@ const consumer = "statement-service.feed"
 // ErrInvalidCursor is returned for a malformed page token.
 var ErrInvalidCursor = errors.New("invalid page token")
 
-type Projector struct{ pool *pgxpool.Pool }
+type Projector struct {
+	pool       *pgxpool.Pool
+	receiptKey []byte
+}
 
-func New(pool *pgxpool.Pool) *Projector { return &Projector{pool: pool} }
+// New builds the projector; receipts are signed with a development key until
+// SetReceiptKey gives the real one.
+func New(pool *pgxpool.Pool) *Projector {
+	return &Projector{pool: pool, receiptKey: []byte("development receipt key")}
+}
 
 // Handle routes an event to its projection. Unknown types are ignored, so
 // new event types never break this consumer.
@@ -177,6 +184,11 @@ type cursor struct {
 
 // Feed returns up to limit items for account, newest first, after the cursor.
 func (p *Projector) Feed(ctx context.Context, account uuid.UUID, pageToken string, limit int) ([]Item, string, error) {
+	return p.FeedBetween(ctx, account, time.Time{}, time.Time{}, pageToken, limit)
+}
+
+// FeedBetween is Feed limited to [from, to) (zero values: unbounded).
+func (p *Projector) FeedBetween(ctx context.Context, account uuid.UUID, from, to time.Time, pageToken string, limit int) ([]Item, string, error) {
 	var after *cursor
 	if pageToken != "" {
 		raw, err := base64.RawURLEncoding.DecodeString(pageToken)
@@ -193,6 +205,14 @@ func (p *Projector) Feed(ctx context.Context, account uuid.UUID, pageToken strin
 	if after != nil {
 		where = `AND (f.occurred_at, f.id) < ($3, $4)`
 		args = append(args, after.At, after.ID)
+	}
+	if !from.IsZero() {
+		args = append(args, from)
+		where += fmt.Sprintf(" AND f.occurred_at >= $%d", len(args))
+	}
+	if !to.IsZero() {
+		args = append(args, to)
+		where += fmt.Sprintf(" AND f.occurred_at < $%d", len(args))
 	}
 	rows, err := p.pool.Query(ctx, `
 		SELECT f.id, f.account_id, f.transaction_id, f.type, f.direction, f.amount, f.currency,

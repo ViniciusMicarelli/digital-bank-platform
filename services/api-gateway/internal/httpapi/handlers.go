@@ -266,15 +266,7 @@ func (a *API) statement(w http.ResponseWriter, r *http.Request, acc *accountv1.A
 	}
 	items := []map[string]any{}
 	for _, it := range resp.GetItems() {
-		dir := "DEBIT"
-		if it.GetDirection() == statementv1.Direction_DIRECTION_CREDIT {
-			dir = "CREDIT"
-		}
-		items = append(items, map[string]any{
-			"id": it.GetId(), "transaction_id": it.GetTransactionId(), "type": it.GetType(), "direction": dir,
-			"amount": moneyJSON(it.GetAmount()), "counterparty_name": it.GetCounterpartyName(),
-			"description": it.GetDescription(), "end_to_end_id": it.GetEndToEndId(), "occurred_at": ts(it.GetOccurredAt()),
-		})
+		items = append(items, feedItemJSON(it))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "next_cursor": resp.GetNextPageToken()})
 }

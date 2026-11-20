@@ -14,6 +14,11 @@ service StatementService {
   // category (from the merchant category code), Pix and transfers sent and
   // bills paid; refunds count against their category.
   rpc GetSpending(GetSpendingRequest) returns (GetSpendingResponse);
+  // A receipt for one feed item, with an authentication code (the item id
+  // and an HMAC of its fields under the bank's key).
+  rpc GetReceipt(GetReceiptRequest) returns (GetReceiptResponse);
+  // Checks an authentication code; NOT_FOUND when it is not genuine.
+  rpc VerifyReceipt(VerifyReceiptRequest) returns (VerifyReceiptResponse);
 }
 
 enum Direction {
@@ -42,6 +47,9 @@ message ListFeedRequest {
   // Defaults to 20, maximum 100.
   int32 page_size = 2;
   string page_token = 3;
+  // Optional period [from, to).
+  google.protobuf.Timestamp from = 4;
+  google.protobuf.Timestamp to = 5;
 }
 
 message ListFeedResponse {
@@ -78,4 +86,34 @@ message GetSpendingResponse {
   repeated CategorySpending categories = 4;
   // The five places with the most spent (Pix and transfers excluded).
   repeated MerchantSpending merchants = 5;
+}
+
+message Receipt {
+  FeedItem item = 1;
+  // The account the receipt belongs to.
+  string holder_name = 2;
+  string branch = 3;
+  string number = 4;
+  // The other account, when it is at this bank.
+  string counterparty_branch = 5;
+  string counterparty_number = 6;
+  // Groups of letters and digits, e.g. "AB3D-...".
+  string authentication_code = 7;
+}
+
+message GetReceiptRequest {
+  string account_id = 1;
+  string item_id = 2;
+}
+
+message GetReceiptResponse {
+  Receipt receipt = 1;
+}
+
+message VerifyReceiptRequest {
+  string authentication_code = 1;
+}
+
+message VerifyReceiptResponse {
+  Receipt receipt = 1;
 }

@@ -26,6 +26,7 @@ try {
 }
 
 export const api = client.api
+export const apiText = client.text
 export const login = client.login
 export const register = client.register
 export const logout = client.logout

@@ -163,7 +163,7 @@ test('spending by category', async ({ page }) => {
     await page.goto('/gastos')
     await expect(page.getByText('Alimentação', { exact: true })).toBeVisible({ timeout: 2000 })
   }).toPass({ timeout: 20_000 })
-  await expect(page.getByText('PADARIA DO BAIRRO')).toBeVisible()
+  await expect(page.getByText('PADARIA DO BAIRRO', { exact: true })).toBeVisible()
   await shot(page, '15-spending')
 })
 
@@ -191,4 +191,33 @@ test('split a closed invoice', async ({ page }) => {
   await page.getByRole('button', { name: 'Parcelar em 3x' }).click()
   await expect(page.getByText('Fatura a pagar')).toHaveCount(0)
   await expect(page.getByText('Parcelamento da fatura')).toBeVisible()
+})
+
+test('receipt, public check and CSV export', async ({ page, browser }) => {
+  await onboard(page)
+  await fund(page, '150,00')
+  await expect(async () => {
+    await page.goto('/extrato')
+    await page.getByRole('button', { name: /^Comprovante:/ }).first().click({ timeout: 2000 })
+  }).toPass({ timeout: 20_000 })
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('Você recebeu')).toBeVisible()
+  await expect(dialog.getByText('R$ 150,00')).toBeVisible()
+  const link = await dialog.getByRole('link').getAttribute('href')
+  await shot(page, '17-receipt')
+
+  // Anyone can check it, without signing in.
+  const visitor = await browser.newContext()
+  const check = await visitor.newPage()
+  await check.goto(link!.replace(/^https?:\/\/[^/]+/, ''))
+  await expect(check.getByText('Autêntico')).toBeVisible()
+  await check.goto('/comprovante/AAAA-BBBB-CCCC')
+  await expect(check.getByText('Este código não corresponde', { exact: false })).toBeVisible()
+  await visitor.close()
+
+  await page.keyboard.press('Escape')
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Exportar CSV' }).click()
+  const file = await download
+  expect(file.suggestedFilename()).toMatch(/^extrato-\d{4}-\d{2}\.csv$/)
 })

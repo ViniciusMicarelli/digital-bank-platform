@@ -102,8 +102,21 @@ export function createClient(opts: ClientOptions) {
     return data as T
   }
 
+  /** A text response (e.g. a CSV export), with the same auth and refresh. */
+  async function text(path: string, retried = false): Promise<string> {
+    if (!access && !retried && refreshToken) await refresh()
+    const res = await fetch(url(path), { headers: access ? { Authorization: `Bearer ${access}` } : {} })
+    if (res.status === 401 && !retried && (await refresh())) return text(path, true)
+    if (!res.ok) {
+      const e = (await res.json().catch(() => ({})))?.error ?? {}
+      throw new ApiError(res.status, e.code ?? `HTTP_${res.status}`, e.message ?? res.statusText)
+    }
+    return res.text()
+  }
+
   return {
     api,
+    text,
     url,
     /** Restores a saved session (the refresh token from storage). */
     restore(token: string | null) {

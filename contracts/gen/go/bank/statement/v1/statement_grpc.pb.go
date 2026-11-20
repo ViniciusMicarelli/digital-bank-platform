@@ -19,8 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	StatementService_ListFeed_FullMethodName    = "/bank.statement.v1.StatementService/ListFeed"
-	StatementService_GetSpending_FullMethodName = "/bank.statement.v1.StatementService/GetSpending"
+	StatementService_ListFeed_FullMethodName      = "/bank.statement.v1.StatementService/ListFeed"
+	StatementService_GetSpending_FullMethodName   = "/bank.statement.v1.StatementService/GetSpending"
+	StatementService_GetReceipt_FullMethodName    = "/bank.statement.v1.StatementService/GetReceipt"
+	StatementService_VerifyReceipt_FullMethodName = "/bank.statement.v1.StatementService/VerifyReceipt"
 )
 
 // StatementServiceClient is the client API for StatementService service.
@@ -36,6 +38,11 @@ type StatementServiceClient interface {
 	// category (from the merchant category code), Pix and transfers sent and
 	// bills paid; refunds count against their category.
 	GetSpending(ctx context.Context, in *GetSpendingRequest, opts ...grpc.CallOption) (*GetSpendingResponse, error)
+	// A receipt for one feed item, with an authentication code (the item id
+	// and an HMAC of its fields under the bank's key).
+	GetReceipt(ctx context.Context, in *GetReceiptRequest, opts ...grpc.CallOption) (*GetReceiptResponse, error)
+	// Checks an authentication code; NOT_FOUND when it is not genuine.
+	VerifyReceipt(ctx context.Context, in *VerifyReceiptRequest, opts ...grpc.CallOption) (*VerifyReceiptResponse, error)
 }
 
 type statementServiceClient struct {
@@ -66,6 +73,26 @@ func (c *statementServiceClient) GetSpending(ctx context.Context, in *GetSpendin
 	return out, nil
 }
 
+func (c *statementServiceClient) GetReceipt(ctx context.Context, in *GetReceiptRequest, opts ...grpc.CallOption) (*GetReceiptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetReceiptResponse)
+	err := c.cc.Invoke(ctx, StatementService_GetReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *statementServiceClient) VerifyReceipt(ctx context.Context, in *VerifyReceiptRequest, opts ...grpc.CallOption) (*VerifyReceiptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifyReceiptResponse)
+	err := c.cc.Invoke(ctx, StatementService_VerifyReceipt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // StatementServiceServer is the server API for StatementService service.
 // All implementations must embed UnimplementedStatementServiceServer
 // for forward compatibility.
@@ -79,6 +106,11 @@ type StatementServiceServer interface {
 	// category (from the merchant category code), Pix and transfers sent and
 	// bills paid; refunds count against their category.
 	GetSpending(context.Context, *GetSpendingRequest) (*GetSpendingResponse, error)
+	// A receipt for one feed item, with an authentication code (the item id
+	// and an HMAC of its fields under the bank's key).
+	GetReceipt(context.Context, *GetReceiptRequest) (*GetReceiptResponse, error)
+	// Checks an authentication code; NOT_FOUND when it is not genuine.
+	VerifyReceipt(context.Context, *VerifyReceiptRequest) (*VerifyReceiptResponse, error)
 	mustEmbedUnimplementedStatementServiceServer()
 }
 
@@ -94,6 +126,12 @@ func (UnimplementedStatementServiceServer) ListFeed(context.Context, *ListFeedRe
 }
 func (UnimplementedStatementServiceServer) GetSpending(context.Context, *GetSpendingRequest) (*GetSpendingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSpending not implemented")
+}
+func (UnimplementedStatementServiceServer) GetReceipt(context.Context, *GetReceiptRequest) (*GetReceiptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetReceipt not implemented")
+}
+func (UnimplementedStatementServiceServer) VerifyReceipt(context.Context, *VerifyReceiptRequest) (*VerifyReceiptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyReceipt not implemented")
 }
 func (UnimplementedStatementServiceServer) mustEmbedUnimplementedStatementServiceServer() {}
 func (UnimplementedStatementServiceServer) testEmbeddedByValue()                          {}
@@ -152,6 +190,42 @@ func _StatementService_GetSpending_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _StatementService_GetReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetReceiptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StatementServiceServer).GetReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StatementService_GetReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StatementServiceServer).GetReceipt(ctx, req.(*GetReceiptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _StatementService_VerifyReceipt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyReceiptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StatementServiceServer).VerifyReceipt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: StatementService_VerifyReceipt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StatementServiceServer).VerifyReceipt(ctx, req.(*VerifyReceiptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // StatementService_ServiceDesc is the grpc.ServiceDesc for StatementService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -166,6 +240,14 @@ var StatementService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSpending",
 			Handler:    _StatementService_GetSpending_Handler,
+		},
+		{
+			MethodName: "GetReceipt",
+			Handler:    _StatementService_GetReceipt_Handler,
+		},
+		{
+			MethodName: "VerifyReceipt",
+			Handler:    _StatementService_VerifyReceipt_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -216,6 +216,12 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Customers ask for a new limit: decreases at once (never below what is used), increases up to +50% at once, refused with an overdue invoice, larger ones to an analyst who may grant less or refuse with a reason (audited); notifications for each outcome.
 - Web and mobile: *Ajustar limite* on the credit screen with the history of requests; back-office *Limites* queue.
 
+## Phase 31 — Receipts and statement export ✅
+
+- A receipt for every statement item with an authentication code signed by the bank (HMAC of what it states), checked publicly at `/comprovante/<code>` with names masked; print / save as PDF and share.
+- CSV export of a month (or any period up to a year) for spreadsheets in Portuguese.
+- Web: tap any movement for its receipt, *Exportar CSV* on the statement, public check page. Mobile: receipt screen with the system share sheet.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

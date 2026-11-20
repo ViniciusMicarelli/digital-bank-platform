@@ -194,8 +194,11 @@ type ListFeedRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	AccountId string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	// Defaults to 20, maximum 100.
-	PageSize      int32  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
-	PageToken     string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	PageSize  int32  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	// Optional period [from, to).
+	From          *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=from,proto3" json:"from,omitempty"`
+	To            *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=to,proto3" json:"to,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -249,6 +252,20 @@ func (x *ListFeedRequest) GetPageToken() string {
 		return x.PageToken
 	}
 	return ""
+}
+
+func (x *ListFeedRequest) GetFrom() *timestamppb.Timestamp {
+	if x != nil {
+		return x.From
+	}
+	return nil
+}
+
+func (x *ListFeedRequest) GetTo() *timestamppb.Timestamp {
+	if x != nil {
+		return x.To
+	}
+	return nil
 }
 
 type ListFeedResponse struct {
@@ -564,6 +581,285 @@ func (x *GetSpendingResponse) GetMerchants() []*MerchantSpending {
 	return nil
 }
 
+type Receipt struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Item  *FeedItem              `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	// The account the receipt belongs to.
+	HolderName string `protobuf:"bytes,2,opt,name=holder_name,json=holderName,proto3" json:"holder_name,omitempty"`
+	Branch     string `protobuf:"bytes,3,opt,name=branch,proto3" json:"branch,omitempty"`
+	Number     string `protobuf:"bytes,4,opt,name=number,proto3" json:"number,omitempty"`
+	// The other account, when it is at this bank.
+	CounterpartyBranch string `protobuf:"bytes,5,opt,name=counterparty_branch,json=counterpartyBranch,proto3" json:"counterparty_branch,omitempty"`
+	CounterpartyNumber string `protobuf:"bytes,6,opt,name=counterparty_number,json=counterpartyNumber,proto3" json:"counterparty_number,omitempty"`
+	// Groups of letters and digits, e.g. "AB3D-...".
+	AuthenticationCode string `protobuf:"bytes,7,opt,name=authentication_code,json=authenticationCode,proto3" json:"authentication_code,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *Receipt) Reset() {
+	*x = Receipt{}
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Receipt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Receipt) ProtoMessage() {}
+
+func (x *Receipt) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Receipt.ProtoReflect.Descriptor instead.
+func (*Receipt) Descriptor() ([]byte, []int) {
+	return file_bank_statement_v1_statement_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *Receipt) GetItem() *FeedItem {
+	if x != nil {
+		return x.Item
+	}
+	return nil
+}
+
+func (x *Receipt) GetHolderName() string {
+	if x != nil {
+		return x.HolderName
+	}
+	return ""
+}
+
+func (x *Receipt) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
+func (x *Receipt) GetNumber() string {
+	if x != nil {
+		return x.Number
+	}
+	return ""
+}
+
+func (x *Receipt) GetCounterpartyBranch() string {
+	if x != nil {
+		return x.CounterpartyBranch
+	}
+	return ""
+}
+
+func (x *Receipt) GetCounterpartyNumber() string {
+	if x != nil {
+		return x.CounterpartyNumber
+	}
+	return ""
+}
+
+func (x *Receipt) GetAuthenticationCode() string {
+	if x != nil {
+		return x.AuthenticationCode
+	}
+	return ""
+}
+
+type GetReceiptRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	ItemId        string                 `protobuf:"bytes,2,opt,name=item_id,json=itemId,proto3" json:"item_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetReceiptRequest) Reset() {
+	*x = GetReceiptRequest{}
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReceiptRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReceiptRequest) ProtoMessage() {}
+
+func (x *GetReceiptRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReceiptRequest.ProtoReflect.Descriptor instead.
+func (*GetReceiptRequest) Descriptor() ([]byte, []int) {
+	return file_bank_statement_v1_statement_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *GetReceiptRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GetReceiptRequest) GetItemId() string {
+	if x != nil {
+		return x.ItemId
+	}
+	return ""
+}
+
+type GetReceiptResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Receipt       *Receipt               `protobuf:"bytes,1,opt,name=receipt,proto3" json:"receipt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetReceiptResponse) Reset() {
+	*x = GetReceiptResponse{}
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetReceiptResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetReceiptResponse) ProtoMessage() {}
+
+func (x *GetReceiptResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetReceiptResponse.ProtoReflect.Descriptor instead.
+func (*GetReceiptResponse) Descriptor() ([]byte, []int) {
+	return file_bank_statement_v1_statement_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetReceiptResponse) GetReceipt() *Receipt {
+	if x != nil {
+		return x.Receipt
+	}
+	return nil
+}
+
+type VerifyReceiptRequest struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	AuthenticationCode string                 `protobuf:"bytes,1,opt,name=authentication_code,json=authenticationCode,proto3" json:"authentication_code,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *VerifyReceiptRequest) Reset() {
+	*x = VerifyReceiptRequest{}
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyReceiptRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyReceiptRequest) ProtoMessage() {}
+
+func (x *VerifyReceiptRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyReceiptRequest.ProtoReflect.Descriptor instead.
+func (*VerifyReceiptRequest) Descriptor() ([]byte, []int) {
+	return file_bank_statement_v1_statement_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *VerifyReceiptRequest) GetAuthenticationCode() string {
+	if x != nil {
+		return x.AuthenticationCode
+	}
+	return ""
+}
+
+type VerifyReceiptResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Receipt       *Receipt               `protobuf:"bytes,1,opt,name=receipt,proto3" json:"receipt,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyReceiptResponse) Reset() {
+	*x = VerifyReceiptResponse{}
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyReceiptResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyReceiptResponse) ProtoMessage() {}
+
+func (x *VerifyReceiptResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_statement_v1_statement_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyReceiptResponse.ProtoReflect.Descriptor instead.
+func (*VerifyReceiptResponse) Descriptor() ([]byte, []int) {
+	return file_bank_statement_v1_statement_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *VerifyReceiptResponse) GetReceipt() *Receipt {
+	if x != nil {
+		return x.Receipt
+	}
+	return nil
+}
+
 var File_bank_statement_v1_statement_proto protoreflect.FileDescriptor
 
 const file_bank_statement_v1_statement_proto_rawDesc = "" +
@@ -583,13 +879,15 @@ const file_bank_statement_v1_statement_proto_rawDesc = "" +
 	"endToEndId\x12;\n" +
 	"\voccurred_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"occurredAt\"l\n" +
+	"occurredAt\"\xc8\x01\n" +
 	"\x0fListFeedRequest\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1b\n" +
 	"\tpage_size\x18\x02 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
-	"page_token\x18\x03 \x01(\tR\tpageToken\"m\n" +
+	"page_token\x18\x03 \x01(\tR\tpageToken\x12.\n" +
+	"\x04from\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x04from\x12*\n" +
+	"\x02to\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x02to\"m\n" +
 	"\x10ListFeedResponse\x121\n" +
 	"\x05items\x18\x01 \x03(\v2\x1b.bank.statement.v1.FeedItemR\x05items\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"I\n" +
@@ -613,14 +911,36 @@ const file_bank_statement_v1_statement_proto_rawDesc = "" +
 	"\n" +
 	"categories\x18\x04 \x03(\v2#.bank.statement.v1.CategorySpendingR\n" +
 	"categories\x12A\n" +
-	"\tmerchants\x18\x05 \x03(\v2#.bank.statement.v1.MerchantSpendingR\tmerchants*Q\n" +
+	"\tmerchants\x18\x05 \x03(\v2#.bank.statement.v1.MerchantSpendingR\tmerchants\"\x9e\x02\n" +
+	"\aReceipt\x12/\n" +
+	"\x04item\x18\x01 \x01(\v2\x1b.bank.statement.v1.FeedItemR\x04item\x12\x1f\n" +
+	"\vholder_name\x18\x02 \x01(\tR\n" +
+	"holderName\x12\x16\n" +
+	"\x06branch\x18\x03 \x01(\tR\x06branch\x12\x16\n" +
+	"\x06number\x18\x04 \x01(\tR\x06number\x12/\n" +
+	"\x13counterparty_branch\x18\x05 \x01(\tR\x12counterpartyBranch\x12/\n" +
+	"\x13counterparty_number\x18\x06 \x01(\tR\x12counterpartyNumber\x12/\n" +
+	"\x13authentication_code\x18\a \x01(\tR\x12authenticationCode\"K\n" +
+	"\x11GetReceiptRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x17\n" +
+	"\aitem_id\x18\x02 \x01(\tR\x06itemId\"J\n" +
+	"\x12GetReceiptResponse\x124\n" +
+	"\areceipt\x18\x01 \x01(\v2\x1a.bank.statement.v1.ReceiptR\areceipt\"G\n" +
+	"\x14VerifyReceiptRequest\x12/\n" +
+	"\x13authentication_code\x18\x01 \x01(\tR\x12authenticationCode\"M\n" +
+	"\x15VerifyReceiptResponse\x124\n" +
+	"\areceipt\x18\x01 \x01(\v2\x1a.bank.statement.v1.ReceiptR\areceipt*Q\n" +
 	"\tDirection\x12\x19\n" +
 	"\x15DIRECTION_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fDIRECTION_DEBIT\x10\x01\x12\x14\n" +
-	"\x10DIRECTION_CREDIT\x10\x022\xc5\x01\n" +
+	"\x10DIRECTION_CREDIT\x10\x022\x84\x03\n" +
 	"\x10StatementService\x12S\n" +
 	"\bListFeed\x12\".bank.statement.v1.ListFeedRequest\x1a#.bank.statement.v1.ListFeedResponse\x12\\\n" +
-	"\vGetSpending\x12%.bank.statement.v1.GetSpendingRequest\x1a&.bank.statement.v1.GetSpendingResponseB\xf0\x01\n" +
+	"\vGetSpending\x12%.bank.statement.v1.GetSpendingRequest\x1a&.bank.statement.v1.GetSpendingResponse\x12Y\n" +
+	"\n" +
+	"GetReceipt\x12$.bank.statement.v1.GetReceiptRequest\x1a%.bank.statement.v1.GetReceiptResponse\x12b\n" +
+	"\rVerifyReceipt\x12'.bank.statement.v1.VerifyReceiptRequest\x1a(.bank.statement.v1.VerifyReceiptResponseB\xf0\x01\n" +
 	"\x15com.bank.statement.v1B\x0eStatementProtoP\x01Zagithub.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/statement/v1;statementv1\xa2\x02\x03BSX\xaa\x02\x11Bank.Statement.V1\xca\x02\x11Bank\\Statement\\V1\xe2\x02\x1dBank\\Statement\\V1\\GPBMetadata\xea\x02\x13Bank::Statement::V1b\x06proto3"
 
 var (
@@ -636,7 +956,7 @@ func file_bank_statement_v1_statement_proto_rawDescGZIP() []byte {
 }
 
 var file_bank_statement_v1_statement_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_bank_statement_v1_statement_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_bank_statement_v1_statement_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_bank_statement_v1_statement_proto_goTypes = []any{
 	(Direction)(0),                // 0: bank.statement.v1.Direction
 	(*FeedItem)(nil),              // 1: bank.statement.v1.FeedItem
@@ -646,29 +966,43 @@ var file_bank_statement_v1_statement_proto_goTypes = []any{
 	(*CategorySpending)(nil),      // 5: bank.statement.v1.CategorySpending
 	(*MerchantSpending)(nil),      // 6: bank.statement.v1.MerchantSpending
 	(*GetSpendingResponse)(nil),   // 7: bank.statement.v1.GetSpendingResponse
-	(*v1.Money)(nil),              // 8: bank.common.v1.Money
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
+	(*Receipt)(nil),               // 8: bank.statement.v1.Receipt
+	(*GetReceiptRequest)(nil),     // 9: bank.statement.v1.GetReceiptRequest
+	(*GetReceiptResponse)(nil),    // 10: bank.statement.v1.GetReceiptResponse
+	(*VerifyReceiptRequest)(nil),  // 11: bank.statement.v1.VerifyReceiptRequest
+	(*VerifyReceiptResponse)(nil), // 12: bank.statement.v1.VerifyReceiptResponse
+	(*v1.Money)(nil),              // 13: bank.common.v1.Money
+	(*timestamppb.Timestamp)(nil), // 14: google.protobuf.Timestamp
 }
 var file_bank_statement_v1_statement_proto_depIdxs = []int32{
 	0,  // 0: bank.statement.v1.FeedItem.direction:type_name -> bank.statement.v1.Direction
-	8,  // 1: bank.statement.v1.FeedItem.amount:type_name -> bank.common.v1.Money
-	9,  // 2: bank.statement.v1.FeedItem.occurred_at:type_name -> google.protobuf.Timestamp
-	1,  // 3: bank.statement.v1.ListFeedResponse.items:type_name -> bank.statement.v1.FeedItem
-	8,  // 4: bank.statement.v1.CategorySpending.amount:type_name -> bank.common.v1.Money
-	8,  // 5: bank.statement.v1.MerchantSpending.amount:type_name -> bank.common.v1.Money
-	8,  // 6: bank.statement.v1.GetSpendingResponse.total:type_name -> bank.common.v1.Money
-	8,  // 7: bank.statement.v1.GetSpendingResponse.previous_total:type_name -> bank.common.v1.Money
-	5,  // 8: bank.statement.v1.GetSpendingResponse.categories:type_name -> bank.statement.v1.CategorySpending
-	6,  // 9: bank.statement.v1.GetSpendingResponse.merchants:type_name -> bank.statement.v1.MerchantSpending
-	2,  // 10: bank.statement.v1.StatementService.ListFeed:input_type -> bank.statement.v1.ListFeedRequest
-	4,  // 11: bank.statement.v1.StatementService.GetSpending:input_type -> bank.statement.v1.GetSpendingRequest
-	3,  // 12: bank.statement.v1.StatementService.ListFeed:output_type -> bank.statement.v1.ListFeedResponse
-	7,  // 13: bank.statement.v1.StatementService.GetSpending:output_type -> bank.statement.v1.GetSpendingResponse
-	12, // [12:14] is the sub-list for method output_type
-	10, // [10:12] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	13, // 1: bank.statement.v1.FeedItem.amount:type_name -> bank.common.v1.Money
+	14, // 2: bank.statement.v1.FeedItem.occurred_at:type_name -> google.protobuf.Timestamp
+	14, // 3: bank.statement.v1.ListFeedRequest.from:type_name -> google.protobuf.Timestamp
+	14, // 4: bank.statement.v1.ListFeedRequest.to:type_name -> google.protobuf.Timestamp
+	1,  // 5: bank.statement.v1.ListFeedResponse.items:type_name -> bank.statement.v1.FeedItem
+	13, // 6: bank.statement.v1.CategorySpending.amount:type_name -> bank.common.v1.Money
+	13, // 7: bank.statement.v1.MerchantSpending.amount:type_name -> bank.common.v1.Money
+	13, // 8: bank.statement.v1.GetSpendingResponse.total:type_name -> bank.common.v1.Money
+	13, // 9: bank.statement.v1.GetSpendingResponse.previous_total:type_name -> bank.common.v1.Money
+	5,  // 10: bank.statement.v1.GetSpendingResponse.categories:type_name -> bank.statement.v1.CategorySpending
+	6,  // 11: bank.statement.v1.GetSpendingResponse.merchants:type_name -> bank.statement.v1.MerchantSpending
+	1,  // 12: bank.statement.v1.Receipt.item:type_name -> bank.statement.v1.FeedItem
+	8,  // 13: bank.statement.v1.GetReceiptResponse.receipt:type_name -> bank.statement.v1.Receipt
+	8,  // 14: bank.statement.v1.VerifyReceiptResponse.receipt:type_name -> bank.statement.v1.Receipt
+	2,  // 15: bank.statement.v1.StatementService.ListFeed:input_type -> bank.statement.v1.ListFeedRequest
+	4,  // 16: bank.statement.v1.StatementService.GetSpending:input_type -> bank.statement.v1.GetSpendingRequest
+	9,  // 17: bank.statement.v1.StatementService.GetReceipt:input_type -> bank.statement.v1.GetReceiptRequest
+	11, // 18: bank.statement.v1.StatementService.VerifyReceipt:input_type -> bank.statement.v1.VerifyReceiptRequest
+	3,  // 19: bank.statement.v1.StatementService.ListFeed:output_type -> bank.statement.v1.ListFeedResponse
+	7,  // 20: bank.statement.v1.StatementService.GetSpending:output_type -> bank.statement.v1.GetSpendingResponse
+	10, // 21: bank.statement.v1.StatementService.GetReceipt:output_type -> bank.statement.v1.GetReceiptResponse
+	12, // 22: bank.statement.v1.StatementService.VerifyReceipt:output_type -> bank.statement.v1.VerifyReceiptResponse
+	19, // [19:23] is the sub-list for method output_type
+	15, // [15:19] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_bank_statement_v1_statement_proto_init() }
@@ -682,7 +1016,7 @@ func file_bank_statement_v1_statement_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_statement_v1_statement_proto_rawDesc), len(file_bank_statement_v1_statement_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

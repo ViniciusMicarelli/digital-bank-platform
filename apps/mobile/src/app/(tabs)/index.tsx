@@ -26,6 +26,7 @@ function FeedRow({ item }: { item: FeedItem }) {
     <Row icon={credit ? ArrowDownLeft : (typeIcons[item.type] ?? ArrowUpRight)} tone={credit ? 'green' : 'slate'}
       title={item.counterparty_name || item.description || typeLabels[item.type] || item.type}
       subtitle={`${typeLabels[item.type] ?? item.type} · ${dateTime(item.occurred_at)}`}
+      onPress={() => router.push({ pathname: '/comprovante/[id]', params: { id: item.id } })}
       right={<Amount value={item.amount} direction={item.direction} />} />
   )
 }

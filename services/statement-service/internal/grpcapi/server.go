@@ -32,7 +32,14 @@ func (s *Server) ListFeed(ctx context.Context, req *statementv1.ListFeedRequest)
 	if size <= 0 {
 		size = 20
 	}
-	items, next, err := s.p.Feed(ctx, account, req.GetPageToken(), min(size, 100))
+	var from, to time.Time
+	if req.GetFrom() != nil {
+		from = req.GetFrom().AsTime()
+	}
+	if req.GetTo() != nil {
+		to = req.GetTo().AsTime()
+	}
+	items, next, err := s.p.FeedBetween(ctx, account, from, to, req.GetPageToken(), min(size, 100))
 	if errors.Is(err, projection.ErrInvalidCursor) {
 		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", err.Error())
 	}
@@ -41,19 +48,59 @@ func (s *Server) ListFeed(ctx context.Context, req *statementv1.ListFeedRequest)
 	}
 	resp := &statementv1.ListFeedResponse{NextPageToken: next}
 	for _, it := range items {
-		dir := statementv1.Direction_DIRECTION_DEBIT
-		if it.Direction == "CREDIT" {
-			dir = statementv1.Direction_DIRECTION_CREDIT
-		}
-		resp.Items = append(resp.Items, &statementv1.FeedItem{
-			Id: it.ID.String(), AccountId: it.AccountID.String(), TransactionId: it.TransactionID.String(),
-			Type: it.Type, Direction: dir,
-			Amount:           &commonv1.Money{MinorUnits: it.AmountMinor, Currency: it.Currency},
-			CounterpartyName: it.CounterpartyName, Description: it.Description,
-			EndToEndId: it.EndToEndID, OccurredAt: timestamppb.New(it.OccurredAt),
-		})
+		resp.Items = append(resp.Items, itemPB(it))
 	}
 	return resp, nil
+}
+
+func itemPB(it projection.Item) *statementv1.FeedItem {
+	dir := statementv1.Direction_DIRECTION_DEBIT
+	if it.Direction == "CREDIT" {
+		dir = statementv1.Direction_DIRECTION_CREDIT
+	}
+	return &statementv1.FeedItem{
+		Id: it.ID.String(), AccountId: it.AccountID.String(), TransactionId: it.TransactionID.String(),
+		Type: it.Type, Direction: dir,
+		Amount:           &commonv1.Money{MinorUnits: it.AmountMinor, Currency: it.Currency},
+		CounterpartyName: it.CounterpartyName, Description: it.Description,
+		EndToEndId: it.EndToEndID, OccurredAt: timestamppb.New(it.OccurredAt),
+	}
+}
+
+func receiptPB(r projection.Receipt) *statementv1.Receipt {
+	return &statementv1.Receipt{Item: itemPB(r.Item), HolderName: r.HolderName, Branch: r.Branch, Number: r.Number,
+		CounterpartyBranch: r.CounterpartyBranch, CounterpartyNumber: r.CounterpartyNumber, AuthenticationCode: r.Code}
+}
+
+func (s *Server) GetReceipt(ctx context.Context, req *statementv1.GetReceiptRequest) (*statementv1.GetReceiptResponse, error) {
+	account, err1 := uuid.Parse(req.GetAccountId())
+	item, err2 := uuid.Parse(req.GetItemId())
+	if err1 != nil || err2 != nil {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", "ids must be UUIDs")
+	}
+	r, err := s.p.Receipt(ctx, account, item)
+	if errors.Is(err, projection.ErrNotFound) {
+		return nil, grpcserver.Error(codes.NotFound, "NOT_FOUND", "no such item")
+	}
+	if err != nil {
+		return nil, grpcserver.Error(codes.Internal, "INTERNAL", "internal error")
+	}
+	return &statementv1.GetReceiptResponse{Receipt: receiptPB(r)}, nil
+}
+
+// VerifyReceipt answers who paid and who received with names masked: the
+// code may be checked by anyone holding the receipt.
+func (s *Server) VerifyReceipt(ctx context.Context, req *statementv1.VerifyReceiptRequest) (*statementv1.VerifyReceiptResponse, error) {
+	r, err := s.p.Verify(ctx, req.GetAuthenticationCode())
+	if errors.Is(err, projection.ErrNotFound) {
+		return nil, grpcserver.Error(codes.NotFound, "RECEIPT_NOT_FOUND", "this code does not match a receipt of this bank")
+	}
+	if err != nil {
+		return nil, grpcserver.Error(codes.Internal, "INTERNAL", "internal error")
+	}
+	r.HolderName, r.CounterpartyName = projection.MaskName(r.HolderName), projection.MaskName(r.CounterpartyName)
+	r.Description, r.Number, r.CounterpartyNumber = "", "", ""
+	return &statementv1.VerifyReceiptResponse{Receipt: receiptPB(r)}, nil
 }
 
 func brl(minor int64) *commonv1.Money { return &commonv1.Money{MinorUnits: minor, Currency: "BRL"} }

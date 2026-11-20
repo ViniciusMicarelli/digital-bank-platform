@@ -49,6 +49,7 @@ const messages: Record<string, string> = {
   TOO_MANY_BOXES: 'Você chegou ao máximo de 20 caixinhas.',
   BOX_CLOSED: 'Esta caixinha foi encerrada.',
   NOTHING_TO_YIELD: 'Guarde algum valor na caixinha primeiro.',
+  RECEIPT_NOT_FOUND: 'Este código não corresponde a um comprovante do Digital Bank.',
   LIMIT_BELOW_USED: 'O limite não pode ficar abaixo do que você já usou.',
   LIMIT_REQUEST_IN_REVIEW: 'Você já tem um pedido de limite em análise.',
   INVOICE_NOT_PLANNABLE: 'Só faturas fechadas e não vencidas podem ser parceladas.',

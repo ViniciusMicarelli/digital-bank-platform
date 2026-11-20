@@ -275,6 +275,8 @@ services:
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
       GRPC_ADDR: ":9005"
+      # Signs receipts. Development only: production keeps it in the vault.
+      RECEIPT_KEY: development-receipt-key-change-me
     ports: ["9005:9005"]
     depends_on:
       postgres: { condition: service_healthy }

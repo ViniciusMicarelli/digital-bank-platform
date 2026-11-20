@@ -41,6 +41,10 @@ func main() {
 	}
 
 	p := projection.New(pool)
+	// Signs receipts' authentication codes. Production: a secret from the vault.
+	if key := config.String("RECEIPT_KEY", ""); key != "" {
+		p.SetReceiptKey([]byte(key))
+	}
 	if brokers := kafka.Brokers(config.String("KAFKA_BROKERS", "")); len(brokers) > 0 {
 		defer kafka.Start(ctx, kafka.ConsumerConfig{
 			Brokers: brokers,

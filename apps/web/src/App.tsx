@@ -18,6 +18,7 @@ const CreditPage = page(() => import('./pages/Credit'), 'CreditPage')
 const BoletosPage = page(() => import('./pages/Boletos'), 'BoletosPage')
 const SavingsPage = page(() => import('./pages/Savings'), 'SavingsPage')
 const SpendingPage = page(() => import('./pages/Spending'), 'SpendingPage')
+const VerifyReceiptPage = page(() => import('./pages/VerifyReceipt'), 'VerifyReceiptPage')
 const NotificationsPage = page(() => import('./pages/Notifications'), 'NotificationsPage')
 const SettingsPage = page(() => import('./pages/Settings'), 'SettingsPage')
 const BackofficePage = page(() => import('./pages/Backoffice'), 'BackofficePage')
@@ -89,6 +90,7 @@ export default function App() {
             </Route>
           </Route>
         </Route>
+        <Route path="/comprovante/:code" element={<Suspense fallback={<Loading />}><VerifyReceiptPage /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

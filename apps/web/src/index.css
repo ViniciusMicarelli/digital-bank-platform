@@ -184,3 +184,10 @@ body {
 @media (prefers-reduced-transparency: reduce) {
   .bar { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
+
+/* Printing a receipt: only the receipt, in black on white. */
+@media print {
+  body * { visibility: hidden; }
+  .receipt, .receipt * { visibility: visible; }
+  .receipt { position: fixed; inset: 0; padding: 2rem; color: #000; background: #fff; }
+}

@@ -1,15 +1,15 @@
-import { addBRL, ApiError, formatBRL, type Card, type CreditLine, type FeedItem, type Invoice, type SavingsSummary } from '@bank/core'
+import { addBRL, ApiError, errorMessage, formatBRL, monthLabel, type Card, type CreditLine, type FeedItem, type Invoice, type SavingsSummary } from '@bank/core'
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Barcode, Bell, ChevronRight, CreditCard, Eye, EyeOff, FileText, PieChart, PiggyBank, QrCode, ShoppingBag, Sparkles,
-  Undo2, Wallet, Zap, type LucideIcon,
-} from 'lucide-react'
+  Undo2, Wallet, Zap, type LucideIcon, Download } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { useAccount, useBalance, useStatement } from '../app/queries'
 import { BankCard } from '../components/BankCard'
+import { ReceiptModal } from '../components/Receipt'
 import { Amount, Button, Empty, IconTile, Loading, Panel, Skeleton } from '../components/ui'
-import { api } from '../lib/api'
+import { api, apiText } from '../lib/api'
 import { cx, dateTimeBR, typeLabels } from '../lib/format'
 import { useCountUp } from '../lib/motion'
 
@@ -21,14 +21,20 @@ const typeIcons: Record<string, LucideIcon> = {
 
 export function FeedRow({ item }: { item: FeedItem }) {
   const credit = item.direction === 'CREDIT'
+  const account = useAccount()
+  const [open, setOpen] = useState(false)
   return (
-    <li className="flex items-center gap-3.5 py-3">
+    <li>
+     <button onClick={() => setOpen(true)} aria-label={`Comprovante: ${item.counterparty_name || typeLabels[item.type] || item.type}`}
+       className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3.5 rounded-xl px-2 py-3 text-left transition hover:bg-surface-2">
       <IconTile icon={credit ? ArrowDownLeft : (typeIcons[item.type] ?? ArrowUpRight)} tone={credit ? 'green' : 'slate'} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-fg">{item.counterparty_name || item.description || typeLabels[item.type] || item.type}</p>
         <p className="text-xs text-muted">{typeLabels[item.type] ?? item.type} · {dateTimeBR(item.occurred_at)}</p>
       </div>
       <Amount value={item.amount} direction={item.direction} className="text-sm" />
+     </button>
+     {open && account && <ReceiptModal accountId={account.id} itemId={item.id} onClose={() => setOpen(false)} />}
     </li>
   )
 }
@@ -246,6 +252,50 @@ export function HomePage() {
   )
 }
 
+/** Downloads a month of the statement as CSV (opens in Excel / Sheets). */
+function ExportCSV({ accountId }: { accountId: string }) {
+  const months = Array.from({ length: 12 }, (_, i) => {
+    const d = new Date()
+    d.setDate(1)
+    d.setMonth(d.getMonth() - i)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+  const [month, setMonth] = useState(months[0])
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const download = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const [y, m] = month.split('-').map(Number)
+      const last = new Date(y, m, 0).getDate()
+      const csv = await apiText(`/v1/accounts/${accountId}/statement.csv?from=${month}-01&to=${month}-${last}`)
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      link.download = `extrato-${month}.csv`
+      link.click()
+      URL.revokeObjectURL(link.href)
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="flex items-end gap-2">
+      <label className="text-xs text-muted">
+        <span className="sr-only">Mês do extrato</span>
+        <select value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Mês do extrato"
+          className="rounded-full bg-surface-2 px-4 py-2.5 text-sm font-medium text-fg">
+          {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+        </select>
+      </label>
+      <Button variant="secondary" size="sm" icon={Download} loading={busy} onClick={() => void download()}>Exportar CSV</Button>
+      {error && <span className="text-xs text-danger">{error}</span>}
+    </div>
+  )
+}
+
 function dayLabel(iso: string) {
   const d = new Date(iso)
   const today = new Date()
@@ -268,7 +318,10 @@ export function StatementPage() {
   }, [])
   return (
     <div>
-      <h1 data-reveal className="mb-6 text-[34px] font-bold tracking-[-0.02em] text-fg">Extrato</h1>
+      <div data-reveal className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-[34px] font-bold tracking-[-0.02em] text-fg">Extrato</h1>
+        {account && <ExportCSV accountId={account.id} />}
+      </div>
       <Panel>
         {feed.isLoading ? <Loading rows={6} /> : items.length === 0 ? <Empty icon={ArrowLeftRight}>Nenhuma movimentação ainda.</Empty> : (
           <>
