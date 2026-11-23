@@ -77,3 +77,14 @@ func TestNextRun(t *testing.T) {
 		}
 	}
 }
+
+func TestRoundUp(t *testing.T) {
+	for amount, want := range map[int64]int64{12_30: 70, 12_00: 0, 1: 99, 99: 1, 0: 0} {
+		if got := RoundUp(amount); got != want {
+			t.Errorf("RoundUp(%d) = %d, want %d", amount, got, want)
+		}
+	}
+	if MovementSource(RoundUpKey("a1")) != "ROUND_UP" || MovementSource(ScheduleKey(time.Now())) != "SCHEDULE" || MovementSource("d1") != "" {
+		t.Fatal("sources")
+	}
+}

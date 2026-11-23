@@ -27,6 +27,10 @@ service SavingsService {
   // Sets (or, with a zero amount, removes) the monthly deposit from the
   // checking account. The first run is the next such day after today.
   rpc SetSchedule(SetScheduleRequest) returns (SetScheduleResponse);
+  // Turns round-ups on for the box (off for the account's other boxes), or
+  // off: each debit card purchase is rounded up to the next real and the
+  // difference is deposited into the box.
+  rpc SetRoundUp(SetRoundUpRequest) returns (SetRoundUpResponse);
   // Sandbox: makes the next monthly deposit now.
   rpc RunSchedule(RunScheduleRequest) returns (RunScheduleResponse);
 
@@ -54,6 +58,8 @@ message Box {
   int32 annual_rate_bp = 9;
   // Unset without a monthly deposit.
   Schedule schedule = 10;
+  // Debit card purchases are rounded up into this box.
+  bool round_up = 11;
 }
 
 // A monthly deposit from the checking account into the box. A run refused
@@ -78,6 +84,8 @@ message Movement {
   string status = 5;
   string failure_reason = 6;
   google.protobuf.Timestamp created_at = 7;
+  // Deposits: ROUND_UP, SCHEDULE, or empty when made by hand.
+  string source = 8;
 }
 
 message CreateBoxRequest {
@@ -207,4 +215,13 @@ message BoxYear {
 message GetYearReportResponse {
   int32 year = 1;
   repeated BoxYear boxes = 2;
+}
+
+message SetRoundUpRequest {
+  string box_id = 1;
+  bool enabled = 2;
+}
+
+message SetRoundUpResponse {
+  Box box = 1;
 }

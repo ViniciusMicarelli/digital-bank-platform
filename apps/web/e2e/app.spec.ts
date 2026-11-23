@@ -119,6 +119,11 @@ test('savings box: create, save, withdraw, yield, monthly deposit, close', async
   await page.getByRole('button', { name: 'Simular 30 dias de rendimento' }).click()
   await expect(page.getByText('Rendimento').first()).toBeVisible()
 
+  // Round-ups of debit purchases go into this box.
+  await page.getByRole('switch', { name: 'Arredondar compras no débito' }).click()
+  await expect(page.getByRole('switch', { name: 'Arredondar compras no débito' })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByText('Recebe os arredondamentos')).toBeVisible()
+
   // A monthly deposit, run now through the sandbox.
   await page.getByRole('button', { name: 'Programar depósito mensal' }).click()
   await page.getByLabel('Quanto por mês').fill('100')
@@ -127,7 +132,7 @@ test('savings box: create, save, withdraw, yield, monthly deposit, close', async
   await expect(page.getByText('todo dia 10, da conta para a caixinha.')).toBeVisible()
   await expect(page.getByText('Guardado', { exact: true })).toHaveCount(1)
   await page.getByRole('button', { name: 'Fazer o depósito programado agora' }).click()
-  await expect(page.getByText('Guardado', { exact: true })).toHaveCount(2)
+  await expect(page.getByText('Depósito programado', { exact: true })).toBeVisible()
   await shot(page, '13-savings')
 
   await page.getByRole('button', { name: 'Encerrar caixinha' }).click()

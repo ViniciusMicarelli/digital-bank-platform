@@ -1,15 +1,14 @@
-import { errorMessage, formatBRL, type SavingsBox, type SavingsMovement, type SavingsSummary } from '@bank/core'
+import { errorMessage, formatBRL, savingsMovementLabel, type SavingsBox, type SavingsMovement, type SavingsSummary } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, CalendarClock, Pencil, PiggyBank, Plus, Sparkles, Target, TrendingUp, X } from 'lucide-react'
 import { useState } from 'react'
 import { useAccount } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
-import { Alert, Button, Empty, Field, IconTile, Loading, Modal, PageTitle, Panel, Sandbox, Select, Stat, Tabs } from '../components/ui'
+import { Alert, Button, Empty, Field, IconTile, Loading, Modal, PageTitle, Panel, Sandbox, Select, Stat, Tabs, Toggle } from '../components/ui'
 import { api } from '../lib/api'
 import { cx, dateBR, dateTimeBR } from '../lib/format'
 
 const rate = (bp?: number) => (bp ? `${(bp / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%` : '')
-const movementLabel = { DEPOSIT: 'Guardado', WITHDRAWAL: 'Resgate', YIELD: 'Rendimento' } as const
 
 /** Share of the goal reached, 0-100. */
 function progress(b: Pick<SavingsBox, 'balance' | 'goal'>): number | null {
@@ -110,6 +109,7 @@ function BoxCard({ box, selected, onSelect }: { box: SavingsBox; selected: boole
         </div>
       </div>
       <p className="tabular mt-4 text-[26px] font-bold tracking-tight text-fg">{formatBRL(box.balance)}</p>
+      {box.round_up && <p className="mt-1 text-xs text-muted">Recebe os arredondamentos</p>}
       {box.schedule && (
         <p className="mt-1 flex items-center gap-1 text-xs text-muted">
           <CalendarClock className="size-3.5" /> {formatBRL(box.schedule.amount)} todo dia {box.schedule.day}
@@ -149,6 +149,11 @@ function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId:
     onSuccess: () => { refresh(); onClosed() },
     onError: (e) => setMessage({ tone: 'red', text: errorMessage(e) }),
   })
+  const roundUp = useMutation({
+    mutationFn: (enabled: boolean) => api('PUT', `${base}/${id}/round-up`, { body: { enabled } }),
+    onSuccess: refresh,
+    onError: (e) => setMessage({ tone: 'red', text: errorMessage(e) }),
+  })
   const runSchedule = useMutation({
     mutationFn: () => api('POST', `/v1/sandbox/accounts/${accountId}/savings/${id}/schedule/run`),
     onSuccess: refresh,
@@ -181,13 +186,17 @@ function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId:
         </form>
       </Panel>
       <SchedulePanel base={base} box={b} onChange={refresh} />
+      <Panel>
+        <Toggle label="Arredondar compras no débito" checked={!!b.round_up} onChange={(on) => roundUp.mutate(on)}
+          description="Cada compra no débito é arredondada para o real seguinte e a diferença vem para esta caixinha (R$ 12,30 guarda R$ 0,70)." />
+      </Panel>
       <Panel title="Histórico" icon={Target}>
         {!b.movements?.length ? <Empty icon={PiggyBank}>Nada guardado ainda.</Empty> : (
           <ul className="-my-2 divide-y divide-line">
             {b.movements.map((m) => (
               <li key={m.id} className="flex items-center justify-between gap-3 py-3 text-sm">
                 <div>
-                  <p className="font-medium text-fg">{movementLabel[m.kind]}{m.status === 'PENDING' && ' · processando'}</p>
+                  <p className="font-medium text-fg">{savingsMovementLabel(m)}{m.status === 'PENDING' && ' · processando'}</p>
                   <p className="text-xs text-muted">{dateTimeBR(m.created_at)}</p>
                 </div>
                 <span className={cx('tabular font-semibold', m.kind === 'WITHDRAWAL' ? 'text-fg' : 'text-positive')}>

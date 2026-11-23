@@ -193,6 +193,7 @@ services:
       TLS_KEY: /certs/savings-service-key.pem
       ALLOWED_CALLERS: api-gateway,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/savings?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317
       GRPC_ADDR: ":9014"
       LEDGER_ADDR: ledger-service:9001
@@ -200,6 +201,7 @@ services:
     ports: ["9014:9014"]
     depends_on:
       postgres: { condition: service_healthy }
+      kafka: { condition: service_healthy }
       ledger-service: { condition: service_healthy }
       transaction-service: { condition: service_healthy }
 

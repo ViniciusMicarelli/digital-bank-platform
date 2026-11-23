@@ -15,6 +15,7 @@ Savings boxes (*caixinhas*): money a customer sets apart from the checking accou
 | Exactly once: each day's yield has a deterministic key (`yield:<day>`); a crash or outage between paying and recording replays the same movement; the loop catches up on missed days | ✅ |
 | Movements left `PENDING` by an outage are settled by the recovery loop | ✅ |
 | Monthly scheduled deposit (*depósito programado*): an amount on a day 1–28, first run the next such day (setting it never moves money); runs once per month with a deterministic key (`schedule:<day>`), an outage keeps it due, a refusal for lack of funds skips the month and is kept on the box (`last_failure`); months missed while the service was down are not caught up | ✅ |
+| Round-ups ("arredondamento"): one box per account takes them; each cleared debit card purchase (`card.purchase.cleared` on `bank.card.events`) is rounded up to the next real and the difference deposited, idempotent on the authorization (`roundup:<id>`), skipped when the money is not there; a new deployment starts from (just before) now, so turning it on never rounds up old purchases. Movements say where a deposit came from (`source`: ROUND_UP, SCHEDULE) | ✅ |
 | Year report for the income tax statement (`GetYearReport`): each box that existed in the year, closed ones included, with its balance on 31/12 of the year before and of the year (ledger balance at the instant) and the yield paid in the year | ✅ |
 | Sandbox: pay N days of yield at once on today's balance; make the next monthly deposit now | ✅ |
 | Business-day CDI with the daily published rate, income tax (IOF / IR regressivo) | planned |
@@ -35,6 +36,7 @@ flowchart LR
 | `CreateBox` / `GetBox` / `ListBoxes` / `UpdateBox` / `CloseBox` | Boxes |
 | `Deposit` / `Withdraw` / `ListMovements` | Money in and out, history |
 | `SetSchedule` | Set or (zero amount) remove the monthly deposit |
+| `SetRoundUp` | Round-ups on for this box (off for the others) or off |
 | `SimulateYield` / `RunSchedule` | Sandbox |
 
 ## Configuration

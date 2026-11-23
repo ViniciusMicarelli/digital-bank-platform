@@ -230,6 +230,8 @@ export interface SavingsBox {
   annual_rate_bp: number
   /** The monthly deposit, when there is one. */
   schedule?: SavingsSchedule
+  /** Debit card purchases are rounded up into this box. */
+  round_up?: boolean
   movements?: SavingsMovement[]
 }
 
@@ -247,6 +249,8 @@ export interface SavingsSchedule {
 export interface SavingsMovement {
   id: string
   kind: 'DEPOSIT' | 'WITHDRAWAL' | 'YIELD'
+  /** Deposits made by the bank for the customer. */
+  source?: '' | 'ROUND_UP' | 'SCHEDULE'
   amount: Money
   status: 'PENDING' | 'COMPLETED' | 'FAILED'
   failure_reason: string
@@ -468,3 +472,10 @@ const declineReasons: Record<string, string> = {
 }
 
 export const declineReasonText = (reason: string) => declineReasons[reason] ?? reason
+
+/** How a savings movement reads in the history. */
+export function savingsMovementLabel(m: { kind: 'DEPOSIT' | 'WITHDRAWAL' | 'YIELD'; source?: string }): string {
+  if (m.source === 'ROUND_UP') return 'Arredondamento'
+  if (m.source === 'SCHEDULE') return 'Depósito programado'
+  return { DEPOSIT: 'Guardado', WITHDRAWAL: 'Resgate', YIELD: 'Rendimento' }[m.kind]
+}

@@ -179,6 +179,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/accounts/{id}/savings/{boxID}/deposits", a.authenticated(a.owned(a.ownedBox(a.boxMove(true)))))
 	mux.HandleFunc("POST /v1/accounts/{id}/savings/{boxID}/withdrawals", a.authenticated(a.owned(a.ownedBox(a.boxMove(false)))))
 	mux.HandleFunc("PUT /v1/accounts/{id}/savings/{boxID}/schedule", a.authenticated(a.owned(a.ownedBox(a.setSchedule))))
+	mux.HandleFunc("PUT /v1/accounts/{id}/savings/{boxID}/round-up", a.authenticated(a.owned(a.ownedBox(a.setRoundUp))))
 	mux.HandleFunc("DELETE /v1/accounts/{id}/savings/{boxID}/schedule", a.authenticated(a.owned(a.ownedBox(a.setSchedule))))
 	mux.HandleFunc("POST /v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}/suspend", a.authenticated(a.owned(a.ownedCard(a.updateToken("SUSPEND")))))
 	mux.HandleFunc("POST /v1/accounts/{id}/cards/{cardID}/tokens/{tokenID}/resume", a.authenticated(a.steppedUp(a.owned(a.ownedCard(a.updateToken("RESUME"))))))

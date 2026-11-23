@@ -4,6 +4,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -520,4 +521,67 @@ func (s *Service) YearReport(ctx context.Context, account uuid.UUID, year int) (
 		out = append(out, y)
 	}
 	return out, nil
+}
+
+// SetRoundUp turns round-ups on for the box (and off for the account's
+// other boxes), or off.
+func (s *Service) SetRoundUp(ctx context.Context, id uuid.UUID, on bool) (View, error) {
+	var b domain.Box
+	err := s.store.InTx(ctx, func(tx ports.Tx) error {
+		var err error
+		if b, err = tx.LockBox(id); err != nil {
+			return err
+		}
+		if on && b.Status != domain.Active {
+			return domain.Refuse("BOX_CLOSED", "this box is closed")
+		}
+		if on {
+			if err := tx.ClearRoundUp(b.AccountID); err != nil {
+				return err
+			}
+		}
+		b.RoundUp = on
+		return tx.SaveBox(b)
+	})
+	if err != nil {
+		return View{}, err
+	}
+	return s.view(ctx, b)
+}
+
+// CardPurchase is the part of a card event the round-up needs.
+type CardPurchase struct {
+	AuthorizationID string `json:"authorization_id"`
+	AccountID       string `json:"account_id"`
+	Function        string `json:"function"`
+	ClearedMinor    int64  `json:"cleared_minor"`
+}
+
+// HandleCardEvent rounds a cleared debit purchase up into the account's
+// round-up box. Idempotent on the authorization (a redelivered event
+// returns the same movement); a refusal (no money left, box closed) is a
+// FAILED movement or nothing, never a retry; a technical error is returned
+// so the event comes again.
+func (s *Service) HandleCardEvent(ctx context.Context, eventType string, payload []byte) error {
+	if eventType != "card.purchase.cleared" {
+		return nil
+	}
+	var p CardPurchase
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return fmt.Errorf("decode %s: %w", eventType, err)
+	}
+	account, err := uuid.Parse(p.AccountID)
+	amount := domain.RoundUp(p.ClearedMinor)
+	if err != nil || account == uuid.Nil || p.Function != "DEBIT" || amount == 0 || p.AuthorizationID == "" {
+		return nil
+	}
+	box, err := s.store.RoundUpBox(ctx, account)
+	if err != nil || box == nil {
+		return err
+	}
+	_, _, err = s.Deposit(ctx, domain.RoundUpKey(p.AuthorizationID), box.ID, amount)
+	if _, refused := domain.AsRefused(err); refused {
+		return nil
+	}
+	return err
 }

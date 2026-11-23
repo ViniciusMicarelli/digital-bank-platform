@@ -278,6 +278,10 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - Each card can have its own spending limit per month (e.g. a virtual card for subscriptions); purchases beyond it are declined, and the card shows how much of it was used.
 - Decline reasons now reach the customer in Portuguese, in the app and in the "Compra recusada" notification.
 
+## Phase 43 — Round-ups ✅
+
+- A savings box can take round-ups: each debit card purchase is rounded up to the next real and the change goes into it (R$ 12,30 saves R$ 0,70), exactly once per purchase; the history says which deposits were round-ups or scheduled.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

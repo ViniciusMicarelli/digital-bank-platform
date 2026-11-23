@@ -28,6 +28,7 @@ const (
 	SavingsService_Withdraw_FullMethodName      = "/bank.savings.v1.SavingsService/Withdraw"
 	SavingsService_ListMovements_FullMethodName = "/bank.savings.v1.SavingsService/ListMovements"
 	SavingsService_SetSchedule_FullMethodName   = "/bank.savings.v1.SavingsService/SetSchedule"
+	SavingsService_SetRoundUp_FullMethodName    = "/bank.savings.v1.SavingsService/SetRoundUp"
 	SavingsService_RunSchedule_FullMethodName   = "/bank.savings.v1.SavingsService/RunSchedule"
 	SavingsService_GetYearReport_FullMethodName = "/bank.savings.v1.SavingsService/GetYearReport"
 	SavingsService_SimulateYield_FullMethodName = "/bank.savings.v1.SavingsService/SimulateYield"
@@ -57,6 +58,10 @@ type SavingsServiceClient interface {
 	// Sets (or, with a zero amount, removes) the monthly deposit from the
 	// checking account. The first run is the next such day after today.
 	SetSchedule(ctx context.Context, in *SetScheduleRequest, opts ...grpc.CallOption) (*SetScheduleResponse, error)
+	// Turns round-ups on for the box (off for the account's other boxes), or
+	// off: each debit card purchase is rounded up to the next real and the
+	// difference is deposited into the box.
+	SetRoundUp(ctx context.Context, in *SetRoundUpRequest, opts ...grpc.CallOption) (*SetRoundUpResponse, error)
 	// Sandbox: makes the next monthly deposit now.
 	RunSchedule(ctx context.Context, in *RunScheduleRequest, opts ...grpc.CallOption) (*RunScheduleResponse, error)
 	// The account's boxes in a year, for the annual tax report: balances on
@@ -164,6 +169,16 @@ func (c *savingsServiceClient) SetSchedule(ctx context.Context, in *SetScheduleR
 	return out, nil
 }
 
+func (c *savingsServiceClient) SetRoundUp(ctx context.Context, in *SetRoundUpRequest, opts ...grpc.CallOption) (*SetRoundUpResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetRoundUpResponse)
+	err := c.cc.Invoke(ctx, SavingsService_SetRoundUp_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *savingsServiceClient) RunSchedule(ctx context.Context, in *RunScheduleRequest, opts ...grpc.CallOption) (*RunScheduleResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RunScheduleResponse)
@@ -218,6 +233,10 @@ type SavingsServiceServer interface {
 	// Sets (or, with a zero amount, removes) the monthly deposit from the
 	// checking account. The first run is the next such day after today.
 	SetSchedule(context.Context, *SetScheduleRequest) (*SetScheduleResponse, error)
+	// Turns round-ups on for the box (off for the account's other boxes), or
+	// off: each debit card purchase is rounded up to the next real and the
+	// difference is deposited into the box.
+	SetRoundUp(context.Context, *SetRoundUpRequest) (*SetRoundUpResponse, error)
 	// Sandbox: makes the next monthly deposit now.
 	RunSchedule(context.Context, *RunScheduleRequest) (*RunScheduleResponse, error)
 	// The account's boxes in a year, for the annual tax report: balances on
@@ -261,6 +280,9 @@ func (UnimplementedSavingsServiceServer) ListMovements(context.Context, *ListMov
 }
 func (UnimplementedSavingsServiceServer) SetSchedule(context.Context, *SetScheduleRequest) (*SetScheduleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetSchedule not implemented")
+}
+func (UnimplementedSavingsServiceServer) SetRoundUp(context.Context, *SetRoundUpRequest) (*SetRoundUpResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetRoundUp not implemented")
 }
 func (UnimplementedSavingsServiceServer) RunSchedule(context.Context, *RunScheduleRequest) (*RunScheduleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RunSchedule not implemented")
@@ -454,6 +476,24 @@ func _SavingsService_SetSchedule_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SavingsService_SetRoundUp_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetRoundUpRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SavingsServiceServer).SetRoundUp(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SavingsService_SetRoundUp_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SavingsServiceServer).SetRoundUp(ctx, req.(*SetRoundUpRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SavingsService_RunSchedule_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RunScheduleRequest)
 	if err := dec(in); err != nil {
@@ -550,6 +590,10 @@ var SavingsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetSchedule",
 			Handler:    _SavingsService_SetSchedule_Handler,
+		},
+		{
+			MethodName: "SetRoundUp",
+			Handler:    _SavingsService_SetRoundUp_Handler,
 		},
 		{
 			MethodName: "RunSchedule",

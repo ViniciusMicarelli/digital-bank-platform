@@ -72,7 +72,9 @@ type Box struct {
 	YieldCarryMicro int64
 	LastAccrued     time.Time
 	Schedule        Schedule
-	CreatedAt       time.Time
+	// RoundUp: debit card purchases are rounded up into this box.
+	RoundUp   bool
+	CreatedAt time.Time
 }
 
 func cleanName(name string) (string, error) {
@@ -225,3 +227,26 @@ func (b *Box) SetSchedule(amount int64, day int, now time.Time) error {
 
 // ScheduleKey is the idempotency key of the run due on day.
 func ScheduleKey(day time.Time) string { return "schedule:" + day.Format(time.DateOnly) }
+
+// RoundUp is what rounds a purchase up to the next whole real (0 when it
+// is already whole): R$ 12,30 -> 70 centavos.
+func RoundUp(amount int64) int64 {
+	if amount <= 0 {
+		return 0
+	}
+	return (100 - amount%100) % 100
+}
+
+// RoundUpKey is the idempotency key of the round-up of a card authorization.
+func RoundUpKey(authorization string) string { return "roundup:" + authorization }
+
+// MovementSource tells where a deposit came from, from its key.
+func MovementSource(key string) string {
+	switch {
+	case strings.HasPrefix(key, "roundup:"):
+		return "ROUND_UP"
+	case strings.HasPrefix(key, "schedule:"):
+		return "SCHEDULE"
+	}
+	return ""
+}

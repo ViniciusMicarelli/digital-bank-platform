@@ -32,7 +32,7 @@ func (s *Store) InTx(ctx context.Context, fn func(ports.Tx) error) error {
 }
 
 const boxCols = `id, idempotency_key, account_id, name, goal, status, yielded, yield_carry_micro, last_accrued,
-	schedule_amount, schedule_day, schedule_next, schedule_last_failure, created_at`
+	schedule_amount, schedule_day, schedule_next, schedule_last_failure, created_at, round_up`
 
 func scanBox(row pgx.Row) (domain.Box, error) {
 	var (
@@ -41,7 +41,7 @@ func scanBox(row pgx.Row) (domain.Box, error) {
 		next   *time.Time
 	)
 	err := row.Scan(&b.ID, &b.IdempotencyKey, &b.AccountID, &b.Name, &b.Goal, &status, &b.Yielded, &b.YieldCarryMicro, &b.LastAccrued,
-		&b.Schedule.Amount, &b.Schedule.Day, &next, &b.Schedule.LastFailure, &b.CreatedAt)
+		&b.Schedule.Amount, &b.Schedule.Day, &next, &b.Schedule.LastFailure, &b.CreatedAt, &b.RoundUp)
 	if next != nil {
 		b.Schedule.Next = *next
 	}
@@ -162,8 +162,8 @@ func (u *unit) LockBox(id uuid.UUID) (domain.Box, error) {
 func (u *unit) SaveBox(b domain.Box) error {
 	_, err := u.tx.Exec(u.ctx, `UPDATE boxes SET name = $2, goal = $3, status = $4, yielded = $5, yield_carry_micro = $6,
 		last_accrued = $7, schedule_amount = $8, schedule_day = $9, schedule_next = $10, schedule_last_failure = $11,
-		updated_at = now() WHERE id = $1`, b.ID, b.Name, b.Goal, b.Status, b.Yielded, b.YieldCarryMicro, b.LastAccrued,
-		b.Schedule.Amount, b.Schedule.Day, scheduleNext(b.Schedule), b.Schedule.LastFailure)
+		round_up = $12, updated_at = now() WHERE id = $1`, b.ID, b.Name, b.Goal, b.Status, b.Yielded, b.YieldCarryMicro, b.LastAccrued,
+		b.Schedule.Amount, b.Schedule.Day, scheduleNext(b.Schedule), b.Schedule.LastFailure, b.RoundUp)
 	return err
 }
 
@@ -199,4 +199,17 @@ func (s *Store) Yielded(ctx context.Context, box uuid.UUID, from, to time.Time) 
 	err := s.pool.QueryRow(ctx, `SELECT COALESCE(sum(amount), 0) FROM movements
 		WHERE box_id = $1 AND kind = 'YIELD' AND status = 'COMPLETED' AND created_at >= $2 AND created_at < $3`, box, from, to).Scan(&n)
 	return n, err
+}
+
+func (u *unit) ClearRoundUp(account uuid.UUID) error {
+	_, err := u.tx.Exec(u.ctx, `UPDATE boxes SET round_up = false, updated_at = now() WHERE account_id = $1 AND round_up`, account)
+	return err
+}
+
+func (s *Store) RoundUpBox(ctx context.Context, account uuid.UUID) (*domain.Box, error) {
+	b, err := scanBox(s.pool.QueryRow(ctx, `SELECT `+boxCols+` FROM boxes WHERE account_id = $1 AND round_up AND status = 'ACTIVE'`, account))
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil, nil
+	}
+	return &b, err
 }

@@ -15,7 +15,7 @@ import (
 func boxJSON(b *savingsv1.Box) map[string]any {
 	out := map[string]any{
 		"id": b.GetId(), "name": b.GetName(), "balance": moneyJSON(b.GetBalance()), "yielded": moneyJSON(b.GetYielded()),
-		"status": b.GetStatus(), "created_at": ts(b.GetCreatedAt()), "annual_rate_bp": b.GetAnnualRateBp(),
+		"status": b.GetStatus(), "created_at": ts(b.GetCreatedAt()), "annual_rate_bp": b.GetAnnualRateBp(), "round_up": b.GetRoundUp(),
 	}
 	if b.GetGoal().GetMinorUnits() > 0 {
 		out["goal"] = moneyJSON(b.GetGoal())
@@ -29,7 +29,7 @@ func boxJSON(b *savingsv1.Box) map[string]any {
 
 func movementJSON(m *savingsv1.Movement) map[string]any {
 	return map[string]any{"id": m.GetId(), "kind": m.GetKind(), "amount": moneyJSON(m.GetAmount()), "status": m.GetStatus(),
-		"failure_reason": m.GetFailureReason(), "created_at": ts(m.GetCreatedAt())}
+		"failure_reason": m.GetFailureReason(), "created_at": ts(m.GetCreatedAt()), "source": m.GetSource()}
 }
 
 // ownedBox checks {boxID} belongs to the {id} account (404 otherwise).
@@ -223,6 +223,22 @@ func (a *API) setSchedule(w http.ResponseWriter, r *http.Request, b *savingsv1.B
 		req.Amount, req.Day = amount, body.Day
 	}
 	resp, err := a.c.Savings.SetSchedule(r.Context(), req)
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, boxJSON(resp.GetBox()))
+}
+
+// setRoundUp turns round-ups of debit card purchases on or off for the box {enabled}.
+func (a *API) setRoundUp(w http.ResponseWriter, r *http.Request, b *savingsv1.Box) {
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	resp, err := a.c.Savings.SetRoundUp(r.Context(), &savingsv1.SetRoundUpRequest{BoxId: b.GetId(), Enabled: req.Enabled})
 	if err != nil {
 		writeGRPCError(w, r.Context(), err)
 		return

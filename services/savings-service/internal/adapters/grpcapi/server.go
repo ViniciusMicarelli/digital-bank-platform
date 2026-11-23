@@ -32,14 +32,15 @@ func (s *Server) boxPB(v application.View) *savingsv1.Box {
 		sched = &savingsv1.Schedule{Amount: brl(v.Schedule.Amount), Day: int32(v.Schedule.Day), //nolint:gosec // 1..28
 			NextRun: v.Schedule.Next.Format(time.DateOnly), LastFailure: v.Schedule.LastFailure}
 	}
-	return &savingsv1.Box{Schedule: sched, Id: v.ID.String(), AccountId: v.AccountID.String(), Name: v.Name, Goal: brl(v.Goal),
+	return &savingsv1.Box{Schedule: sched, RoundUp: v.RoundUp, Id: v.ID.String(), AccountId: v.AccountID.String(), Name: v.Name, Goal: brl(v.Goal),
 		Balance: brl(v.Balance), Yielded: brl(v.Yielded), Status: string(v.Status), CreatedAt: timestamppb.New(v.CreatedAt),
 		AnnualRateBp: int32(s.app.AnnualRateBP())} //nolint:gosec // basis points
 }
 
 func movementPB(m domain.Movement) *savingsv1.Movement {
 	return &savingsv1.Movement{Id: m.ID.String(), BoxId: m.BoxID.String(), Kind: string(m.Kind), Amount: brl(m.Amount),
-		Status: string(m.Status), FailureReason: m.FailureReason, CreatedAt: timestamppb.New(m.CreatedAt)}
+		Status: string(m.Status), FailureReason: m.FailureReason, CreatedAt: timestamppb.New(m.CreatedAt),
+		Source: domain.MovementSource(m.IdempotencyKey)}
 }
 
 func parseID(v string) (uuid.UUID, error) {
@@ -257,4 +258,16 @@ func (s *Server) GetYearReport(ctx context.Context, req *savingsv1.GetYearReport
 			BalanceStart: brl(b.Start), BalanceEnd: brl(b.End), Yielded: brl(b.Yield)})
 	}
 	return out, nil
+}
+
+func (s *Server) SetRoundUp(ctx context.Context, req *savingsv1.SetRoundUpRequest) (*savingsv1.SetRoundUpResponse, error) {
+	id, err := parseID(req.GetBoxId())
+	if err != nil {
+		return nil, err
+	}
+	v, err := s.app.SetRoundUp(ctx, id, req.GetEnabled())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &savingsv1.SetRoundUpResponse{Box: s.boxPB(v)}, nil
 }

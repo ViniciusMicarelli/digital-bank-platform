@@ -20,6 +20,8 @@ type Store interface {
 	PendingMovements(ctx context.Context, before time.Time, limit int) ([]domain.Movement, error)
 	// BoxesToAccrue lists active boxes whose yield was last paid before day.
 	BoxesToAccrue(ctx context.Context, day time.Time, limit int) ([]uuid.UUID, error)
+	// RoundUpBox is the account's active box that takes round-ups, if any.
+	RoundUpBox(ctx context.Context, account uuid.UUID) (*domain.Box, error)
 	// AllBoxes lists the account's boxes in any status created before until.
 	AllBoxes(ctx context.Context, account uuid.UUID, until time.Time) ([]domain.Box, error)
 	// Yielded is the yield paid into a box in [from, to).
@@ -34,6 +36,8 @@ type Tx interface {
 	CountActive(account uuid.UUID) (int, error)
 	LockBox(id uuid.UUID) (domain.Box, error)
 	SaveBox(b domain.Box) error
+	// ClearRoundUp turns round-ups off for every box of the account.
+	ClearRoundUp(account uuid.UUID) error
 	// InsertMovement returns the stored movement when (box, key) exists.
 	InsertMovement(m domain.Movement) (existing *domain.Movement, err error)
 	LockMovement(id uuid.UUID) (domain.Movement, error)

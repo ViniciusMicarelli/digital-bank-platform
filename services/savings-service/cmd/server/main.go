@@ -16,6 +16,8 @@ import (
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/kafka"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/outbox"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/telemetry"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/savings-service/internal/adapters/clients"
@@ -60,6 +62,17 @@ func main() {
 	app := application.New(pgstore.NewStore(pool), clients.NewLedger(ledgerv1.NewLedgerServiceClient(ledgerConn)),
 		clients.NewTransactions(txv1.NewTransactionServiceClient(txConn)), log, rate)
 	go app.Run(ctx, config.Duration("WORKER_INTERVAL", 30*time.Second))
+
+	// Round-ups of debit card purchases. A new deployment starts from (just
+	// before) now: turning it on never rounds up old purchases.
+	if brokers := kafka.Brokers(config.String("KAFKA_BROKERS", "")); len(brokers) > 0 {
+		defer kafka.Start(ctx, kafka.ConsumerConfig{
+			Brokers: brokers, Group: config.String("CONSUMER_GROUP", "savings-service"), NewGroupLookback: 10 * time.Minute,
+			Topics: []string{"bank.card.events"},
+		}, log, func(ctx context.Context, ev outbox.Event) error { return app.HandleCardEvent(ctx, ev.Type, ev.Payload) })()
+	} else {
+		log.Warn("KAFKA_BROKERS not set: no round-ups")
+	}
 
 	srvOpts, err := grpcserver.OptionsFromEnv()
 	if err != nil {

@@ -1,14 +1,13 @@
-import { errorMessage, formatBRL, type SavingsBox, type SavingsSummary } from '@bank/core'
+import { errorMessage, formatBRL, savingsMovementLabel, type SavingsBox, type SavingsSummary } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, CalendarClock, PiggyBank, Plus, Sparkles, X } from 'lucide-react-native'
 import { useState } from 'react'
 import { View } from 'react-native'
-import { Button, Card, Field, Loading, MoneyField, Muted, Notice, Press, Row, Sandbox, Screen, Segmented, Txt } from '../components/ui'
+import { Button, Card, Field, Loading, MoneyField, Muted, Notice, Press, Row, Sandbox, Screen, Segmented, Toggle, Txt } from '../components/ui'
 import { api } from '../lib/client'
 import { date, dateTime, useAccount } from '../lib/queries'
 import { font, useTheme } from '../lib/theme'
 
-const movementLabel = { DEPOSIT: 'Guardado', WITHDRAWAL: 'Resgate', YIELD: 'Rendimento' } as const
 const rate = (bp: number) => `${(bp / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`
 
 function NewBox({ base, onDone }: { base: string; onDone: (b: SavingsBox) => void }) {
@@ -95,6 +94,7 @@ function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId:
     onError: fail,
   })
   const close = useMutation({ mutationFn: () => api('DELETE', `${base}/${id}`, { idempotent: true }), onSuccess: () => { refresh(); onClosed() }, onError: fail })
+  const roundUp = useMutation({ mutationFn: (enabled: boolean) => api('PUT', `${base}/${id}/round-up`, { body: { enabled } }), onSuccess: refresh, onError: fail })
   const runSchedule = useMutation({
     mutationFn: () => api('POST', `/v1/sandbox/accounts/${accountId}/savings/${id}/schedule/run`),
     onSuccess: refresh,
@@ -117,9 +117,12 @@ function BoxDetail({ base, accountId, id, onClosed }: { base: string; accountId:
         {message && <Notice tone={message.tone}>{message.text}</Notice>}
       </Card>
       <ScheduleCard base={base} box={b} onChange={refresh} />
+      <Card index={3}>
+        <Toggle label="Arredondar compras no débito" description="R$ 12,30 no débito guarda R$ 0,70 aqui." value={!!b.round_up} onChange={(on) => roundUp.mutate(on)} />
+      </Card>
       <Card title="Histórico" index={3}>
         {!b.movements?.length ? <Muted>Nada guardado ainda.</Muted> : b.movements.map((m) => (
-          <Row key={m.id} title={movementLabel[m.kind] + (m.status === 'PENDING' ? ' · processando' : '')} subtitle={dateTime(m.created_at)}
+          <Row key={m.id} title={savingsMovementLabel(m) + (m.status === 'PENDING' ? ' · processando' : '')} subtitle={dateTime(m.created_at)}
             right={<Txt variant="label" tone={m.kind === 'WITHDRAWAL' ? 'fg' : 'positive'} style={{ fontFamily: font.semibold }}>{m.kind === 'WITHDRAWAL' ? '− ' : '+ '}{formatBRL(m.amount)}</Txt>} />
         ))}
       </Card>

@@ -2,6 +2,7 @@ package application_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -310,5 +311,54 @@ func TestYearReport(t *testing.T) {
 	r27, _ := e.svc.YearReport(e.ctx, e.account, 2027)
 	if len(r27) != 1 || r27[0].Start != y.End {
 		t.Fatalf("2027 starts where 2026 ended: %+v", r27)
+	}
+}
+
+func TestRoundUps(t *testing.T) {
+	e := setup(t) // R$ 1.000 in checking
+	a, _ := e.svc.Create(e.ctx, "k1", e.account, "Troco", 0)
+	b, _ := e.svc.Create(e.ctx, "k2", e.account, "Outra", 0)
+	event := func(auth, function string, cleared int64) error {
+		payload, _ := json.Marshal(map[string]any{"authorization_id": auth, "account_id": e.account.String(), "function": function, "cleared_minor": cleared})
+		return e.svc.HandleCardEvent(e.ctx, "card.purchase.cleared", payload)
+	}
+	// Off: nothing happens.
+	if err := event("auth-0", "DEBIT", 12_30); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := e.svc.Box(e.ctx, a.ID); v.Balance != 0 {
+		t.Fatalf("round-up while off: %+v", v)
+	}
+	_, _ = e.svc.SetRoundUp(e.ctx, b.ID, true)
+	if v, _ := e.svc.SetRoundUp(e.ctx, a.ID, true); !v.RoundUp {
+		t.Fatalf("on = %+v", v)
+	}
+	if v, _ := e.svc.Box(e.ctx, b.ID); v.RoundUp {
+		t.Fatal("one round-up box per account")
+	}
+	// R$ 12,30 on debit: 70 centavos, once even if the event comes twice.
+	for range 2 {
+		if err := event("auth-1", "DEBIT", 12_30); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = event("auth-2", "CREDIT", 5_10) // credit purchases are not rounded up
+	_ = event("auth-3", "DEBIT", 20_00) // already whole
+	v, _ := e.svc.Box(e.ctx, a.ID)
+	list, _ := e.svc.Movements(e.ctx, a.ID, 10)
+	if v.Balance != 70 || len(list) != 1 || domain.MovementSource(list[0].IdempotencyKey) != "ROUND_UP" {
+		t.Fatalf("after round-ups: %+v %+v", v, list)
+	}
+	// An outage: the event is retried and deposits once.
+	e.bank.down = true
+	_ = event("auth-4", "DEBIT", 9_99)
+	e.bank.down = false
+	e.now = e.now.Add(time.Minute)
+	e.svc.RecoverOnce(e.ctx, 30*time.Second)
+	if err := event("auth-4", "DEBIT", 9_99); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := e.svc.Box(e.ctx, a.ID); v.Balance != 71 {
+		t.Fatalf("after the outage = %d", v.Balance)
 	}
 }
