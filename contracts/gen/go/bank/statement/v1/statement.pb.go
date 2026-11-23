@@ -197,8 +197,13 @@ type ListFeedRequest struct {
 	PageSize  int32  `protobuf:"varint,2,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	PageToken string `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	// Optional period [from, to).
-	From          *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=from,proto3" json:"from,omitempty"`
-	To            *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=to,proto3" json:"to,omitempty"`
+	From *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=from,proto3" json:"from,omitempty"`
+	To   *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=to,proto3" json:"to,omitempty"`
+	// Optional: CREDIT (money in) or DEBIT (money out).
+	Direction string `protobuf:"bytes,6,opt,name=direction,proto3" json:"direction,omitempty"`
+	// Optional: words in the counterparty or the description (any case, up to
+	// 100 characters).
+	Query         string `protobuf:"bytes,7,opt,name=query,proto3" json:"query,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -266,6 +271,20 @@ func (x *ListFeedRequest) GetTo() *timestamppb.Timestamp {
 		return x.To
 	}
 	return nil
+}
+
+func (x *ListFeedRequest) GetDirection() string {
+	if x != nil {
+		return x.Direction
+	}
+	return ""
+}
+
+func (x *ListFeedRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
 }
 
 type ListFeedResponse struct {
@@ -1144,7 +1163,7 @@ const file_bank_statement_v1_statement_proto_rawDesc = "" +
 	"endToEndId\x12;\n" +
 	"\voccurred_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"occurredAt\"\xc8\x01\n" +
+	"occurredAt\"\xfc\x01\n" +
 	"\x0fListFeedRequest\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1b\n" +
@@ -1152,7 +1171,9 @@ const file_bank_statement_v1_statement_proto_rawDesc = "" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tR\tpageToken\x12.\n" +
 	"\x04from\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x04from\x12*\n" +
-	"\x02to\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x02to\"m\n" +
+	"\x02to\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x02to\x12\x1c\n" +
+	"\tdirection\x18\x06 \x01(\tR\tdirection\x12\x14\n" +
+	"\x05query\x18\a \x01(\tR\x05query\"m\n" +
 	"\x10ListFeedResponse\x121\n" +
 	"\x05items\x18\x01 \x03(\v2\x1b.bank.statement.v1.FeedItemR\x05items\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"I\n" +

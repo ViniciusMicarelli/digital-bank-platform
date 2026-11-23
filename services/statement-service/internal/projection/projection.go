@@ -193,6 +193,27 @@ func (p *Projector) Feed(ctx context.Context, account uuid.UUID, pageToken strin
 
 // FeedBetween is Feed limited to [from, to) (zero values: unbounded).
 func (p *Projector) FeedBetween(ctx context.Context, account uuid.UUID, from, to time.Time, pageToken string, limit int) ([]Item, string, error) {
+	return p.FeedFiltered(ctx, account, FeedFilter{From: from, To: to}, pageToken, limit)
+}
+
+// FeedFilter narrows the feed: a period [From, To), a direction (CREDIT or
+// DEBIT) and words found in the counterparty or the description (any case).
+type FeedFilter struct {
+	From, To  time.Time
+	Direction string
+	Query     string
+}
+
+// likePattern turns a search into an ILIKE pattern that matches it literally.
+func likePattern(q string) string {
+	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+	return "%" + r.Replace(strings.TrimSpace(q)) + "%"
+}
+
+// FeedFiltered is Feed narrowed by f; the page token works across pages of
+// the same filter.
+func (p *Projector) FeedFiltered(ctx context.Context, account uuid.UUID, f FeedFilter, pageToken string, limit int) ([]Item, string, error) {
+	from, to := f.From, f.To
 	var after *cursor
 	if pageToken != "" {
 		raw, err := base64.RawURLEncoding.DecodeString(pageToken)
@@ -217,6 +238,15 @@ func (p *Projector) FeedBetween(ctx context.Context, account uuid.UUID, from, to
 	if !to.IsZero() {
 		args = append(args, to)
 		where += fmt.Sprintf(" AND f.occurred_at < $%d", len(args))
+	}
+	if f.Direction != "" {
+		args = append(args, f.Direction)
+		where += fmt.Sprintf(" AND f.direction = $%d", len(args))
+	}
+	if strings.TrimSpace(f.Query) != "" {
+		args = append(args, likePattern(f.Query))
+		n := len(args)
+		where += fmt.Sprintf(" AND (COALESCE(f.counterparty_name, a.holder_name, '') ILIKE $%d OR f.description ILIKE $%d)", n, n)
 	}
 	rows, err := p.pool.Query(ctx, `
 		SELECT f.id, f.account_id, f.transaction_id, f.type, f.direction, f.amount, f.currency,

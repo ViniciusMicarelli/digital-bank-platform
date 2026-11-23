@@ -202,8 +202,8 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
   )
 }
 
-/** Segmented tabs with a sliding indicator. */
-export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; onChange: (t: T) => void; tabs: [T, string][] }) {
+/** Segmented tabs with a sliding indicator; inline drops the space below (for a toolbar). */
+export function Tabs<T extends string>({ value, onChange, tabs, inline }: { value: T; onChange: (t: T) => void; tabs: [T, string][]; inline?: boolean }) {
   const list = useRef<HTMLDivElement>(null)
   const pill = useRef<HTMLSpanElement>(null)
   const first = useRef(true)
@@ -216,7 +216,8 @@ export function Tabs<T extends string>({ value, onChange, tabs }: { value: T; on
     first.current = false
   }, [value])
   return (
-    <div ref={list} role="tablist" data-reveal className="no-scrollbar relative mb-6 flex gap-1 overflow-x-auto rounded-full bg-surface-2 p-1">
+    <div ref={list} role="tablist" data-reveal={inline ? undefined : true}
+      className={cx('no-scrollbar relative flex shrink-0 gap-1 overflow-x-auto rounded-full bg-surface-2 p-1', !inline && 'mb-6')}>
       <span ref={pill} aria-hidden className="glass-strong absolute top-1 bottom-1 left-0 rounded-full" />
       {tabs.map(([id, label]) => (
         <button key={id} role="tab" aria-selected={value === id} onClick={() => onChange(id)}

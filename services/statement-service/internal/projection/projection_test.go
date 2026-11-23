@@ -121,3 +121,60 @@ func TestSameBankPixAndPagination(t *testing.T) {
 		t.Fatal("expected invalid cursor error")
 	}
 }
+
+func TestFeedFilters(t *testing.T) {
+	p := projection.New(pgtest.NewDB(t, migrations.FS, "."))
+	ctx := context.Background()
+	ana, bruno, settlement := uuid.New(), uuid.New(), uuid.New()
+	t0 := time.Date(2026, 11, 17, 12, 0, 0, 0, time.UTC)
+	for _, ev := range []outbox.Event{
+		opened(t, ana, "Ana Silva"), opened(t, bruno, "Bruno Lima"),
+		completed(t, "INTERNAL_TRANSFER", ana, bruno, 30_00, t0, nil), // Bruno resolved from the accounts view
+		completed(t, "PIX_OUT", ana, settlement, 10_00, t0.Add(time.Minute), map[string]string{"counterparty_name": "Maria Oliveira"}),
+		completed(t, "PIX_IN", settlement, ana, 5_00, t0.Add(2*time.Minute), map[string]string{"counterparty_name": "Mariana 100% Sá"}),
+		completed(t, "PIX_IN", settlement, ana, 7_00, t0.Add(3*time.Minute), map[string]string{"counterparty_name": "João Pereira"}),
+	} {
+		if err := p.Handle(ctx, ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+	names := func(f projection.FeedFilter) (out []string) {
+		t.Helper()
+		items, _, err := p.FeedFiltered(ctx, ana, f, "", 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, it := range items {
+			out = append(out, it.CounterpartyName)
+		}
+		return out
+	}
+	if got := names(projection.FeedFilter{Direction: "CREDIT"}); len(got) != 2 {
+		t.Fatalf("money in = %v", got)
+	}
+	if got := names(projection.FeedFilter{Direction: "DEBIT"}); len(got) != 2 {
+		t.Fatalf("money out = %v", got)
+	}
+	if got := names(projection.FeedFilter{Query: "maria"}); len(got) != 2 {
+		t.Fatalf("maria = %v", got)
+	}
+	if got := names(projection.FeedFilter{Query: "bruno"}); len(got) != 1 || got[0] != "Bruno Lima" {
+		t.Fatalf("resolved names are searched too: %v", got)
+	}
+	// % and _ are matched literally.
+	if got := names(projection.FeedFilter{Query: "100%"}); len(got) != 1 || got[0] != "Mariana 100% Sá" {
+		t.Fatalf("literal %%: %v", got)
+	}
+	if got := names(projection.FeedFilter{Query: "_"}); len(got) != 0 {
+		t.Fatalf("literal _: %v", got)
+	}
+	if got := names(projection.FeedFilter{Query: "maria", Direction: "DEBIT"}); len(got) != 1 || got[0] != "Maria Oliveira" {
+		t.Fatalf("both = %v", got)
+	}
+	// Pages of a filtered feed.
+	page, next, _ := p.FeedFiltered(ctx, ana, projection.FeedFilter{Direction: "CREDIT"}, "", 1)
+	rest, _, _ := p.FeedFiltered(ctx, ana, projection.FeedFilter{Direction: "CREDIT"}, next, 1)
+	if len(page) != 1 || len(rest) != 1 || page[0].ID == rest[0].ID || rest[0].Direction != "CREDIT" {
+		t.Fatalf("pages = %+v / %+v", page, rest)
+	}
+}

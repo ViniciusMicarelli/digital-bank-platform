@@ -25,6 +25,20 @@ test('onboarding, Pix in and out with live notifications', async ({ page }) => {
   await expect(page.getByText('Maria Oliveira', { exact: true }).first()).toBeVisible()
   await shot(page, '03-home')
 
+  // The statement filters: money out only, then a search.
+  await page.goto('/extrato')
+  const statement = page.locator('section').last()
+  await page.getByRole('tab', { name: 'Saídas' }).click()
+  await expect(statement.getByText('Maria Oliveira', { exact: true })).toBeVisible()
+  await expect(statement.getByText(/^Empresa X/)).toBeHidden()
+  await page.getByRole('tab', { name: 'Tudo' }).click()
+  await page.getByLabel('Buscar no extrato').fill('empresa')
+  await expect(statement.getByText(/^Empresa X/)).toBeVisible()
+  await expect(statement.getByText('Maria Oliveira', { exact: true })).toBeHidden()
+  await shot(page, '25-statement-search')
+  await page.getByLabel('Buscar no extrato').fill('ninguém')
+  await expect(page.getByText('Nada encontrado com esses filtros.')).toBeVisible()
+
   await page.goto('/pix?aba=cobrar')
   await page.getByLabel('Valor (opcional)').fill('25')
   await page.getByRole('button', { name: 'Gerar QR Code' }).click()

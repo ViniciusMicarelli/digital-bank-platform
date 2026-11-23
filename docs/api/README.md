@@ -56,7 +56,7 @@
 | `GET` | `/v1/accounts/{id}/closure` | Can the account be closed now: `{can_close, blockers [{code: BALANCE \| SAVINGS \| CREDIT_DEBT \| PAYMENTS_IN_PROGRESS, amount?, count?}], will_cancel {pix_schedules, boleto_schedules, pix_automatico, empty_savings_boxes}}` |
 | `POST` | `/v1/accounts/{id}/close` | 🔐 Close the account at the holder's request `{reason?}`: 409 `CLOSURE_BLOCKED` (with the check) while something blocks it; otherwise scheduled Pix and boletos, Pix Automático authorizations and empty boxes are cancelled, the account is closed, and `account.closed` cancels cards and removes Pix keys. The statement and receipts stay readable |
 | `GET` / `PUT` | `/v1/accounts/{id}/limits` | Limits and today's usage / change limits |
-| `GET` | `/v1/accounts/{id}/statement` | Feed, newest first |
+| `GET` | `/v1/accounts/{id}/statement` | Feed, newest first (`?limit=`, `?cursor=`); filters `?direction=credit\|debit` and `?q=` (words in the counterparty or description, any case, matched literally); the cursor works within a filter |
 | `POST` | `/v1/accounts/{id}/transfers` | `{to_account_id, amount, description}` · Idempotency-Key |
 | `GET` / `POST` | `/v1/accounts/{id}/pix/keys` | List / register `{type: CPF\|EMAIL\|PHONE\|EVP, value}` |
 | `DELETE` | `/v1/accounts/{id}/pix/keys/{keyID}` | Delete a key |

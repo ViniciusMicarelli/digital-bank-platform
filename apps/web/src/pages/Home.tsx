@@ -2,13 +2,13 @@ import { addBRL, ApiError, errorMessage, formatBRL, monthLabel, type Card, type 
 import { useQuery } from '@tanstack/react-query'
 import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Barcode, Bell, ChevronRight, CreditCard, Eye, EyeOff, FileText, PieChart, PiggyBank, QrCode, ShoppingBag, Sparkles,
-  Undo2, Wallet, Zap, type LucideIcon, Download } from 'lucide-react'
-import { useState } from 'react'
+  Search, Undo2, Wallet, Zap, type LucideIcon, Download } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useAccount, useBalance, useStatement } from '../app/queries'
 import { BankCard } from '../components/BankCard'
 import { ReceiptModal } from '../components/Receipt'
-import { Amount, Button, Empty, IconTile, Loading, Panel, Skeleton } from '../components/ui'
+import { Amount, Button, Empty, IconTile, Loading, Panel, Skeleton, Tabs } from '../components/ui'
 import { api, apiText } from '../lib/api'
 import { cx, dateTimeBR, typeLabels } from '../lib/format'
 import { useCountUp } from '../lib/motion'
@@ -305,9 +305,23 @@ function dayLabel(iso: string) {
   return d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
 }
 
+/** Waits a moment after typing before searching. */
+function useDebounced<T>(value: T, ms = 300): T {
+  const [v, setV] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms)
+    return () => clearTimeout(t)
+  }, [value, ms])
+  return v
+}
+
 export function StatementPage() {
   const account = useAccount()
-  const feed = useStatement(account?.id, 25)
+  const [direction, setDirection] = useState<'ALL' | 'CREDIT' | 'DEBIT'>('ALL')
+  const [search, setSearch] = useState('')
+  const q = useDebounced(search)
+  const filtered = direction !== 'ALL' || q.trim() !== ''
+  const feed = useStatement(account?.id, 25, { direction: direction === 'ALL' ? undefined : direction, q })
   const items = feed.data?.pages.flatMap((p) => p.items) ?? []
   const groups = items.reduce<[string, FeedItem[]][]>((acc, item) => {
     const label = dayLabel(item.occurred_at)
@@ -325,8 +339,20 @@ export function StatementPage() {
           <Link to="/informe" className="rounded-full px-3 py-2.5 text-sm font-medium text-brand-strong hover:bg-surface-2">Informe de rendimentos</Link>
         </div>
       </div>
+      <div data-reveal className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <Tabs inline value={direction} onChange={setDirection} tabs={[['ALL', 'Tudo'], ['CREDIT', 'Entradas'], ['DEBIT', 'Saídas']]} />
+        <label className="relative flex-1">
+          <span className="sr-only">Buscar no extrato</span>
+          <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted" aria-hidden />
+          <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} maxLength={100}
+            placeholder="Buscar por nome ou descrição" aria-label="Buscar no extrato"
+            className="w-full rounded-full bg-surface-2 py-2.5 pr-4 pl-10 text-sm text-fg placeholder:text-subtle focus:ring-2 focus:ring-brand focus:outline-none" />
+        </label>
+      </div>
       <Panel>
-        {feed.isLoading ? <Loading rows={6} /> : items.length === 0 ? <Empty icon={ArrowLeftRight}>Nenhuma movimentação ainda.</Empty> : (
+        {feed.isLoading ? <Loading rows={6} /> : items.length === 0 ? (
+          <Empty icon={filtered ? Search : ArrowLeftRight}>{filtered ? 'Nada encontrado com esses filtros.' : 'Nenhuma movimentação ainda.'}</Empty>
+        ) : (
           <>
             {groups.map(([label, list]) => (
               <div key={label} className="mb-2">

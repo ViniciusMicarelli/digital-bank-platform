@@ -4,11 +4,11 @@ import { router } from 'expo-router'
 import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Barcode, Bell, ChevronRight, CreditCard, Eye, EyeOff, FileText, QrCode, ShoppingBag, Sparkles,
   Undo2, Wallet, Zap, type LucideIcon, PiggyBank, PieChart } from 'lucide-react-native'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native'
 import Animated, { FadeInDown } from 'react-native-reanimated'
 import { Glass } from '../../components/Glass'
-import { Amount, Card, IconTile, Loading, Muted, Press, Row, Screen, Txt } from '../../components/ui'
+import { Amount, Card, Field, IconTile, Loading, Muted, Press, Row, Screen, Segmented, Txt } from '../../components/ui'
 import { api } from '../../lib/client'
 import { useCountUp } from '../../lib/motion'
 import { dateTime, typeLabels, useAccount, useBalance, useStatement } from '../../lib/queries'
@@ -166,11 +166,32 @@ export default function Home() {
 
       {account && <Animated.View entering={FadeInDown.delay(260).duration(500)}><Credit accountId={account.id} hidden={hidden} /></Animated.View>}
 
-      <Card title="Movimentações" index={4}>
-        {feed.isLoading ? <Loading /> : !items.length ? <Muted>Nenhuma movimentação ainda. Cadastre uma chave Pix e receba.</Muted> :
-          items.slice(0, 12).map((i) => <FeedRow key={i.id} item={i} />)}
-      </Card>
+      {account && <Movements accountId={account.id} recent={items} loading={feed.isLoading} />}
     </Screen>
+  )
+}
+
+/** The latest movements, or what matches the filters (money in or out, and a search). */
+function Movements({ accountId, recent, loading }: { accountId: string; recent: FeedItem[]; loading: boolean }) {
+  const [direction, setDirection] = useState<'ALL' | 'CREDIT' | 'DEBIT'>('ALL')
+  const [search, setSearch] = useState('')
+  const [q, setQ] = useState('')
+  useEffect(() => {
+    const t = setTimeout(() => setQ(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+  const filtered = direction !== 'ALL' || q.trim() !== ''
+  const found = useStatement(filtered ? accountId : undefined, 30, { direction: direction === 'ALL' ? undefined : direction, q })
+  const list = filtered ? found.data ?? [] : recent
+  const busy = filtered ? found.isLoading : loading
+  return (
+    <Card title="Movimentações" index={4}>
+      <Segmented value={direction} onChange={setDirection} options={[['ALL', 'Tudo'], ['CREDIT', 'Entradas'], ['DEBIT', 'Saídas']]} />
+      <Field label="Buscar" placeholder="Nome ou descrição" value={search} onChangeText={setSearch} maxLength={100} />
+      {busy ? <Loading /> : !list.length
+        ? <Muted>{filtered ? 'Nada encontrado com esses filtros.' : 'Nenhuma movimentação ainda. Cadastre uma chave Pix e receba.'}</Muted>
+        : list.slice(0, filtered ? 30 : 12).map((i) => <FeedRow key={i.id} item={i} />)}
+    </Card>
   )
 }
 

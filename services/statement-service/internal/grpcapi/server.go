@@ -39,7 +39,15 @@ func (s *Server) ListFeed(ctx context.Context, req *statementv1.ListFeedRequest)
 	if req.GetTo() != nil {
 		to = req.GetTo().AsTime()
 	}
-	items, next, err := s.p.FeedBetween(ctx, account, from, to, req.GetPageToken(), min(size, 100))
+	dir := req.GetDirection()
+	if dir != "" && dir != "CREDIT" && dir != "DEBIT" {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", "direction is CREDIT or DEBIT")
+	}
+	if len([]rune(req.GetQuery())) > 100 {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", "the search has at most 100 characters")
+	}
+	items, next, err := s.p.FeedFiltered(ctx, account, projection.FeedFilter{From: from, To: to, Direction: dir, Query: req.GetQuery()},
+		req.GetPageToken(), min(size, 100))
 	if errors.Is(err, projection.ErrInvalidCursor) {
 		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", err.Error())
 	}

@@ -10,6 +10,7 @@ The **read side** (CQRS) for everything the customer sees in their feed and stat
 |---|---|
 | Unified feed of completed transactions (transfers, Pix out, Pix in, same-bank Pix), cursor-paginated, newest first | ✅ |
 | Counterparty names (from Pix metadata, or the local holder projection) | ✅ |
+| Filters: money in or out, and a search in the counterparty (resolved names too) or description, `%` and `_` matched literally; cursor pagination within a filter | ✅ |
 | Spending by month (Brasília time): card purchases (debit and credit, from `card.purchase.cleared`) by category from the merchant category code, Pix and transfers sent, bills paid; refunds subtract from their purchase's category; previous month and top merchants (`GetSpending`) | ✅ |
 | Monthly budgets per category or on the month's total (`SetBudget` / `ListBudgets`, with what was spent); reaching 80% and 100% in the current month publishes `statement.budget.threshold` once each (recorded in `budget_alerts`, sent through the transactional outbox to `bank.statement.events`; locking the budget row serializes two expenses so an alert is never missed; a late event of a past month alerts nobody). Budgets are owned data, not rebuilt from events | ✅ |
 | Receipts for every item, with an authentication code: the item id plus an HMAC-SHA256 tag (80 bits) of what the receipt states under the bank's key (`RECEIPT_KEY`), so it is checked without storing anything and cannot be forged or edited; public check with names masked | ✅ |

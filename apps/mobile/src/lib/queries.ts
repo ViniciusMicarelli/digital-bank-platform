@@ -34,13 +34,19 @@ export function useBalance(id?: string) {
   return useQuery({ queryKey: ['balance', id], enabled: !!id, queryFn: () => api<Balance>('GET', `/v1/accounts/${id}/balance`) })
 }
 
-export function useStatement(id?: string, limit = 30) {
+/** Narrows the statement: money in or out, and words in the counterparty or description. */
+export interface StatementFilter { direction?: 'CREDIT' | 'DEBIT'; q?: string }
+
+export function useStatement(id?: string, limit = 30, filter: StatementFilter = {}) {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (filter.direction) params.set('direction', filter.direction)
+  if (filter.q?.trim()) params.set('q', filter.q.trim())
   return useQuery({
-    queryKey: ['statement', id, limit],
+    queryKey: ['statement', id, limit, filter.direction ?? '', filter.q?.trim() ?? ''],
     enabled: !!id,
     // The statement is a projection that can trail the events; keep it fresh.
     refetchInterval: 10_000,
-    queryFn: async () => (await api<{ items: FeedItem[] }>('GET', `/v1/accounts/${id}/statement?limit=${limit}`)).items,
+    queryFn: async () => (await api<{ items: FeedItem[] }>('GET', `/v1/accounts/${id}/statement?${params}`)).items,
   })
 }
 

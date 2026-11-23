@@ -282,6 +282,10 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 
 - A savings box can take round-ups: each debit card purchase is rounded up to the next real and the change goes into it (R$ 12,30 saves R$ 0,70), exactly once per purchase; the history says which deposits were round-ups or scheduled.
 
+## Phase 44 — Statement search ✅
+
+- The statement can be narrowed to money in or out and searched by name or description, on the web and on mobile; pages keep working within a filter.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

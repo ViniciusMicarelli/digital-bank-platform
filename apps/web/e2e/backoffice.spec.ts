@@ -9,7 +9,7 @@ test.describe.configure({ mode: 'serial', timeout: 150_000 })
 test('an analyst approves a manual KYC review from the queue', async ({ page, request }) => {
   // A politically exposed customer (CPF prefix 222) waits for an analyst.
   const tag = crypto.randomUUID().slice(0, 6)
-  const name = `Carla ${tag.replace(/[0-9]/g, 'x')} Dias`
+  const name = `Carla ${tag.replace(/[0-9]/g, (d) => 'abcdefghij'[Number(d)])} Dias`
   const email = `pep-${tag}@example.com`
   await request.post(api('/v1/auth/register'), { data: { email, password: PASSWORD, full_name: name } })
   const login = await (await request.post(api('/v1/auth/login'), { data: { email, password: PASSWORD } })).json()

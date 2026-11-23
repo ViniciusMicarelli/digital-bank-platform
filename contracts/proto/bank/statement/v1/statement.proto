@@ -55,6 +55,11 @@ message ListFeedRequest {
   // Optional period [from, to).
   google.protobuf.Timestamp from = 4;
   google.protobuf.Timestamp to = 5;
+  // Optional: CREDIT (money in) or DEBIT (money out).
+  string direction = 6;
+  // Optional: words in the counterparty or the description (any case, up to
+  // 100 characters).
+  string query = 7;
 }
 
 message ListFeedResponse {

@@ -47,13 +47,19 @@ export function useBalance(id?: string) {
   })
 }
 
-export function useStatement(accountId?: string, pageSize = 20) {
+/** Narrows the statement: money in or out, and words in the counterparty or description. */
+export interface StatementFilter { direction?: 'CREDIT' | 'DEBIT'; q?: string }
+
+export function useStatement(accountId?: string, pageSize = 20, filter: StatementFilter = {}) {
+  const params = new URLSearchParams({ limit: String(pageSize) })
+  if (filter.direction) params.set('direction', filter.direction)
+  if (filter.q?.trim()) params.set('q', filter.q.trim())
   return useInfiniteQuery({
-    queryKey: ['statement', accountId, pageSize],
+    queryKey: ['statement', accountId, pageSize, filter.direction ?? '', filter.q?.trim() ?? ''],
     enabled: !!accountId,
     initialPageParam: '',
     queryFn: ({ pageParam }) =>
-      api<{ items: FeedItem[]; next_cursor: string }>('GET', `/v1/accounts/${accountId}/statement?limit=${pageSize}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`),
+      api<{ items: FeedItem[]; next_cursor: string }>('GET', `/v1/accounts/${accountId}/statement?${params}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`),
     getNextPageParam: (last) => last.next_cursor || undefined,
     // The statement is a projection that can trail the events; keep it fresh.
     refetchInterval: 10_000,

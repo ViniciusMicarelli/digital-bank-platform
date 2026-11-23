@@ -258,8 +258,10 @@ func (a *API) updateLimits(w http.ResponseWriter, r *http.Request, acc *accountv
 
 func (a *API) statement(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	q := r.URL.Query()
 	resp, err := a.c.Statement.ListFeed(r.Context(), &statementv1.ListFeedRequest{
-		AccountId: acc.GetId(), PageSize: int32(min(max(limit, 0), 100)), PageToken: r.URL.Query().Get("cursor"),
+		AccountId: acc.GetId(), PageSize: int32(min(max(limit, 0), 100)), PageToken: q.Get("cursor"), //nolint:gosec // bounded
+		Direction: strings.ToUpper(q.Get("direction")), Query: q.Get("q"),
 	})
 	if err != nil {
 		writeGRPCError(w, r.Context(), err)
