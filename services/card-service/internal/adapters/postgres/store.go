@@ -27,7 +27,7 @@ func NewStore(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
 var _ ports.Store = (*Store)(nil)
 
 const cardCols = `id, idempotency_key, account_id, kind, status, status_reason, last4, expiry_month, expiry_year,
-	holder_name, online, international, contactless, created_at, valid_until`
+	holder_name, online, international, contactless, created_at, valid_until, monthly_limit`
 
 func scanCard(row pgx.Row) (domain.Card, error) {
 	var (
@@ -36,7 +36,7 @@ func scanCard(row pgx.Row) (domain.Card, error) {
 	)
 	err := row.Scan(&c.ID, &c.IdempotencyKey, &c.AccountID, &kind, &status, &c.StatusReason, &c.Last4,
 		&c.ExpiryMonth, &c.ExpiryYear, &c.HolderName, &c.Controls.Online, &c.Controls.International,
-		&c.Controls.Contactless, &c.CreatedAt, &c.ValidUntil)
+		&c.Controls.Contactless, &c.CreatedAt, &c.ValidUntil, &c.MonthlyLimit)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return c, fmt.Errorf("%w: card", domain.ErrNotFound)
 	}
@@ -98,8 +98,8 @@ func (s *Store) PANEnc(ctx context.Context, card uuid.UUID) ([]byte, error) {
 func (s *Store) SaveCard(ctx context.Context, c domain.Card, events ...outbox.Message) error {
 	return pg.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `UPDATE cards SET status = $2, status_reason = $3, online = $4, international = $5,
-			contactless = $6, updated_at = now() WHERE id = $1`,
-			c.ID, c.Status, c.StatusReason, c.Controls.Online, c.Controls.International, c.Controls.Contactless); err != nil {
+			contactless = $6, monthly_limit = $7, updated_at = now() WHERE id = $1`,
+			c.ID, c.Status, c.StatusReason, c.Controls.Online, c.Controls.International, c.Controls.Contactless, c.MonthlyLimit); err != nil {
 			return err
 		}
 		for _, ev := range events {
@@ -206,10 +206,10 @@ func nullable(id uuid.UUID) *uuid.UUID {
 func (s *Store) ClaimAuthorization(ctx context.Context, a domain.Authorization) (*domain.Authorization, error) {
 	p := a.Purchase
 	tag, err := s.pool.Exec(ctx, `INSERT INTO authorizations (id, network_reference, card_id, token_id, status, response_code, reason,
-		amount, currency, merchant_name, mcc, country, channel, function, installments)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ON CONFLICT (network_reference) DO NOTHING`,
+		amount, currency, merchant_name, mcc, country, channel, function, installments, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, COALESCE($16, now())) ON CONFLICT (network_reference) DO NOTHING`,
 		a.ID, a.NetworkReference, nullable(a.CardID), nullable(a.TokenID), a.Status, a.Code, a.Reason, p.Amount.Minor(), string(p.Amount.Currency()),
-		p.MerchantName, p.MCC, p.Country, p.Channel, p.Function, max(p.Installments, 1))
+		p.MerchantName, p.MCC, p.Country, p.Channel, p.Function, max(p.Installments, 1), nullTime(a.CreatedAt))
 	if err != nil || tag.RowsAffected() == 1 {
 		return nil, err
 	}
@@ -502,4 +502,25 @@ func (s *Store) ReleaseTemporary(ctx context.Context, id uuid.UUID) error {
 	_, err := s.pool.Exec(ctx, `UPDATE cards SET status = 'ACTIVE', status_reason = '', updated_at = now()
 		WHERE id = $1 AND kind = 'TEMPORARY' AND status = 'CANCELLED' AND status_reason = 'USED'`, id)
 	return err
+}
+
+// MonthUsed is what the card spent since since: approved and cleared
+// purchases (cleared ones at the cleared amount, net of refunds) and the
+// ones still being decided or cleaned up, except one (the purchase being
+// decided). Every authorization is stored before it is decided, so two
+// purchases at once always see each other: the limit can only be enforced
+// too strictly, never exceeded.
+func (s *Store) MonthUsed(ctx context.Context, card uuid.UUID, since time.Time, except uuid.UUID) (int64, error) {
+	var used int64
+	err := s.pool.QueryRow(ctx, `SELECT COALESCE(sum(CASE WHEN status = 'CLEARED' THEN cleared_amount - refunded_amount ELSE amount END), 0)
+		FROM authorizations WHERE card_id = $1 AND created_at >= $2 AND id <> $3
+		AND status IN ('APPROVED', 'CLEARED', 'PENDING_REVERSAL')`, card, since, except).Scan(&used)
+	return used, err
+}
+
+func nullTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
 }

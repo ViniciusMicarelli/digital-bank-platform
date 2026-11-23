@@ -168,6 +168,16 @@ func (s *Service) UpdateControls(ctx context.Context, id uuid.UUID, ctl domain.C
 	})
 }
 
+// SetMonthlyLimit sets (or, with 0, removes) the card's monthly limit.
+func (s *Service) SetMonthlyLimit(ctx context.Context, id uuid.UUID, amount int64) (domain.Card, error) {
+	return s.change(ctx, id, "card.controls.changed", func(c *domain.Card) error { return c.SetMonthlyLimit(amount) })
+}
+
+// MonthUsed is what the card spent in the current month (Brasília).
+func (s *Service) MonthUsed(ctx context.Context, id uuid.UUID) (int64, error) {
+	return s.store.MonthUsed(ctx, id, domain.MonthStart(s.now()), uuid.Nil)
+}
+
 func (s *Service) change(ctx context.Context, id uuid.UUID, eventType string, fn func(*domain.Card) error) (domain.Card, error) {
 	c, err := s.store.Card(ctx, id)
 	if err != nil {
@@ -225,7 +235,7 @@ func (s *Service) Authorize(ctx context.Context, pan string, p domain.Purchase) 
 	}
 	a := domain.Authorization{
 		ID: uuid.Must(uuid.NewV7()), NetworkReference: p.NetworkReference, Purchase: p,
-		Status: domain.PendingReversal, Code: domain.CodeIssuerUnavailable, Reason: "processing",
+		Status: domain.PendingReversal, Code: domain.CodeIssuerUnavailable, Reason: "processing", CreatedAt: s.now(),
 	}
 	card, token, cardErr := s.findCard(ctx, pan)
 	if cardErr == nil {
@@ -255,6 +265,15 @@ func (s *Service) Authorize(ctx context.Context, pan string, p domain.Purchase) 
 	}
 	if !d.Approve {
 		return s.decide(ctx, a, domain.Declined, d.Code, d.Reason)
+	}
+	if card.MonthlyLimit > 0 {
+		used, err := s.store.MonthUsed(ctx, card.ID, domain.MonthStart(s.now()), a.ID)
+		if err != nil {
+			return a, nil // stays PENDING_REVERSAL: the network gets a 91
+		}
+		if !card.WithinMonthlyLimit(used, p.Amount.Minor()) {
+			return s.decide(ctx, a, domain.Declined, domain.CodeExceedsLimit, "card monthly limit")
+		}
 	}
 	// A temporary card is spent by its first purchase: claim it atomically.
 	temporary := card.Kind == domain.Temporary && token == nil

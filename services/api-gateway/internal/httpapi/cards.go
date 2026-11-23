@@ -20,7 +20,34 @@ func cardJSON(c *cardv1.Card) map[string]any {
 	if c.GetValidUntil() != nil {
 		out["valid_until"] = ts(c.GetValidUntil())
 	}
+	if c.GetMonthlyLimit().GetMinorUnits() > 0 {
+		out["monthly_limit"] = map[string]any{"amount": moneyJSON(c.GetMonthlyLimit()), "used": moneyJSON(c.GetMonthUsed())}
+	}
 	return out
+}
+
+// monthlyLimit sets the card's spending limit per month {amount} (PUT) or removes it (DELETE).
+func (a *API) monthlyLimit(w http.ResponseWriter, r *http.Request, c *cardv1.Card) {
+	req := &cardv1.SetMonthlyLimitRequest{Id: c.GetId()}
+	if r.Method == http.MethodPut {
+		var body struct {
+			Amount string `json:"amount"`
+		}
+		if !decode(w, r, &body) {
+			return
+		}
+		amount, ok := parseBRL(w, r, body.Amount)
+		if !ok {
+			return
+		}
+		req.Amount = amount
+	}
+	resp, err := a.c.Cards.SetMonthlyLimit(r.Context(), req)
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, cardJSON(resp.GetCard()))
 }
 
 func (a *API) issueCard(w http.ResponseWriter, r *http.Request, acc *accountv1.Account) {

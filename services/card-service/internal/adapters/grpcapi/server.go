@@ -275,7 +275,7 @@ func (s *Server) GetCard(ctx context.Context, req *cardv1.GetCardRequest) (*card
 	if err != nil {
 		return nil, toStatus(err)
 	}
-	return &cardv1.GetCardResponse{Card: cardPB(c)}, nil
+	return &cardv1.GetCardResponse{Card: s.withUsage(ctx, c)}, nil
 }
 
 func (s *Server) ListCards(ctx context.Context, req *cardv1.ListCardsRequest) (*cardv1.ListCardsResponse, error) {
@@ -289,7 +289,7 @@ func (s *Server) ListCards(ctx context.Context, req *cardv1.ListCardsRequest) (*
 	}
 	resp := &cardv1.ListCardsResponse{}
 	for _, c := range list {
-		resp.Cards = append(resp.Cards, cardPB(c))
+		resp.Cards = append(resp.Cards, s.withUsage(ctx, c))
 	}
 	return resp, nil
 }
@@ -329,6 +329,33 @@ func (s *Server) UpdateControls(ctx context.Context, req *cardv1.UpdateControlsR
 		return nil, toStatus(err)
 	}
 	return &cardv1.UpdateControlsResponse{Card: cardPB(c)}, nil
+}
+
+// withUsage is the card with this month's spending, when it has a limit.
+func (s *Server) withUsage(ctx context.Context, c domain.Card) *cardv1.Card {
+	out := cardPB(c)
+	if c.MonthlyLimit > 0 {
+		out.MonthlyLimit = brl(c.MonthlyLimit)
+		if used, err := s.app.MonthUsed(ctx, c.ID); err == nil {
+			out.MonthUsed = brl(used)
+		}
+	}
+	return out
+}
+
+func (s *Server) SetMonthlyLimit(ctx context.Context, req *cardv1.SetMonthlyLimitRequest) (*cardv1.SetMonthlyLimitResponse, error) {
+	id, err := parseID(req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	if c := req.GetAmount().GetCurrency(); c != "" && c != "BRL" {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_AMOUNT", "amount must be in BRL")
+	}
+	c, err := s.app.SetMonthlyLimit(ctx, id, req.GetAmount().GetMinorUnits())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &cardv1.SetMonthlyLimitResponse{Card: s.withUsage(ctx, c)}, nil
 }
 
 func (s *Server) RevealCardDetails(ctx context.Context, req *cardv1.RevealCardDetailsRequest) (*cardv1.RevealCardDetailsResponse, error) {

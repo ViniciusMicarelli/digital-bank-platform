@@ -350,3 +350,22 @@ test('annual income report', async ({ page }) => {
   await expect(page.getByRole('cell', { name: 'R$ 200,00' })).toBeVisible() // checking on 31/12 (today)
   await shot(page, '23-tax-report')
 })
+
+test('card monthly limit', async ({ page }) => {
+  await onboard(page)
+  await fund(page, '200,00')
+  await page.goto('/cartoes')
+  await page.getByRole('button', { name: 'Criar cartão virtual' }).click()
+  await page.getByRole('button', { name: 'Definir limite mensal' }).click()
+  await page.getByLabel('Limite por mês').fill('50')
+  await page.getByRole('button', { name: 'Salvar limite' }).click()
+  await expect(page.getByText('usados este mês', { exact: false })).toBeVisible()
+
+  await page.getByLabel('Simular compra de').fill('60')
+  await page.getByLabel('Loja', { exact: true }).fill('STREAMING')
+  await page.getByRole('button', { name: 'Passar o cartão' }).click()
+  await page.getByLabel('Senha').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Confirmar' }).click()
+  await expect(page.getByText('Recusada (código 61): passou do limite mensal do cartão.')).toBeVisible()
+  await shot(page, '24-card-monthly-limit')
+})

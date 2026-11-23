@@ -25,6 +25,7 @@ const (
 	CardService_BlockCard_FullMethodName          = "/bank.card.v1.CardService/BlockCard"
 	CardService_UnblockCard_FullMethodName        = "/bank.card.v1.CardService/UnblockCard"
 	CardService_UpdateControls_FullMethodName     = "/bank.card.v1.CardService/UpdateControls"
+	CardService_SetMonthlyLimit_FullMethodName    = "/bank.card.v1.CardService/SetMonthlyLimit"
 	CardService_RevealCardDetails_FullMethodName  = "/bank.card.v1.CardService/RevealCardDetails"
 	CardService_TokenizeCard_FullMethodName       = "/bank.card.v1.CardService/TokenizeCard"
 	CardService_ListTokens_FullMethodName         = "/bank.card.v1.CardService/ListTokens"
@@ -55,6 +56,9 @@ type CardServiceClient interface {
 	BlockCard(ctx context.Context, in *BlockCardRequest, opts ...grpc.CallOption) (*BlockCardResponse, error)
 	UnblockCard(ctx context.Context, in *UnblockCardRequest, opts ...grpc.CallOption) (*UnblockCardResponse, error)
 	UpdateControls(ctx context.Context, in *UpdateControlsRequest, opts ...grpc.CallOption) (*UpdateControlsResponse, error)
+	// Sets (or, with zero, removes) the card's spending limit per calendar
+	// month (Brasília): purchases above what is left are declined (61).
+	SetMonthlyLimit(ctx context.Context, in *SetMonthlyLimitRequest, opts ...grpc.CallOption) (*SetMonthlyLimitResponse, error)
 	// Returns the full card number, expiry and CVV to the card holder.
 	RevealCardDetails(ctx context.Context, in *RevealCardDetailsRequest, opts ...grpc.CallOption) (*RevealCardDetailsResponse, error)
 	// Provisions a token (a different card number) for a wallet or a merchant.
@@ -150,6 +154,16 @@ func (c *cardServiceClient) UpdateControls(ctx context.Context, in *UpdateContro
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateControlsResponse)
 	err := c.cc.Invoke(ctx, CardService_UpdateControls_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *cardServiceClient) SetMonthlyLimit(ctx context.Context, in *SetMonthlyLimitRequest, opts ...grpc.CallOption) (*SetMonthlyLimitResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetMonthlyLimitResponse)
+	err := c.cc.Invoke(ctx, CardService_SetMonthlyLimit_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -301,6 +315,9 @@ type CardServiceServer interface {
 	BlockCard(context.Context, *BlockCardRequest) (*BlockCardResponse, error)
 	UnblockCard(context.Context, *UnblockCardRequest) (*UnblockCardResponse, error)
 	UpdateControls(context.Context, *UpdateControlsRequest) (*UpdateControlsResponse, error)
+	// Sets (or, with zero, removes) the card's spending limit per calendar
+	// month (Brasília): purchases above what is left are declined (61).
+	SetMonthlyLimit(context.Context, *SetMonthlyLimitRequest) (*SetMonthlyLimitResponse, error)
 	// Returns the full card number, expiry and CVV to the card holder.
 	RevealCardDetails(context.Context, *RevealCardDetailsRequest) (*RevealCardDetailsResponse, error)
 	// Provisions a token (a different card number) for a wallet or a merchant.
@@ -359,6 +376,9 @@ func (UnimplementedCardServiceServer) UnblockCard(context.Context, *UnblockCardR
 }
 func (UnimplementedCardServiceServer) UpdateControls(context.Context, *UpdateControlsRequest) (*UpdateControlsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateControls not implemented")
+}
+func (UnimplementedCardServiceServer) SetMonthlyLimit(context.Context, *SetMonthlyLimitRequest) (*SetMonthlyLimitResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetMonthlyLimit not implemented")
 }
 func (UnimplementedCardServiceServer) RevealCardDetails(context.Context, *RevealCardDetailsRequest) (*RevealCardDetailsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RevealCardDetails not implemented")
@@ -524,6 +544,24 @@ func _CardService_UpdateControls_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CardServiceServer).UpdateControls(ctx, req.(*UpdateControlsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CardService_SetMonthlyLimit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetMonthlyLimitRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CardServiceServer).SetMonthlyLimit(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CardService_SetMonthlyLimit_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CardServiceServer).SetMonthlyLimit(ctx, req.(*SetMonthlyLimitRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -792,6 +830,10 @@ var CardService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateControls",
 			Handler:    _CardService_UpdateControls_Handler,
+		},
+		{
+			MethodName: "SetMonthlyLimit",
+			Handler:    _CardService_SetMonthlyLimit_Handler,
 		},
 		{
 			MethodName: "RevealCardDetails",

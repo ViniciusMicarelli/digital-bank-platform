@@ -18,6 +18,8 @@ type Store interface {
 	InsertCard(ctx context.Context, c domain.Card, panEnc, panIndex []byte, ev outbox.Message) (existing *domain.Card, err error)
 	Card(ctx context.Context, id uuid.UUID) (domain.Card, error)
 	CardsByAccount(ctx context.Context, account uuid.UUID) ([]domain.Card, error)
+	// MonthUsed is what the card spent since since, except one authorization.
+	MonthUsed(ctx context.Context, card uuid.UUID, since time.Time, except uuid.UUID) (int64, error)
 	CardByPANIndex(ctx context.Context, index []byte) (domain.Card, error)
 	PANEnc(ctx context.Context, cardID uuid.UUID) ([]byte, error)
 	SaveCard(ctx context.Context, c domain.Card, events ...outbox.Message) error

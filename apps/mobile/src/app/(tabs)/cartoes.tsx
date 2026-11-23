@@ -1,4 +1,4 @@
-import { errorMessage, formatBRL, type Card as CardT, type CardDetails } from '@bank/core'
+import { declineReasonText, errorMessage, formatBRL, type Card as CardT, type CardDetails } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Eye, EyeOff, Lock, LockOpen, Plus, ShoppingCart, Timer, Wifi } from 'lucide-react-native'
 import { useState } from 'react'
@@ -10,6 +10,50 @@ import { useStepUp } from '../../components/StepUp'
 import { Button, Card, IconTile, Loading, MoneyField, Muted, Notice, Press, Sandbox, Screen, Segmented, Toggle, Txt } from '../../components/ui'
 import { api } from '../../lib/client'
 import { useAccount } from '../../lib/queries'
+import { useTheme } from '../../lib/theme'
+
+/** A spending limit per month for this card. */
+function MonthlyLimit({ base, card, onChange }: { base: string; card: CardT; onChange: () => void }) {
+  const { c } = useTheme()
+  const ml = card.monthly_limit
+  const [editing, setEditing] = useState(false)
+  const [amount, setAmount] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const save = useMutation({
+    mutationFn: (remove: boolean) => remove ? api('DELETE', `${base}/monthly-limit`) : api('PUT', `${base}/monthly-limit`, { body: { amount } }),
+    onSuccess: () => { setEditing(false); setError(''); onChange() },
+    onError: (e) => setError(errorMessage(e)),
+  })
+  const pct = ml ? Math.min(100, (Number(ml.used.amount) / Number(ml.amount.amount)) * 100) : 0
+  return (
+    <View style={{ gap: 8 }}>
+      <Txt variant="label">Limite mensal deste cartão</Txt>
+      {ml && !editing && (
+        <>
+          <View style={{ height: 6, borderRadius: 3, backgroundColor: c.surface2, overflow: 'hidden' }}
+            accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.round(pct) }}>
+            <View style={{ height: 6, width: `${pct}%`, backgroundColor: pct >= 100 ? c.danger : pct >= 80 ? c.warning : c.positive }} />
+          </View>
+          <Muted>{formatBRL(ml.used)} de {formatBRL(ml.amount)} usados este mês.</Muted>
+        </>
+      )}
+      {!ml && !editing && <Muted>Sem limite próprio: vale o saldo da conta ou o limite do crédito.</Muted>}
+      {editing ? (
+        <>
+          <MoneyField label="Limite por mês (reais inteiros)" onValue={setAmount} />
+          <Button title="Salvar limite" disabled={!amount} loading={save.isPending} onPress={() => save.mutate(false)} />
+          <Button title="Cancelar" variant="ghost" onPress={() => setEditing(false)} />
+        </>
+      ) : card.status !== 'CANCELLED' && (
+        <>
+          <Button title={ml ? 'Alterar limite' : 'Definir limite mensal'} variant="secondary" onPress={() => setEditing(true)} />
+          {ml && <Button title="Remover limite" variant="ghost" loading={save.isPending} onPress={() => save.mutate(true)} />}
+        </>
+      )}
+      <Notice>{error}</Notice>
+    </View>
+  )
+}
 
 export default function Cards() {
   const account = useAccount()
@@ -54,7 +98,7 @@ export default function Cards() {
       return a
     },
     onSuccess: (a) => {
-      setResult(a.status === 'APPROVED' ? `Aprovada: ${formatBRL(amount!)}` : `Recusada (${a.response_code}): ${a.reason}`)
+      setResult(a.status === 'APPROVED' ? `Aprovada: ${formatBRL(amount!)}` : `Recusada (${a.response_code}): ${declineReasonText(a.reason)}`)
       qc.invalidateQueries({ queryKey: ['purchases', card?.id] })
     },
     onError: (e) => { if (!cancelled(e)) setResult(errorMessage(e)) },
@@ -123,6 +167,7 @@ export default function Cards() {
         <Toggle label="Compras online" description="Sites e aplicativos" value={card.controls.online} onChange={set('online')} />
         <Toggle label="Compras internacionais" description="Fora do Brasil" value={card.controls.international} onChange={set('international')} />
         <Toggle label="Aproximação" description="Encostar o cartão na maquininha" value={card.controls.contactless} onChange={set('contactless')} />
+        <MonthlyLimit base={base} card={card} onChange={refresh} />
       </Card>
       <Purchases accountId={account.id} card={card} />
       {card.status === 'ACTIVE' && (

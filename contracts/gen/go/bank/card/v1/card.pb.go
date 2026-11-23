@@ -474,7 +474,11 @@ type Card struct {
 	Controls     *Controls              `protobuf:"bytes,10,opt,name=controls,proto3" json:"controls,omitempty"`
 	CreatedAt    *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	// Temporary cards: when they stop working.
-	ValidUntil    *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=valid_until,json=validUntil,proto3" json:"valid_until,omitempty"`
+	ValidUntil *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=valid_until,json=validUntil,proto3" json:"valid_until,omitempty"`
+	// The spending limit per calendar month; zero when there is none.
+	MonthlyLimit *v1.Money `protobuf:"bytes,13,opt,name=monthly_limit,json=monthlyLimit,proto3" json:"monthly_limit,omitempty"`
+	// Spent this month (set when there is a monthly limit).
+	MonthUsed     *v1.Money `protobuf:"bytes,14,opt,name=month_used,json=monthUsed,proto3" json:"month_used,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -589,6 +593,20 @@ func (x *Card) GetCreatedAt() *timestamppb.Timestamp {
 func (x *Card) GetValidUntil() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ValidUntil
+	}
+	return nil
+}
+
+func (x *Card) GetMonthlyLimit() *v1.Money {
+	if x != nil {
+		return x.MonthlyLimit
+	}
+	return nil
+}
+
+func (x *Card) GetMonthUsed() *v1.Money {
+	if x != nil {
+		return x.MonthUsed
 	}
 	return nil
 }
@@ -1153,6 +1171,103 @@ func (x *UpdateControlsResponse) GetCard() *Card {
 	return nil
 }
 
+type SetMonthlyLimitRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Whole reais, up to R$ 50.000,00; zero removes the limit.
+	Amount        *v1.Money `protobuf:"bytes,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetMonthlyLimitRequest) Reset() {
+	*x = SetMonthlyLimitRequest{}
+	mi := &file_bank_card_v1_card_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetMonthlyLimitRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetMonthlyLimitRequest) ProtoMessage() {}
+
+func (x *SetMonthlyLimitRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_card_v1_card_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetMonthlyLimitRequest.ProtoReflect.Descriptor instead.
+func (*SetMonthlyLimitRequest) Descriptor() ([]byte, []int) {
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *SetMonthlyLimitRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SetMonthlyLimitRequest) GetAmount() *v1.Money {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+type SetMonthlyLimitResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Card          *Card                  `protobuf:"bytes,1,opt,name=card,proto3" json:"card,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetMonthlyLimitResponse) Reset() {
+	*x = SetMonthlyLimitResponse{}
+	mi := &file_bank_card_v1_card_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetMonthlyLimitResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetMonthlyLimitResponse) ProtoMessage() {}
+
+func (x *SetMonthlyLimitResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_card_v1_card_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetMonthlyLimitResponse.ProtoReflect.Descriptor instead.
+func (*SetMonthlyLimitResponse) Descriptor() ([]byte, []int) {
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *SetMonthlyLimitResponse) GetCard() *Card {
+	if x != nil {
+		return x.Card
+	}
+	return nil
+}
+
 type RevealCardDetailsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1162,7 +1277,7 @@ type RevealCardDetailsRequest struct {
 
 func (x *RevealCardDetailsRequest) Reset() {
 	*x = RevealCardDetailsRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[14]
+	mi := &file_bank_card_v1_card_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1174,7 +1289,7 @@ func (x *RevealCardDetailsRequest) String() string {
 func (*RevealCardDetailsRequest) ProtoMessage() {}
 
 func (x *RevealCardDetailsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[14]
+	mi := &file_bank_card_v1_card_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1187,7 +1302,7 @@ func (x *RevealCardDetailsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealCardDetailsRequest.ProtoReflect.Descriptor instead.
 func (*RevealCardDetailsRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{14}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *RevealCardDetailsRequest) GetId() string {
@@ -1209,7 +1324,7 @@ type RevealCardDetailsResponse struct {
 
 func (x *RevealCardDetailsResponse) Reset() {
 	*x = RevealCardDetailsResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[15]
+	mi := &file_bank_card_v1_card_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1221,7 +1336,7 @@ func (x *RevealCardDetailsResponse) String() string {
 func (*RevealCardDetailsResponse) ProtoMessage() {}
 
 func (x *RevealCardDetailsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[15]
+	mi := &file_bank_card_v1_card_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1234,7 +1349,7 @@ func (x *RevealCardDetailsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevealCardDetailsResponse.ProtoReflect.Descriptor instead.
 func (*RevealCardDetailsResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{15}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *RevealCardDetailsResponse) GetPan() string {
@@ -1296,7 +1411,7 @@ type Authorization struct {
 
 func (x *Authorization) Reset() {
 	*x = Authorization{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[16]
+	mi := &file_bank_card_v1_card_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1308,7 +1423,7 @@ func (x *Authorization) String() string {
 func (*Authorization) ProtoMessage() {}
 
 func (x *Authorization) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[16]
+	mi := &file_bank_card_v1_card_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1321,7 +1436,7 @@ func (x *Authorization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Authorization.ProtoReflect.Descriptor instead.
 func (*Authorization) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{16}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Authorization) GetId() string {
@@ -1475,7 +1590,7 @@ type AuthorizeRequest struct {
 
 func (x *AuthorizeRequest) Reset() {
 	*x = AuthorizeRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[17]
+	mi := &file_bank_card_v1_card_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1487,7 +1602,7 @@ func (x *AuthorizeRequest) String() string {
 func (*AuthorizeRequest) ProtoMessage() {}
 
 func (x *AuthorizeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[17]
+	mi := &file_bank_card_v1_card_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1500,7 +1615,7 @@ func (x *AuthorizeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthorizeRequest.ProtoReflect.Descriptor instead.
 func (*AuthorizeRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{17}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *AuthorizeRequest) GetNetworkReference() string {
@@ -1596,7 +1711,7 @@ type AuthorizeResponse struct {
 
 func (x *AuthorizeResponse) Reset() {
 	*x = AuthorizeResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[18]
+	mi := &file_bank_card_v1_card_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1608,7 +1723,7 @@ func (x *AuthorizeResponse) String() string {
 func (*AuthorizeResponse) ProtoMessage() {}
 
 func (x *AuthorizeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[18]
+	mi := &file_bank_card_v1_card_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1621,7 +1736,7 @@ func (x *AuthorizeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AuthorizeResponse.ProtoReflect.Descriptor instead.
 func (*AuthorizeResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{18}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *AuthorizeResponse) GetAuthorization() *Authorization {
@@ -1642,7 +1757,7 @@ type ClearRequest struct {
 
 func (x *ClearRequest) Reset() {
 	*x = ClearRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[19]
+	mi := &file_bank_card_v1_card_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1654,7 +1769,7 @@ func (x *ClearRequest) String() string {
 func (*ClearRequest) ProtoMessage() {}
 
 func (x *ClearRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[19]
+	mi := &file_bank_card_v1_card_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1667,7 +1782,7 @@ func (x *ClearRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearRequest.ProtoReflect.Descriptor instead.
 func (*ClearRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{19}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ClearRequest) GetAuthorizationId() string {
@@ -1693,7 +1808,7 @@ type ClearResponse struct {
 
 func (x *ClearResponse) Reset() {
 	*x = ClearResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[20]
+	mi := &file_bank_card_v1_card_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1705,7 +1820,7 @@ func (x *ClearResponse) String() string {
 func (*ClearResponse) ProtoMessage() {}
 
 func (x *ClearResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[20]
+	mi := &file_bank_card_v1_card_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1718,7 +1833,7 @@ func (x *ClearResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearResponse.ProtoReflect.Descriptor instead.
 func (*ClearResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{20}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ClearResponse) GetAuthorization() *Authorization {
@@ -1737,7 +1852,7 @@ type ReverseRequest struct {
 
 func (x *ReverseRequest) Reset() {
 	*x = ReverseRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[21]
+	mi := &file_bank_card_v1_card_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1749,7 +1864,7 @@ func (x *ReverseRequest) String() string {
 func (*ReverseRequest) ProtoMessage() {}
 
 func (x *ReverseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[21]
+	mi := &file_bank_card_v1_card_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1762,7 +1877,7 @@ func (x *ReverseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReverseRequest.ProtoReflect.Descriptor instead.
 func (*ReverseRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{21}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ReverseRequest) GetAuthorizationId() string {
@@ -1781,7 +1896,7 @@ type ReverseResponse struct {
 
 func (x *ReverseResponse) Reset() {
 	*x = ReverseResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[22]
+	mi := &file_bank_card_v1_card_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1793,7 +1908,7 @@ func (x *ReverseResponse) String() string {
 func (*ReverseResponse) ProtoMessage() {}
 
 func (x *ReverseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[22]
+	mi := &file_bank_card_v1_card_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1806,7 +1921,7 @@ func (x *ReverseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReverseResponse.ProtoReflect.Descriptor instead.
 func (*ReverseResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{22}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ReverseResponse) GetAuthorization() *Authorization {
@@ -1833,7 +1948,7 @@ type CardToken struct {
 
 func (x *CardToken) Reset() {
 	*x = CardToken{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[23]
+	mi := &file_bank_card_v1_card_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1845,7 +1960,7 @@ func (x *CardToken) String() string {
 func (*CardToken) ProtoMessage() {}
 
 func (x *CardToken) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[23]
+	mi := &file_bank_card_v1_card_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1858,7 +1973,7 @@ func (x *CardToken) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CardToken.ProtoReflect.Descriptor instead.
 func (*CardToken) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{23}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *CardToken) GetId() string {
@@ -1921,7 +2036,7 @@ type TokenizeCardRequest struct {
 
 func (x *TokenizeCardRequest) Reset() {
 	*x = TokenizeCardRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[24]
+	mi := &file_bank_card_v1_card_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1933,7 +2048,7 @@ func (x *TokenizeCardRequest) String() string {
 func (*TokenizeCardRequest) ProtoMessage() {}
 
 func (x *TokenizeCardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[24]
+	mi := &file_bank_card_v1_card_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1946,7 +2061,7 @@ func (x *TokenizeCardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenizeCardRequest.ProtoReflect.Descriptor instead.
 func (*TokenizeCardRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{24}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *TokenizeCardRequest) GetCardId() string {
@@ -1981,7 +2096,7 @@ type TokenizeCardResponse struct {
 
 func (x *TokenizeCardResponse) Reset() {
 	*x = TokenizeCardResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[25]
+	mi := &file_bank_card_v1_card_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1993,7 +2108,7 @@ func (x *TokenizeCardResponse) String() string {
 func (*TokenizeCardResponse) ProtoMessage() {}
 
 func (x *TokenizeCardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[25]
+	mi := &file_bank_card_v1_card_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2006,7 +2121,7 @@ func (x *TokenizeCardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenizeCardResponse.ProtoReflect.Descriptor instead.
 func (*TokenizeCardResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{25}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *TokenizeCardResponse) GetToken() *CardToken {
@@ -2032,7 +2147,7 @@ type ListTokensRequest struct {
 
 func (x *ListTokensRequest) Reset() {
 	*x = ListTokensRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[26]
+	mi := &file_bank_card_v1_card_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2044,7 +2159,7 @@ func (x *ListTokensRequest) String() string {
 func (*ListTokensRequest) ProtoMessage() {}
 
 func (x *ListTokensRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[26]
+	mi := &file_bank_card_v1_card_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2057,7 +2172,7 @@ func (x *ListTokensRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTokensRequest.ProtoReflect.Descriptor instead.
 func (*ListTokensRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{26}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ListTokensRequest) GetCardId() string {
@@ -2076,7 +2191,7 @@ type ListTokensResponse struct {
 
 func (x *ListTokensResponse) Reset() {
 	*x = ListTokensResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[27]
+	mi := &file_bank_card_v1_card_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2088,7 +2203,7 @@ func (x *ListTokensResponse) String() string {
 func (*ListTokensResponse) ProtoMessage() {}
 
 func (x *ListTokensResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[27]
+	mi := &file_bank_card_v1_card_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2101,7 +2216,7 @@ func (x *ListTokensResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTokensResponse.ProtoReflect.Descriptor instead.
 func (*ListTokensResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{27}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ListTokensResponse) GetTokens() []*CardToken {
@@ -2122,7 +2237,7 @@ type UpdateTokenRequest struct {
 
 func (x *UpdateTokenRequest) Reset() {
 	*x = UpdateTokenRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[28]
+	mi := &file_bank_card_v1_card_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2134,7 +2249,7 @@ func (x *UpdateTokenRequest) String() string {
 func (*UpdateTokenRequest) ProtoMessage() {}
 
 func (x *UpdateTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[28]
+	mi := &file_bank_card_v1_card_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2147,7 +2262,7 @@ func (x *UpdateTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTokenRequest.ProtoReflect.Descriptor instead.
 func (*UpdateTokenRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{28}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *UpdateTokenRequest) GetCardId() string {
@@ -2180,7 +2295,7 @@ type UpdateTokenResponse struct {
 
 func (x *UpdateTokenResponse) Reset() {
 	*x = UpdateTokenResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[29]
+	mi := &file_bank_card_v1_card_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2192,7 +2307,7 @@ func (x *UpdateTokenResponse) String() string {
 func (*UpdateTokenResponse) ProtoMessage() {}
 
 func (x *UpdateTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[29]
+	mi := &file_bank_card_v1_card_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2205,7 +2320,7 @@ func (x *UpdateTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTokenResponse.ProtoReflect.Descriptor instead.
 func (*UpdateTokenResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{29}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *UpdateTokenResponse) GetToken() *CardToken {
@@ -2227,7 +2342,7 @@ type RefundRequest struct {
 
 func (x *RefundRequest) Reset() {
 	*x = RefundRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[30]
+	mi := &file_bank_card_v1_card_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2239,7 +2354,7 @@ func (x *RefundRequest) String() string {
 func (*RefundRequest) ProtoMessage() {}
 
 func (x *RefundRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[30]
+	mi := &file_bank_card_v1_card_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2252,7 +2367,7 @@ func (x *RefundRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefundRequest.ProtoReflect.Descriptor instead.
 func (*RefundRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{30}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *RefundRequest) GetAuthorizationId() string {
@@ -2293,7 +2408,7 @@ type Refund struct {
 
 func (x *Refund) Reset() {
 	*x = Refund{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[31]
+	mi := &file_bank_card_v1_card_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2305,7 +2420,7 @@ func (x *Refund) String() string {
 func (*Refund) ProtoMessage() {}
 
 func (x *Refund) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[31]
+	mi := &file_bank_card_v1_card_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2318,7 +2433,7 @@ func (x *Refund) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Refund.ProtoReflect.Descriptor instead.
 func (*Refund) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{31}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *Refund) GetId() string {
@@ -2379,7 +2494,7 @@ type RefundResponse struct {
 
 func (x *RefundResponse) Reset() {
 	*x = RefundResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[32]
+	mi := &file_bank_card_v1_card_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2391,7 +2506,7 @@ func (x *RefundResponse) String() string {
 func (*RefundResponse) ProtoMessage() {}
 
 func (x *RefundResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[32]
+	mi := &file_bank_card_v1_card_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2404,7 +2519,7 @@ func (x *RefundResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefundResponse.ProtoReflect.Descriptor instead.
 func (*RefundResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{32}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *RefundResponse) GetRefund() *Refund {
@@ -2424,7 +2539,7 @@ type ListAuthorizationsRequest struct {
 
 func (x *ListAuthorizationsRequest) Reset() {
 	*x = ListAuthorizationsRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[33]
+	mi := &file_bank_card_v1_card_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2436,7 +2551,7 @@ func (x *ListAuthorizationsRequest) String() string {
 func (*ListAuthorizationsRequest) ProtoMessage() {}
 
 func (x *ListAuthorizationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[33]
+	mi := &file_bank_card_v1_card_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2449,7 +2564,7 @@ func (x *ListAuthorizationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAuthorizationsRequest.ProtoReflect.Descriptor instead.
 func (*ListAuthorizationsRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{33}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ListAuthorizationsRequest) GetCardId() string {
@@ -2475,7 +2590,7 @@ type ListAuthorizationsResponse struct {
 
 func (x *ListAuthorizationsResponse) Reset() {
 	*x = ListAuthorizationsResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[34]
+	mi := &file_bank_card_v1_card_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2487,7 +2602,7 @@ func (x *ListAuthorizationsResponse) String() string {
 func (*ListAuthorizationsResponse) ProtoMessage() {}
 
 func (x *ListAuthorizationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[34]
+	mi := &file_bank_card_v1_card_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2500,7 +2615,7 @@ func (x *ListAuthorizationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAuthorizationsResponse.ProtoReflect.Descriptor instead.
 func (*ListAuthorizationsResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{34}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ListAuthorizationsResponse) GetAuthorizations() []*Authorization {
@@ -2532,7 +2647,7 @@ type Dispute struct {
 
 func (x *Dispute) Reset() {
 	*x = Dispute{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[35]
+	mi := &file_bank_card_v1_card_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2544,7 +2659,7 @@ func (x *Dispute) String() string {
 func (*Dispute) ProtoMessage() {}
 
 func (x *Dispute) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[35]
+	mi := &file_bank_card_v1_card_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2557,7 +2672,7 @@ func (x *Dispute) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Dispute.ProtoReflect.Descriptor instead.
 func (*Dispute) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{35}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *Dispute) GetId() string {
@@ -2673,7 +2788,7 @@ type OpenDisputeRequest struct {
 
 func (x *OpenDisputeRequest) Reset() {
 	*x = OpenDisputeRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[36]
+	mi := &file_bank_card_v1_card_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2685,7 +2800,7 @@ func (x *OpenDisputeRequest) String() string {
 func (*OpenDisputeRequest) ProtoMessage() {}
 
 func (x *OpenDisputeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[36]
+	mi := &file_bank_card_v1_card_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2698,7 +2813,7 @@ func (x *OpenDisputeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenDisputeRequest.ProtoReflect.Descriptor instead.
 func (*OpenDisputeRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{36}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *OpenDisputeRequest) GetAuthorizationId() string {
@@ -2745,7 +2860,7 @@ type OpenDisputeResponse struct {
 
 func (x *OpenDisputeResponse) Reset() {
 	*x = OpenDisputeResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[37]
+	mi := &file_bank_card_v1_card_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2757,7 +2872,7 @@ func (x *OpenDisputeResponse) String() string {
 func (*OpenDisputeResponse) ProtoMessage() {}
 
 func (x *OpenDisputeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[37]
+	mi := &file_bank_card_v1_card_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2770,7 +2885,7 @@ func (x *OpenDisputeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OpenDisputeResponse.ProtoReflect.Descriptor instead.
 func (*OpenDisputeResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{37}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *OpenDisputeResponse) GetDispute() *Dispute {
@@ -2789,7 +2904,7 @@ type GetDisputeRequest struct {
 
 func (x *GetDisputeRequest) Reset() {
 	*x = GetDisputeRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[38]
+	mi := &file_bank_card_v1_card_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2801,7 +2916,7 @@ func (x *GetDisputeRequest) String() string {
 func (*GetDisputeRequest) ProtoMessage() {}
 
 func (x *GetDisputeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[38]
+	mi := &file_bank_card_v1_card_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2814,7 +2929,7 @@ func (x *GetDisputeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDisputeRequest.ProtoReflect.Descriptor instead.
 func (*GetDisputeRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{38}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *GetDisputeRequest) GetId() string {
@@ -2833,7 +2948,7 @@ type GetDisputeResponse struct {
 
 func (x *GetDisputeResponse) Reset() {
 	*x = GetDisputeResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[39]
+	mi := &file_bank_card_v1_card_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2845,7 +2960,7 @@ func (x *GetDisputeResponse) String() string {
 func (*GetDisputeResponse) ProtoMessage() {}
 
 func (x *GetDisputeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[39]
+	mi := &file_bank_card_v1_card_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2858,7 +2973,7 @@ func (x *GetDisputeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDisputeResponse.ProtoReflect.Descriptor instead.
 func (*GetDisputeResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{39}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *GetDisputeResponse) GetDispute() *Dispute {
@@ -2879,7 +2994,7 @@ type ListDisputesRequest struct {
 
 func (x *ListDisputesRequest) Reset() {
 	*x = ListDisputesRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[40]
+	mi := &file_bank_card_v1_card_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2891,7 +3006,7 @@ func (x *ListDisputesRequest) String() string {
 func (*ListDisputesRequest) ProtoMessage() {}
 
 func (x *ListDisputesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[40]
+	mi := &file_bank_card_v1_card_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2904,7 +3019,7 @@ func (x *ListDisputesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDisputesRequest.ProtoReflect.Descriptor instead.
 func (*ListDisputesRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{40}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *ListDisputesRequest) GetAccountId() string {
@@ -2937,7 +3052,7 @@ type ListDisputesResponse struct {
 
 func (x *ListDisputesResponse) Reset() {
 	*x = ListDisputesResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[41]
+	mi := &file_bank_card_v1_card_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2949,7 +3064,7 @@ func (x *ListDisputesResponse) String() string {
 func (*ListDisputesResponse) ProtoMessage() {}
 
 func (x *ListDisputesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[41]
+	mi := &file_bank_card_v1_card_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2962,7 +3077,7 @@ func (x *ListDisputesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDisputesResponse.ProtoReflect.Descriptor instead.
 func (*ListDisputesResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{41}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *ListDisputesResponse) GetDisputes() []*Dispute {
@@ -2984,7 +3099,7 @@ type DecideDisputeRequest struct {
 
 func (x *DecideDisputeRequest) Reset() {
 	*x = DecideDisputeRequest{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[42]
+	mi := &file_bank_card_v1_card_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2996,7 +3111,7 @@ func (x *DecideDisputeRequest) String() string {
 func (*DecideDisputeRequest) ProtoMessage() {}
 
 func (x *DecideDisputeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[42]
+	mi := &file_bank_card_v1_card_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3009,7 +3124,7 @@ func (x *DecideDisputeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideDisputeRequest.ProtoReflect.Descriptor instead.
 func (*DecideDisputeRequest) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{42}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *DecideDisputeRequest) GetId() string {
@@ -3049,7 +3164,7 @@ type DecideDisputeResponse struct {
 
 func (x *DecideDisputeResponse) Reset() {
 	*x = DecideDisputeResponse{}
-	mi := &file_bank_card_v1_card_proto_msgTypes[43]
+	mi := &file_bank_card_v1_card_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3061,7 +3176,7 @@ func (x *DecideDisputeResponse) String() string {
 func (*DecideDisputeResponse) ProtoMessage() {}
 
 func (x *DecideDisputeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_bank_card_v1_card_proto_msgTypes[43]
+	mi := &file_bank_card_v1_card_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3074,7 +3189,7 @@ func (x *DecideDisputeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecideDisputeResponse.ProtoReflect.Descriptor instead.
 func (*DecideDisputeResponse) Descriptor() ([]byte, []int) {
-	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{43}
+	return file_bank_card_v1_card_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *DecideDisputeResponse) GetDispute() *Dispute {
@@ -3092,7 +3207,7 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\bControls\x12\x16\n" +
 	"\x06online\x18\x01 \x01(\bR\x06online\x12$\n" +
 	"\rinternational\x18\x02 \x01(\bR\rinternational\x12 \n" +
-	"\vcontactless\x18\x03 \x01(\bR\vcontactless\"\xdf\x03\n" +
+	"\vcontactless\x18\x03 \x01(\bR\vcontactless\"\xd1\x04\n" +
 	"\x04Card\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -3111,7 +3226,10 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12;\n" +
 	"\vvalid_until\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"validUntil\"\x86\x01\n" +
+	"validUntil\x12:\n" +
+	"\rmonthly_limit\x18\r \x01(\v2\x15.bank.common.v1.MoneyR\fmonthlyLimit\x124\n" +
+	"\n" +
+	"month_used\x18\x0e \x01(\v2\x15.bank.common.v1.MoneyR\tmonthUsed\"\x86\x01\n" +
 	"\x10IssueCardRequest\x12'\n" +
 	"\x0fidempotency_key\x18\x01 \x01(\tR\x0eidempotencyKey\x12\x1d\n" +
 	"\n" +
@@ -3141,6 +3259,11 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x122\n" +
 	"\bcontrols\x18\x02 \x01(\v2\x16.bank.card.v1.ControlsR\bcontrols\"@\n" +
 	"\x16UpdateControlsResponse\x12&\n" +
+	"\x04card\x18\x01 \x01(\v2\x12.bank.card.v1.CardR\x04card\"W\n" +
+	"\x16SetMonthlyLimitRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12-\n" +
+	"\x06amount\x18\x02 \x01(\v2\x15.bank.common.v1.MoneyR\x06amount\"A\n" +
+	"\x17SetMonthlyLimitResponse\x12&\n" +
 	"\x04card\x18\x01 \x01(\v2\x12.bank.card.v1.CardR\x04card\"*\n" +
 	"\x18RevealCardDetailsRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\x83\x01\n" +
@@ -3329,14 +3452,15 @@ const file_bank_card_v1_card_proto_rawDesc = "" +
 	"\x1aDISPUTE_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13DISPUTE_STATUS_OPEN\x10\x01\x12\x16\n" +
 	"\x12DISPUTE_STATUS_WON\x10\x02\x12\x17\n" +
-	"\x13DISPUTE_STATUS_LOST\x10\x032\xae\f\n" +
+	"\x13DISPUTE_STATUS_LOST\x10\x032\x8e\r\n" +
 	"\vCardService\x12L\n" +
 	"\tIssueCard\x12\x1e.bank.card.v1.IssueCardRequest\x1a\x1f.bank.card.v1.IssueCardResponse\x12F\n" +
 	"\aGetCard\x12\x1c.bank.card.v1.GetCardRequest\x1a\x1d.bank.card.v1.GetCardResponse\x12L\n" +
 	"\tListCards\x12\x1e.bank.card.v1.ListCardsRequest\x1a\x1f.bank.card.v1.ListCardsResponse\x12L\n" +
 	"\tBlockCard\x12\x1e.bank.card.v1.BlockCardRequest\x1a\x1f.bank.card.v1.BlockCardResponse\x12R\n" +
 	"\vUnblockCard\x12 .bank.card.v1.UnblockCardRequest\x1a!.bank.card.v1.UnblockCardResponse\x12[\n" +
-	"\x0eUpdateControls\x12#.bank.card.v1.UpdateControlsRequest\x1a$.bank.card.v1.UpdateControlsResponse\x12d\n" +
+	"\x0eUpdateControls\x12#.bank.card.v1.UpdateControlsRequest\x1a$.bank.card.v1.UpdateControlsResponse\x12^\n" +
+	"\x0fSetMonthlyLimit\x12$.bank.card.v1.SetMonthlyLimitRequest\x1a%.bank.card.v1.SetMonthlyLimitResponse\x12d\n" +
 	"\x11RevealCardDetails\x12&.bank.card.v1.RevealCardDetailsRequest\x1a'.bank.card.v1.RevealCardDetailsResponse\x12U\n" +
 	"\fTokenizeCard\x12!.bank.card.v1.TokenizeCardRequest\x1a\".bank.card.v1.TokenizeCardResponse\x12O\n" +
 	"\n" +
@@ -3367,7 +3491,7 @@ func file_bank_card_v1_card_proto_rawDescGZIP() []byte {
 }
 
 var file_bank_card_v1_card_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_bank_card_v1_card_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
+var file_bank_card_v1_card_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_bank_card_v1_card_proto_goTypes = []any{
 	(CardKind)(0),                      // 0: bank.card.v1.CardKind
 	(CardStatus)(0),                    // 1: bank.card.v1.CardStatus
@@ -3390,133 +3514,141 @@ var file_bank_card_v1_card_proto_goTypes = []any{
 	(*UnblockCardResponse)(nil),        // 18: bank.card.v1.UnblockCardResponse
 	(*UpdateControlsRequest)(nil),      // 19: bank.card.v1.UpdateControlsRequest
 	(*UpdateControlsResponse)(nil),     // 20: bank.card.v1.UpdateControlsResponse
-	(*RevealCardDetailsRequest)(nil),   // 21: bank.card.v1.RevealCardDetailsRequest
-	(*RevealCardDetailsResponse)(nil),  // 22: bank.card.v1.RevealCardDetailsResponse
-	(*Authorization)(nil),              // 23: bank.card.v1.Authorization
-	(*AuthorizeRequest)(nil),           // 24: bank.card.v1.AuthorizeRequest
-	(*AuthorizeResponse)(nil),          // 25: bank.card.v1.AuthorizeResponse
-	(*ClearRequest)(nil),               // 26: bank.card.v1.ClearRequest
-	(*ClearResponse)(nil),              // 27: bank.card.v1.ClearResponse
-	(*ReverseRequest)(nil),             // 28: bank.card.v1.ReverseRequest
-	(*ReverseResponse)(nil),            // 29: bank.card.v1.ReverseResponse
-	(*CardToken)(nil),                  // 30: bank.card.v1.CardToken
-	(*TokenizeCardRequest)(nil),        // 31: bank.card.v1.TokenizeCardRequest
-	(*TokenizeCardResponse)(nil),       // 32: bank.card.v1.TokenizeCardResponse
-	(*ListTokensRequest)(nil),          // 33: bank.card.v1.ListTokensRequest
-	(*ListTokensResponse)(nil),         // 34: bank.card.v1.ListTokensResponse
-	(*UpdateTokenRequest)(nil),         // 35: bank.card.v1.UpdateTokenRequest
-	(*UpdateTokenResponse)(nil),        // 36: bank.card.v1.UpdateTokenResponse
-	(*RefundRequest)(nil),              // 37: bank.card.v1.RefundRequest
-	(*Refund)(nil),                     // 38: bank.card.v1.Refund
-	(*RefundResponse)(nil),             // 39: bank.card.v1.RefundResponse
-	(*ListAuthorizationsRequest)(nil),  // 40: bank.card.v1.ListAuthorizationsRequest
-	(*ListAuthorizationsResponse)(nil), // 41: bank.card.v1.ListAuthorizationsResponse
-	(*Dispute)(nil),                    // 42: bank.card.v1.Dispute
-	(*OpenDisputeRequest)(nil),         // 43: bank.card.v1.OpenDisputeRequest
-	(*OpenDisputeResponse)(nil),        // 44: bank.card.v1.OpenDisputeResponse
-	(*GetDisputeRequest)(nil),          // 45: bank.card.v1.GetDisputeRequest
-	(*GetDisputeResponse)(nil),         // 46: bank.card.v1.GetDisputeResponse
-	(*ListDisputesRequest)(nil),        // 47: bank.card.v1.ListDisputesRequest
-	(*ListDisputesResponse)(nil),       // 48: bank.card.v1.ListDisputesResponse
-	(*DecideDisputeRequest)(nil),       // 49: bank.card.v1.DecideDisputeRequest
-	(*DecideDisputeResponse)(nil),      // 50: bank.card.v1.DecideDisputeResponse
-	(*timestamppb.Timestamp)(nil),      // 51: google.protobuf.Timestamp
-	(*v1.Money)(nil),                   // 52: bank.common.v1.Money
+	(*SetMonthlyLimitRequest)(nil),     // 21: bank.card.v1.SetMonthlyLimitRequest
+	(*SetMonthlyLimitResponse)(nil),    // 22: bank.card.v1.SetMonthlyLimitResponse
+	(*RevealCardDetailsRequest)(nil),   // 23: bank.card.v1.RevealCardDetailsRequest
+	(*RevealCardDetailsResponse)(nil),  // 24: bank.card.v1.RevealCardDetailsResponse
+	(*Authorization)(nil),              // 25: bank.card.v1.Authorization
+	(*AuthorizeRequest)(nil),           // 26: bank.card.v1.AuthorizeRequest
+	(*AuthorizeResponse)(nil),          // 27: bank.card.v1.AuthorizeResponse
+	(*ClearRequest)(nil),               // 28: bank.card.v1.ClearRequest
+	(*ClearResponse)(nil),              // 29: bank.card.v1.ClearResponse
+	(*ReverseRequest)(nil),             // 30: bank.card.v1.ReverseRequest
+	(*ReverseResponse)(nil),            // 31: bank.card.v1.ReverseResponse
+	(*CardToken)(nil),                  // 32: bank.card.v1.CardToken
+	(*TokenizeCardRequest)(nil),        // 33: bank.card.v1.TokenizeCardRequest
+	(*TokenizeCardResponse)(nil),       // 34: bank.card.v1.TokenizeCardResponse
+	(*ListTokensRequest)(nil),          // 35: bank.card.v1.ListTokensRequest
+	(*ListTokensResponse)(nil),         // 36: bank.card.v1.ListTokensResponse
+	(*UpdateTokenRequest)(nil),         // 37: bank.card.v1.UpdateTokenRequest
+	(*UpdateTokenResponse)(nil),        // 38: bank.card.v1.UpdateTokenResponse
+	(*RefundRequest)(nil),              // 39: bank.card.v1.RefundRequest
+	(*Refund)(nil),                     // 40: bank.card.v1.Refund
+	(*RefundResponse)(nil),             // 41: bank.card.v1.RefundResponse
+	(*ListAuthorizationsRequest)(nil),  // 42: bank.card.v1.ListAuthorizationsRequest
+	(*ListAuthorizationsResponse)(nil), // 43: bank.card.v1.ListAuthorizationsResponse
+	(*Dispute)(nil),                    // 44: bank.card.v1.Dispute
+	(*OpenDisputeRequest)(nil),         // 45: bank.card.v1.OpenDisputeRequest
+	(*OpenDisputeResponse)(nil),        // 46: bank.card.v1.OpenDisputeResponse
+	(*GetDisputeRequest)(nil),          // 47: bank.card.v1.GetDisputeRequest
+	(*GetDisputeResponse)(nil),         // 48: bank.card.v1.GetDisputeResponse
+	(*ListDisputesRequest)(nil),        // 49: bank.card.v1.ListDisputesRequest
+	(*ListDisputesResponse)(nil),       // 50: bank.card.v1.ListDisputesResponse
+	(*DecideDisputeRequest)(nil),       // 51: bank.card.v1.DecideDisputeRequest
+	(*DecideDisputeResponse)(nil),      // 52: bank.card.v1.DecideDisputeResponse
+	(*timestamppb.Timestamp)(nil),      // 53: google.protobuf.Timestamp
+	(*v1.Money)(nil),                   // 54: bank.common.v1.Money
 }
 var file_bank_card_v1_card_proto_depIdxs = []int32{
 	0,  // 0: bank.card.v1.Card.kind:type_name -> bank.card.v1.CardKind
 	1,  // 1: bank.card.v1.Card.status:type_name -> bank.card.v1.CardStatus
 	7,  // 2: bank.card.v1.Card.controls:type_name -> bank.card.v1.Controls
-	51, // 3: bank.card.v1.Card.created_at:type_name -> google.protobuf.Timestamp
-	51, // 4: bank.card.v1.Card.valid_until:type_name -> google.protobuf.Timestamp
-	0,  // 5: bank.card.v1.IssueCardRequest.kind:type_name -> bank.card.v1.CardKind
-	8,  // 6: bank.card.v1.IssueCardResponse.card:type_name -> bank.card.v1.Card
-	8,  // 7: bank.card.v1.GetCardResponse.card:type_name -> bank.card.v1.Card
-	8,  // 8: bank.card.v1.ListCardsResponse.cards:type_name -> bank.card.v1.Card
-	8,  // 9: bank.card.v1.BlockCardResponse.card:type_name -> bank.card.v1.Card
-	8,  // 10: bank.card.v1.UnblockCardResponse.card:type_name -> bank.card.v1.Card
-	7,  // 11: bank.card.v1.UpdateControlsRequest.controls:type_name -> bank.card.v1.Controls
-	8,  // 12: bank.card.v1.UpdateControlsResponse.card:type_name -> bank.card.v1.Card
-	4,  // 13: bank.card.v1.Authorization.status:type_name -> bank.card.v1.AuthorizationStatus
-	52, // 14: bank.card.v1.Authorization.amount:type_name -> bank.common.v1.Money
-	52, // 15: bank.card.v1.Authorization.cleared_amount:type_name -> bank.common.v1.Money
-	2,  // 16: bank.card.v1.Authorization.channel:type_name -> bank.card.v1.Channel
-	51, // 17: bank.card.v1.Authorization.created_at:type_name -> google.protobuf.Timestamp
-	3,  // 18: bank.card.v1.Authorization.function:type_name -> bank.card.v1.Function
-	52, // 19: bank.card.v1.Authorization.refunded_amount:type_name -> bank.common.v1.Money
-	42, // 20: bank.card.v1.Authorization.dispute:type_name -> bank.card.v1.Dispute
-	52, // 21: bank.card.v1.AuthorizeRequest.amount:type_name -> bank.common.v1.Money
-	2,  // 22: bank.card.v1.AuthorizeRequest.channel:type_name -> bank.card.v1.Channel
-	3,  // 23: bank.card.v1.AuthorizeRequest.function:type_name -> bank.card.v1.Function
-	23, // 24: bank.card.v1.AuthorizeResponse.authorization:type_name -> bank.card.v1.Authorization
-	52, // 25: bank.card.v1.ClearRequest.amount:type_name -> bank.common.v1.Money
-	23, // 26: bank.card.v1.ClearResponse.authorization:type_name -> bank.card.v1.Authorization
-	23, // 27: bank.card.v1.ReverseResponse.authorization:type_name -> bank.card.v1.Authorization
-	51, // 28: bank.card.v1.CardToken.created_at:type_name -> google.protobuf.Timestamp
-	30, // 29: bank.card.v1.TokenizeCardResponse.token:type_name -> bank.card.v1.CardToken
-	30, // 30: bank.card.v1.ListTokensResponse.tokens:type_name -> bank.card.v1.CardToken
-	30, // 31: bank.card.v1.UpdateTokenResponse.token:type_name -> bank.card.v1.CardToken
-	52, // 32: bank.card.v1.RefundRequest.amount:type_name -> bank.common.v1.Money
-	52, // 33: bank.card.v1.Refund.amount:type_name -> bank.common.v1.Money
-	51, // 34: bank.card.v1.Refund.created_at:type_name -> google.protobuf.Timestamp
-	38, // 35: bank.card.v1.RefundResponse.refund:type_name -> bank.card.v1.Refund
-	23, // 36: bank.card.v1.ListAuthorizationsResponse.authorizations:type_name -> bank.card.v1.Authorization
-	5,  // 37: bank.card.v1.Dispute.reason:type_name -> bank.card.v1.DisputeReason
-	52, // 38: bank.card.v1.Dispute.amount:type_name -> bank.common.v1.Money
-	6,  // 39: bank.card.v1.Dispute.status:type_name -> bank.card.v1.DisputeStatus
-	51, // 40: bank.card.v1.Dispute.created_at:type_name -> google.protobuf.Timestamp
-	51, // 41: bank.card.v1.Dispute.decided_at:type_name -> google.protobuf.Timestamp
-	51, // 42: bank.card.v1.Dispute.purchased_at:type_name -> google.protobuf.Timestamp
-	5,  // 43: bank.card.v1.OpenDisputeRequest.reason:type_name -> bank.card.v1.DisputeReason
-	52, // 44: bank.card.v1.OpenDisputeRequest.amount:type_name -> bank.common.v1.Money
-	42, // 45: bank.card.v1.OpenDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
-	42, // 46: bank.card.v1.GetDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
-	6,  // 47: bank.card.v1.ListDisputesRequest.status:type_name -> bank.card.v1.DisputeStatus
-	42, // 48: bank.card.v1.ListDisputesResponse.disputes:type_name -> bank.card.v1.Dispute
-	42, // 49: bank.card.v1.DecideDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
-	9,  // 50: bank.card.v1.CardService.IssueCard:input_type -> bank.card.v1.IssueCardRequest
-	11, // 51: bank.card.v1.CardService.GetCard:input_type -> bank.card.v1.GetCardRequest
-	13, // 52: bank.card.v1.CardService.ListCards:input_type -> bank.card.v1.ListCardsRequest
-	15, // 53: bank.card.v1.CardService.BlockCard:input_type -> bank.card.v1.BlockCardRequest
-	17, // 54: bank.card.v1.CardService.UnblockCard:input_type -> bank.card.v1.UnblockCardRequest
-	19, // 55: bank.card.v1.CardService.UpdateControls:input_type -> bank.card.v1.UpdateControlsRequest
-	21, // 56: bank.card.v1.CardService.RevealCardDetails:input_type -> bank.card.v1.RevealCardDetailsRequest
-	31, // 57: bank.card.v1.CardService.TokenizeCard:input_type -> bank.card.v1.TokenizeCardRequest
-	33, // 58: bank.card.v1.CardService.ListTokens:input_type -> bank.card.v1.ListTokensRequest
-	35, // 59: bank.card.v1.CardService.UpdateToken:input_type -> bank.card.v1.UpdateTokenRequest
-	24, // 60: bank.card.v1.CardService.Authorize:input_type -> bank.card.v1.AuthorizeRequest
-	26, // 61: bank.card.v1.CardService.Clear:input_type -> bank.card.v1.ClearRequest
-	28, // 62: bank.card.v1.CardService.Reverse:input_type -> bank.card.v1.ReverseRequest
-	37, // 63: bank.card.v1.CardService.Refund:input_type -> bank.card.v1.RefundRequest
-	40, // 64: bank.card.v1.CardService.ListAuthorizations:input_type -> bank.card.v1.ListAuthorizationsRequest
-	43, // 65: bank.card.v1.CardService.OpenDispute:input_type -> bank.card.v1.OpenDisputeRequest
-	45, // 66: bank.card.v1.CardService.GetDispute:input_type -> bank.card.v1.GetDisputeRequest
-	47, // 67: bank.card.v1.CardService.ListDisputes:input_type -> bank.card.v1.ListDisputesRequest
-	49, // 68: bank.card.v1.CardService.DecideDispute:input_type -> bank.card.v1.DecideDisputeRequest
-	10, // 69: bank.card.v1.CardService.IssueCard:output_type -> bank.card.v1.IssueCardResponse
-	12, // 70: bank.card.v1.CardService.GetCard:output_type -> bank.card.v1.GetCardResponse
-	14, // 71: bank.card.v1.CardService.ListCards:output_type -> bank.card.v1.ListCardsResponse
-	16, // 72: bank.card.v1.CardService.BlockCard:output_type -> bank.card.v1.BlockCardResponse
-	18, // 73: bank.card.v1.CardService.UnblockCard:output_type -> bank.card.v1.UnblockCardResponse
-	20, // 74: bank.card.v1.CardService.UpdateControls:output_type -> bank.card.v1.UpdateControlsResponse
-	22, // 75: bank.card.v1.CardService.RevealCardDetails:output_type -> bank.card.v1.RevealCardDetailsResponse
-	32, // 76: bank.card.v1.CardService.TokenizeCard:output_type -> bank.card.v1.TokenizeCardResponse
-	34, // 77: bank.card.v1.CardService.ListTokens:output_type -> bank.card.v1.ListTokensResponse
-	36, // 78: bank.card.v1.CardService.UpdateToken:output_type -> bank.card.v1.UpdateTokenResponse
-	25, // 79: bank.card.v1.CardService.Authorize:output_type -> bank.card.v1.AuthorizeResponse
-	27, // 80: bank.card.v1.CardService.Clear:output_type -> bank.card.v1.ClearResponse
-	29, // 81: bank.card.v1.CardService.Reverse:output_type -> bank.card.v1.ReverseResponse
-	39, // 82: bank.card.v1.CardService.Refund:output_type -> bank.card.v1.RefundResponse
-	41, // 83: bank.card.v1.CardService.ListAuthorizations:output_type -> bank.card.v1.ListAuthorizationsResponse
-	44, // 84: bank.card.v1.CardService.OpenDispute:output_type -> bank.card.v1.OpenDisputeResponse
-	46, // 85: bank.card.v1.CardService.GetDispute:output_type -> bank.card.v1.GetDisputeResponse
-	48, // 86: bank.card.v1.CardService.ListDisputes:output_type -> bank.card.v1.ListDisputesResponse
-	50, // 87: bank.card.v1.CardService.DecideDispute:output_type -> bank.card.v1.DecideDisputeResponse
-	69, // [69:88] is the sub-list for method output_type
-	50, // [50:69] is the sub-list for method input_type
-	50, // [50:50] is the sub-list for extension type_name
-	50, // [50:50] is the sub-list for extension extendee
-	0,  // [0:50] is the sub-list for field type_name
+	53, // 3: bank.card.v1.Card.created_at:type_name -> google.protobuf.Timestamp
+	53, // 4: bank.card.v1.Card.valid_until:type_name -> google.protobuf.Timestamp
+	54, // 5: bank.card.v1.Card.monthly_limit:type_name -> bank.common.v1.Money
+	54, // 6: bank.card.v1.Card.month_used:type_name -> bank.common.v1.Money
+	0,  // 7: bank.card.v1.IssueCardRequest.kind:type_name -> bank.card.v1.CardKind
+	8,  // 8: bank.card.v1.IssueCardResponse.card:type_name -> bank.card.v1.Card
+	8,  // 9: bank.card.v1.GetCardResponse.card:type_name -> bank.card.v1.Card
+	8,  // 10: bank.card.v1.ListCardsResponse.cards:type_name -> bank.card.v1.Card
+	8,  // 11: bank.card.v1.BlockCardResponse.card:type_name -> bank.card.v1.Card
+	8,  // 12: bank.card.v1.UnblockCardResponse.card:type_name -> bank.card.v1.Card
+	7,  // 13: bank.card.v1.UpdateControlsRequest.controls:type_name -> bank.card.v1.Controls
+	8,  // 14: bank.card.v1.UpdateControlsResponse.card:type_name -> bank.card.v1.Card
+	54, // 15: bank.card.v1.SetMonthlyLimitRequest.amount:type_name -> bank.common.v1.Money
+	8,  // 16: bank.card.v1.SetMonthlyLimitResponse.card:type_name -> bank.card.v1.Card
+	4,  // 17: bank.card.v1.Authorization.status:type_name -> bank.card.v1.AuthorizationStatus
+	54, // 18: bank.card.v1.Authorization.amount:type_name -> bank.common.v1.Money
+	54, // 19: bank.card.v1.Authorization.cleared_amount:type_name -> bank.common.v1.Money
+	2,  // 20: bank.card.v1.Authorization.channel:type_name -> bank.card.v1.Channel
+	53, // 21: bank.card.v1.Authorization.created_at:type_name -> google.protobuf.Timestamp
+	3,  // 22: bank.card.v1.Authorization.function:type_name -> bank.card.v1.Function
+	54, // 23: bank.card.v1.Authorization.refunded_amount:type_name -> bank.common.v1.Money
+	44, // 24: bank.card.v1.Authorization.dispute:type_name -> bank.card.v1.Dispute
+	54, // 25: bank.card.v1.AuthorizeRequest.amount:type_name -> bank.common.v1.Money
+	2,  // 26: bank.card.v1.AuthorizeRequest.channel:type_name -> bank.card.v1.Channel
+	3,  // 27: bank.card.v1.AuthorizeRequest.function:type_name -> bank.card.v1.Function
+	25, // 28: bank.card.v1.AuthorizeResponse.authorization:type_name -> bank.card.v1.Authorization
+	54, // 29: bank.card.v1.ClearRequest.amount:type_name -> bank.common.v1.Money
+	25, // 30: bank.card.v1.ClearResponse.authorization:type_name -> bank.card.v1.Authorization
+	25, // 31: bank.card.v1.ReverseResponse.authorization:type_name -> bank.card.v1.Authorization
+	53, // 32: bank.card.v1.CardToken.created_at:type_name -> google.protobuf.Timestamp
+	32, // 33: bank.card.v1.TokenizeCardResponse.token:type_name -> bank.card.v1.CardToken
+	32, // 34: bank.card.v1.ListTokensResponse.tokens:type_name -> bank.card.v1.CardToken
+	32, // 35: bank.card.v1.UpdateTokenResponse.token:type_name -> bank.card.v1.CardToken
+	54, // 36: bank.card.v1.RefundRequest.amount:type_name -> bank.common.v1.Money
+	54, // 37: bank.card.v1.Refund.amount:type_name -> bank.common.v1.Money
+	53, // 38: bank.card.v1.Refund.created_at:type_name -> google.protobuf.Timestamp
+	40, // 39: bank.card.v1.RefundResponse.refund:type_name -> bank.card.v1.Refund
+	25, // 40: bank.card.v1.ListAuthorizationsResponse.authorizations:type_name -> bank.card.v1.Authorization
+	5,  // 41: bank.card.v1.Dispute.reason:type_name -> bank.card.v1.DisputeReason
+	54, // 42: bank.card.v1.Dispute.amount:type_name -> bank.common.v1.Money
+	6,  // 43: bank.card.v1.Dispute.status:type_name -> bank.card.v1.DisputeStatus
+	53, // 44: bank.card.v1.Dispute.created_at:type_name -> google.protobuf.Timestamp
+	53, // 45: bank.card.v1.Dispute.decided_at:type_name -> google.protobuf.Timestamp
+	53, // 46: bank.card.v1.Dispute.purchased_at:type_name -> google.protobuf.Timestamp
+	5,  // 47: bank.card.v1.OpenDisputeRequest.reason:type_name -> bank.card.v1.DisputeReason
+	54, // 48: bank.card.v1.OpenDisputeRequest.amount:type_name -> bank.common.v1.Money
+	44, // 49: bank.card.v1.OpenDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
+	44, // 50: bank.card.v1.GetDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
+	6,  // 51: bank.card.v1.ListDisputesRequest.status:type_name -> bank.card.v1.DisputeStatus
+	44, // 52: bank.card.v1.ListDisputesResponse.disputes:type_name -> bank.card.v1.Dispute
+	44, // 53: bank.card.v1.DecideDisputeResponse.dispute:type_name -> bank.card.v1.Dispute
+	9,  // 54: bank.card.v1.CardService.IssueCard:input_type -> bank.card.v1.IssueCardRequest
+	11, // 55: bank.card.v1.CardService.GetCard:input_type -> bank.card.v1.GetCardRequest
+	13, // 56: bank.card.v1.CardService.ListCards:input_type -> bank.card.v1.ListCardsRequest
+	15, // 57: bank.card.v1.CardService.BlockCard:input_type -> bank.card.v1.BlockCardRequest
+	17, // 58: bank.card.v1.CardService.UnblockCard:input_type -> bank.card.v1.UnblockCardRequest
+	19, // 59: bank.card.v1.CardService.UpdateControls:input_type -> bank.card.v1.UpdateControlsRequest
+	21, // 60: bank.card.v1.CardService.SetMonthlyLimit:input_type -> bank.card.v1.SetMonthlyLimitRequest
+	23, // 61: bank.card.v1.CardService.RevealCardDetails:input_type -> bank.card.v1.RevealCardDetailsRequest
+	33, // 62: bank.card.v1.CardService.TokenizeCard:input_type -> bank.card.v1.TokenizeCardRequest
+	35, // 63: bank.card.v1.CardService.ListTokens:input_type -> bank.card.v1.ListTokensRequest
+	37, // 64: bank.card.v1.CardService.UpdateToken:input_type -> bank.card.v1.UpdateTokenRequest
+	26, // 65: bank.card.v1.CardService.Authorize:input_type -> bank.card.v1.AuthorizeRequest
+	28, // 66: bank.card.v1.CardService.Clear:input_type -> bank.card.v1.ClearRequest
+	30, // 67: bank.card.v1.CardService.Reverse:input_type -> bank.card.v1.ReverseRequest
+	39, // 68: bank.card.v1.CardService.Refund:input_type -> bank.card.v1.RefundRequest
+	42, // 69: bank.card.v1.CardService.ListAuthorizations:input_type -> bank.card.v1.ListAuthorizationsRequest
+	45, // 70: bank.card.v1.CardService.OpenDispute:input_type -> bank.card.v1.OpenDisputeRequest
+	47, // 71: bank.card.v1.CardService.GetDispute:input_type -> bank.card.v1.GetDisputeRequest
+	49, // 72: bank.card.v1.CardService.ListDisputes:input_type -> bank.card.v1.ListDisputesRequest
+	51, // 73: bank.card.v1.CardService.DecideDispute:input_type -> bank.card.v1.DecideDisputeRequest
+	10, // 74: bank.card.v1.CardService.IssueCard:output_type -> bank.card.v1.IssueCardResponse
+	12, // 75: bank.card.v1.CardService.GetCard:output_type -> bank.card.v1.GetCardResponse
+	14, // 76: bank.card.v1.CardService.ListCards:output_type -> bank.card.v1.ListCardsResponse
+	16, // 77: bank.card.v1.CardService.BlockCard:output_type -> bank.card.v1.BlockCardResponse
+	18, // 78: bank.card.v1.CardService.UnblockCard:output_type -> bank.card.v1.UnblockCardResponse
+	20, // 79: bank.card.v1.CardService.UpdateControls:output_type -> bank.card.v1.UpdateControlsResponse
+	22, // 80: bank.card.v1.CardService.SetMonthlyLimit:output_type -> bank.card.v1.SetMonthlyLimitResponse
+	24, // 81: bank.card.v1.CardService.RevealCardDetails:output_type -> bank.card.v1.RevealCardDetailsResponse
+	34, // 82: bank.card.v1.CardService.TokenizeCard:output_type -> bank.card.v1.TokenizeCardResponse
+	36, // 83: bank.card.v1.CardService.ListTokens:output_type -> bank.card.v1.ListTokensResponse
+	38, // 84: bank.card.v1.CardService.UpdateToken:output_type -> bank.card.v1.UpdateTokenResponse
+	27, // 85: bank.card.v1.CardService.Authorize:output_type -> bank.card.v1.AuthorizeResponse
+	29, // 86: bank.card.v1.CardService.Clear:output_type -> bank.card.v1.ClearResponse
+	31, // 87: bank.card.v1.CardService.Reverse:output_type -> bank.card.v1.ReverseResponse
+	41, // 88: bank.card.v1.CardService.Refund:output_type -> bank.card.v1.RefundResponse
+	43, // 89: bank.card.v1.CardService.ListAuthorizations:output_type -> bank.card.v1.ListAuthorizationsResponse
+	46, // 90: bank.card.v1.CardService.OpenDispute:output_type -> bank.card.v1.OpenDisputeResponse
+	48, // 91: bank.card.v1.CardService.GetDispute:output_type -> bank.card.v1.GetDisputeResponse
+	50, // 92: bank.card.v1.CardService.ListDisputes:output_type -> bank.card.v1.ListDisputesResponse
+	52, // 93: bank.card.v1.CardService.DecideDispute:output_type -> bank.card.v1.DecideDisputeResponse
+	74, // [74:94] is the sub-list for method output_type
+	54, // [54:74] is the sub-list for method input_type
+	54, // [54:54] is the sub-list for extension type_name
+	54, // [54:54] is the sub-list for extension extendee
+	0,  // [0:54] is the sub-list for field type_name
 }
 
 func init() { file_bank_card_v1_card_proto_init() }
@@ -3530,7 +3662,7 @@ func file_bank_card_v1_card_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_card_v1_card_proto_rawDesc), len(file_bank_card_v1_card_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   44,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

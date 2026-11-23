@@ -163,6 +163,8 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/accounts/{id}/cards/{cardID}/block", a.authenticated(a.owned(a.ownedCard(a.blockCard))))
 	mux.HandleFunc("POST /v1/accounts/{id}/cards/{cardID}/unblock", a.authenticated(a.owned(a.ownedCard(a.unblockCard))))
 	mux.HandleFunc("PUT /v1/accounts/{id}/cards/{cardID}/controls", a.authenticated(a.owned(a.ownedCard(a.cardControls))))
+	mux.HandleFunc("PUT /v1/accounts/{id}/cards/{cardID}/monthly-limit", a.authenticated(a.owned(a.ownedCard(a.monthlyLimit))))
+	mux.HandleFunc("DELETE /v1/accounts/{id}/cards/{cardID}/monthly-limit", a.authenticated(a.owned(a.ownedCard(a.monthlyLimit))))
 	mux.HandleFunc("POST /v1/accounts/{id}/cards/{cardID}/reveal", a.authenticated(a.steppedUp(a.owned(a.ownedCard(a.revealCard)))))
 	mux.HandleFunc("POST /v1/accounts/{id}/cards/{cardID}/tokens", a.authenticated(a.steppedUp(a.owned(a.ownedCard(a.tokenizeCard)))))
 	mux.HandleFunc("GET /v1/accounts/{id}/cards/{cardID}/tokens", a.authenticated(a.owned(a.ownedCard(a.listTokens))))

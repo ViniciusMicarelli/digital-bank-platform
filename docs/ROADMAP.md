@@ -273,6 +273,11 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 
 - The "informe de rendimentos" for the income tax return: checking and savings box balances on 31/12 of the year and the year before, and what each box yielded, for any account (closed ones too) and year; printable (or saved as PDF) on the web, shareable on mobile.
 
+## Phase 42 — Card monthly limit ✅
+
+- Each card can have its own spending limit per month (e.g. a virtual card for subscriptions); purchases beyond it are declined, and the card shows how much of it was used.
+- Decline reasons now reach the customer in Portuguese, in the app and in the "Compra recusada" notification.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

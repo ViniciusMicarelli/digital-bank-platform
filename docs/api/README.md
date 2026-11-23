@@ -79,6 +79,7 @@
 | `POST` / `GET` | `/v1/accounts/{id}/cards` | Issue a debit card `{kind: PHYSICAL\|VIRTUAL\|TEMPORARY}` (Idempotency-Key; `TEMPORARY`: single use, 24 h, `TOO_MANY_TEMPORARY_CARDS`) / list cards (`valid_until` on temporary ones) |
 | `POST` | `/v1/accounts/{id}/cards/{cardID}/block` · `/unblock` | Block (`{reason}`) / unblock |
 | `PUT` | `/v1/accounts/{id}/cards/{cardID}/controls` | `{online, international, contactless}` |
+| `PUT` · `DELETE` | `/v1/accounts/{id}/cards/{cardID}/monthly-limit` | Spending limit per month `{amount}` (whole reais) / remove it; cards then carry `monthly_limit {amount, used}` |
 | `POST` | `/v1/accounts/{id}/cards/{cardID}/reveal` | 🔐 Card number, expiry, CVV |
 | `POST` | `/v1/accounts/{id}/cards/{cardID}/tokens` | 🔐 `{wallet, device_name}` → wallet token (`token_pan` returned once) |
 | `GET` | `/v1/accounts/{id}/cards/{cardID}/tokens` | Active and suspended tokens |

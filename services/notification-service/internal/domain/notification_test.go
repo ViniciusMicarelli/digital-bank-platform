@@ -56,6 +56,8 @@ func TestFromEvent(t *testing.T) {
 		{"transaction.completed", map[string]any{"type": "MANUAL_CREDIT", "to_account_id": acc, "amount_minor": 2500,
 			"description": "Crédito do Digital Bank: Estorno da tarifa cobrada por engano."},
 			"Crédito do Digital Bank", "Creditamos R$ 25,00 na sua conta. Estorno da tarifa cobrada por engano."},
+		{"card.authorization.declined", map[string]any{"account_id": acc, "amount_minor": 2500, "merchant_name": "STREAMING", "reason": "card monthly limit"},
+			"Compra recusada", "Uma compra de R$ 25,00 em STREAMING foi recusada: passou do limite mensal do cartão."},
 		{"account.closed", map[string]any{"account_id": acc}, "Conta encerrada",
 			"Sua conta foi encerrada, com cartões cancelados e chaves Pix removidas. Os comprovantes e o extrato continuam disponíveis."},
 		{"credit.limit.changed", map[string]any{"account_id": acc, "previous_limit": 100000, "granted": 300000},

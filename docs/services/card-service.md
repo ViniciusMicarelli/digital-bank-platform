@@ -72,6 +72,7 @@ Defined in [`contracts/proto/bank/card/v1/card.proto`](../../contracts/proto/ban
 |---|---|
 | `IssueCard` / `GetCard` / `ListCards` | Issue and query |
 | `BlockCard` / `UnblockCard` / `UpdateControls` | Customer controls |
+| `SetMonthlyLimit` | Spending limit per card and calendar month (Brasília), whole reais up to R$ 50.000,00; 0 removes it. A purchase that would go over it is declined (61, "card monthly limit"). Usage is summed from the authorizations themselves (approved, cleared net of refunds, and in flight), each stored before it is decided, so concurrent purchases see each other and the limit is never exceeded |
 | `RevealCardDetails` | PAN, expiry, CVV |
 | `TokenizeCard` / `ListTokens` / `UpdateToken` | Wallet tokens (the token number is returned once) |
 | `Authorize` / `Clear` / `Reverse` / `Refund` | Network-facing |

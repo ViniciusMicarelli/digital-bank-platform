@@ -82,6 +82,8 @@ export interface Card {
   expiry_month: number
   expiry_year: number
   controls: { online: boolean; international: boolean; contactless: boolean }
+  /** The spending limit per calendar month and what was used of it, when set. */
+  monthly_limit?: { amount: Money; used: Money }
 }
 
 export interface CardDetails {
@@ -439,3 +441,30 @@ export function closureBlockerText(b: ClosureCheck['blockers'][number]): { title
       return { title: 'Há pagamentos em andamento', action: 'Espere eles terminarem (alguns minutos).', route: '/boletos' }
   }
 }
+
+/** Why a card purchase was declined, in pt-BR (as is when unknown). */
+const declineReasons: Record<string, string> = {
+  'CVV required for card-not-present purchases': 'o código de segurança (CVV) não foi informado',
+  'amount above the single purchase limit': 'o valor passa do máximo por compra',
+  'card blocked': 'o cartão está bloqueado',
+  'card cancelled': 'o cartão foi cancelado',
+  'card expired': 'o cartão está vencido',
+  'contactless disabled': 'o pagamento por aproximação está desligado',
+  'expiry date does not match': 'a validade informada não confere',
+  'international purchases disabled': 'as compras internacionais estão desligadas',
+  'merchant category not allowed': 'este tipo de estabelecimento não é permitido',
+  'online purchases disabled': 'as compras online estão desligadas',
+  'temporary card expired': 'o cartão temporário expirou',
+  'wrong CVV': 'o código de segurança (CVV) está errado',
+  'card monthly limit': 'passou do limite mensal do cartão',
+  'temporary card already used': 'o cartão temporário já foi usado',
+  'INSUFFICIENT_FUNDS': 'saldo insuficiente',
+  'LIMIT_EXCEEDED': 'passou do limite de transações da conta',
+  'ACCOUNT_NOT_ACTIVE': 'a conta não está ativa',
+  'CREDIT_LINE_BLOCKED': 'o crédito está bloqueado',
+  'INSUFFICIENT_LIMIT': 'limite de crédito insuficiente',
+  'NO_CREDIT_LINE': 'o crédito não está ativado',
+  'unknown card': 'cartão não reconhecido',
+}
+
+export const declineReasonText = (reason: string) => declineReasons[reason] ?? reason

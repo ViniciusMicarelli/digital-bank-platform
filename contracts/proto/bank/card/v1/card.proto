@@ -16,6 +16,9 @@ service CardService {
   rpc BlockCard(BlockCardRequest) returns (BlockCardResponse);
   rpc UnblockCard(UnblockCardRequest) returns (UnblockCardResponse);
   rpc UpdateControls(UpdateControlsRequest) returns (UpdateControlsResponse);
+  // Sets (or, with zero, removes) the card's spending limit per calendar
+  // month (Brasília): purchases above what is left are declined (61).
+  rpc SetMonthlyLimit(SetMonthlyLimitRequest) returns (SetMonthlyLimitResponse);
   // Returns the full card number, expiry and CVV to the card holder.
   rpc RevealCardDetails(RevealCardDetailsRequest) returns (RevealCardDetailsResponse);
 
@@ -88,6 +91,10 @@ message Card {
   google.protobuf.Timestamp created_at = 11;
   // Temporary cards: when they stop working.
   google.protobuf.Timestamp valid_until = 12;
+  // The spending limit per calendar month; zero when there is none.
+  bank.common.v1.Money monthly_limit = 13;
+  // Spent this month (set when there is a monthly limit).
+  bank.common.v1.Money month_used = 14;
 }
 
 message IssueCardRequest {
@@ -139,6 +146,16 @@ message UpdateControlsRequest {
 }
 
 message UpdateControlsResponse {
+  Card card = 1;
+}
+
+message SetMonthlyLimitRequest {
+  string id = 1;
+  // Whole reais, up to R$ 50.000,00; zero removes the limit.
+  bank.common.v1.Money amount = 2;
+}
+
+message SetMonthlyLimitResponse {
   Card card = 1;
 }
 

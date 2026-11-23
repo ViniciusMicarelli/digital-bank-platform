@@ -550,3 +550,45 @@ func TestTemporaryCard(t *testing.T) {
 		t.Fatalf("fourth: %v", err)
 	}
 }
+
+func TestMonthlyLimit(t *testing.T) {
+	e := setup(t) // R$ 100 in the account
+	now := time.Date(2026, 11, 20, 15, 0, 0, 0, time.UTC)
+	e.svc.SetClock(func() time.Time { return now })
+	c, _ := e.svc.Issue(e.ctx, "ml-1", account, domain.Virtual)
+	d, _ := e.svc.Reveal(e.ctx, c.ID)
+	if _, err := e.svc.SetMonthlyLimit(e.ctx, c.ID, 12_34); !errors.Is(err, domain.ErrInvalidArgument) {
+		t.Fatalf("not whole reais: %v", err)
+	}
+	if c, _ = e.svc.SetMonthlyLimit(e.ctx, c.ID, 50_00); c.MonthlyLimit != 50_00 {
+		t.Fatalf("limit = %+v", c)
+	}
+
+	first, _ := e.svc.Authorize(e.ctx, d.PAN, purchase(d, "30"))
+	if first.Status != domain.Approved {
+		t.Fatalf("within the limit = %+v", first)
+	}
+	if a, _ := e.svc.Authorize(e.ctx, d.PAN, purchase(d, "25")); a.Status != domain.Declined || a.Code != domain.CodeExceedsLimit || a.Reason != "card monthly limit" {
+		t.Fatalf("over the limit = %+v", a)
+	}
+	if used, _ := e.svc.MonthUsed(e.ctx, c.ID); used != 30_00 {
+		t.Fatalf("used = %d", used)
+	}
+	// A reversed purchase gives its room back.
+	if _, err := e.svc.Reverse(e.ctx, first.ID); err != nil {
+		t.Fatal(err)
+	}
+	if a, _ := e.svc.Authorize(e.ctx, d.PAN, purchase(d, "45")); a.Status != domain.Approved {
+		t.Fatalf("after the reversal = %+v", a)
+	}
+	// A new month starts from zero: 01/12 at 00:30 in Brasília.
+	now = time.Date(2026, 12, 1, 3, 30, 0, 0, time.UTC)
+	if used, _ := e.svc.MonthUsed(e.ctx, c.ID); used != 0 {
+		t.Fatalf("next month used = %d", used)
+	}
+	// No limit: only the money in the account counts.
+	_, _ = e.svc.SetMonthlyLimit(e.ctx, c.ID, 0)
+	if a, _ := e.svc.Authorize(e.ctx, d.PAN, purchase(d, "54")); a.Status != domain.Approved {
+		t.Fatalf("without a limit = %+v", a)
+	}
+}

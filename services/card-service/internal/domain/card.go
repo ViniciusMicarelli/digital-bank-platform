@@ -118,6 +118,36 @@ type Controls struct {
 	Online, International, Contactless bool
 }
 
+// MaxMonthlyLimit bounds the per-card monthly limit (R$ 50.000,00).
+const MaxMonthlyLimit = 50_000_00
+
+// Brasilia is the bank's calendar (no daylight saving since 2019).
+var Brasilia = time.FixedZone("BRT", -3*60*60)
+
+// MonthStart is the start of now's calendar month in Brasília.
+func MonthStart(now time.Time) time.Time {
+	y, m, _ := now.In(Brasilia).Date()
+	return time.Date(y, m, 1, 0, 0, 0, 0, Brasilia)
+}
+
+// WithinMonthlyLimit reports whether a purchase of amount fits the card's
+// monthly limit, given what the card already used this month.
+func (c Card) WithinMonthlyLimit(used, amount int64) bool {
+	return c.MonthlyLimit == 0 || used+amount <= c.MonthlyLimit
+}
+
+// SetMonthlyLimit sets (or, with 0, removes) the card's monthly limit.
+func (c *Card) SetMonthlyLimit(amount int64) error {
+	switch {
+	case c.Status == Cancelled:
+		return fmt.Errorf("%w: card is cancelled", ErrInvalidTransition)
+	case amount < 0 || amount > MaxMonthlyLimit || amount%100 != 0:
+		return fmt.Errorf("%w: the monthly limit is in whole reais, up to R$ 50.000,00", ErrInvalidArgument)
+	}
+	c.MonthlyLimit = amount
+	return nil
+}
+
 // DefaultControls: international purchases must be enabled explicitly.
 var DefaultControls = Controls{Online: true, International: false, Contactless: true}
 
@@ -134,7 +164,9 @@ type Card struct {
 	ExpiryYear     int
 	HolderName     string
 	Controls       Controls
-	CreatedAt      time.Time
+	// MonthlyLimit caps what the card spends per calendar month (0: none).
+	MonthlyLimit int64
+	CreatedAt    time.Time
 	// ValidUntil is set for temporary cards.
 	ValidUntil *time.Time
 }

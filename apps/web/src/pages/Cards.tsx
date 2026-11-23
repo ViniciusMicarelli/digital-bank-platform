@@ -8,9 +8,53 @@ import { BankCard } from '../components/BankCard'
 import { Alert, Badge, Button, Empty, Field, IconButton, IconTile, Loading, Modal, PageTitle, Panel, Sandbox, Select, Toggle } from '../components/ui'
 import { cx, dateTimeBR } from '../lib/format'
 import { api } from '../lib/api'
-import { disputeReasons, errorMessage, formatBRL, type Card, type CardDetails, type CardPurchase, type CardToken, type DisputeReason } from '@bank/core'
+import { declineReasonText, disputeReasons, errorMessage, formatBRL, type Card, type CardDetails, type CardPurchase, type CardToken, type DisputeReason } from '@bank/core'
 
 const wallets: Record<string, string> = { APPLE_PAY: 'Apple Pay', GOOGLE_PAY: 'Google Pay', SAMSUNG_PAY: 'Samsung Pay', MERCHANT: 'Loja' }
+
+/** A spending limit per month for this card (e.g. a virtual card for subscriptions). */
+function MonthlyLimit({ base, card, onChange }: { base: string; card: Card; onChange: () => void }) {
+  const ml = card.monthly_limit
+  const [editing, setEditing] = useState(false)
+  const [amount, setAmount] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const save = useMutation({
+    mutationFn: (remove: boolean) => remove ? api('DELETE', `${base}/monthly-limit`) : api('PUT', `${base}/monthly-limit`, { body: { amount } }),
+    onSuccess: () => { setEditing(false); setError(''); onChange() },
+    onError: (e) => setError(errorMessage(e)),
+  })
+  const pct = ml ? Math.min(100, (Number(ml.used.amount) / Number(ml.amount.amount)) * 100) : 0
+  return (
+    <div className="space-y-3 pt-3">
+      <p className="text-sm font-medium text-fg">Limite mensal deste cartão</p>
+      {ml && !editing && (
+        <>
+          <div className="h-1.5 overflow-hidden rounded-full bg-surface-2" role="meter" aria-label="Limite mensal do cartão"
+            aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)}>
+            <div className={cx('h-full rounded-full', pct >= 100 ? 'bg-danger' : pct >= 80 ? 'bg-warning' : 'bg-positive')} style={{ width: `${pct}%` }} />
+          </div>
+          <p className="text-xs text-muted"><span className="tabular font-semibold text-fg">{formatBRL(ml.used)}</span> de {formatBRL(ml.amount)} usados este mês. Acima disso, as compras são recusadas.</p>
+        </>
+      )}
+      {!ml && !editing && <p className="text-xs text-muted">Sem limite próprio: vale o saldo da conta (débito) ou o limite do crédito.</p>}
+      {editing ? (
+        <form className="space-y-2" onSubmit={(e) => { e.preventDefault(); save.mutate(false) }}>
+          <MoneyField label="Limite por mês" hint="Em reais inteiros." onValue={setAmount} />
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={!amount} loading={save.isPending}>Salvar limite</Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancelar</Button>
+          </div>
+        </form>
+      ) : card.status !== 'CANCELLED' && (
+        <div className="flex gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>{ml ? 'Alterar limite' : 'Definir limite mensal'}</Button>
+          {ml && <Button size="sm" variant="ghost" loading={save.isPending} onClick={() => save.mutate(true)}>Remover</Button>}
+        </div>
+      )}
+      <Alert>{error}</Alert>
+    </div>
+  )
+}
 
 function Wallets({ accountId, card, confirm }: { accountId: string; card: Card; confirm: () => Promise<string> }) {
   const qc = useQueryClient()
@@ -91,7 +135,7 @@ function SimulatePurchase({ card, reveal }: { card: Card; reveal: () => Promise<
       return auth
     },
     onSuccess: (a) => {
-      setResult(a.status === 'APPROVED' ? `Aprovada: ${formatBRL(amount!)} em ${merchant}.` : `Recusada (código ${a.response_code}): ${a.reason}.`)
+      setResult(a.status === 'APPROVED' ? `Aprovada: ${formatBRL(amount!)} em ${merchant}.` : `Recusada (código ${a.response_code}): ${declineReasonText(a.reason)}.`)
       qc.invalidateQueries({ queryKey: ['balance'] })
       qc.invalidateQueries({ queryKey: ['purchases', card.id] })
     },
@@ -257,6 +301,7 @@ function CardView({ accountId, card }: { accountId: string; card: Card }) {
             <Toggle label="Compras online" description="Sites e aplicativos" checked={card.controls.online} onChange={setControl('online')} />
             <Toggle label="Compras internacionais" description="Fora do Brasil" checked={card.controls.international} onChange={setControl('international')} />
             <Toggle label="Pagamento por aproximação" description="Encostar o cartão na maquininha" checked={card.controls.contactless} onChange={setControl('contactless')} />
+            <MonthlyLimit base={base} card={card} onChange={refresh} />
           </div>
         </Panel>
         <Purchases accountId={accountId} card={card} />

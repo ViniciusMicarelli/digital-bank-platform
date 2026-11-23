@@ -150,6 +150,39 @@ type payload struct {
 	Description     string            `json:"description"`
 }
 
+// declineReasons tells the customer, in Portuguese, why card-service declined.
+var declineReasons = map[string]string{
+	"CVV required for card-not-present purchases": "o código de segurança (CVV) não foi informado",
+	"amount above the single purchase limit":      "o valor passa do máximo por compra",
+	"card blocked":                                "o cartão está bloqueado",
+	"card cancelled":                              "o cartão foi cancelado",
+	"card expired":                                "o cartão está vencido",
+	"contactless disabled":                        "o pagamento por aproximação está desligado",
+	"expiry date does not match":                  "a validade informada não confere",
+	"international purchases disabled":            "as compras internacionais estão desligadas",
+	"merchant category not allowed":               "este tipo de estabelecimento não é permitido",
+	"online purchases disabled":                   "as compras online estão desligadas",
+	"temporary card expired":                      "o cartão temporário expirou",
+	"wrong CVV":                                   "o código de segurança (CVV) está errado",
+	"card monthly limit":                          "passou do limite mensal do cartão",
+	"temporary card already used":                 "o cartão temporário já foi usado",
+	"INSUFFICIENT_FUNDS":                          "saldo insuficiente",
+	"LIMIT_EXCEEDED":                              "passou do limite de transações da conta",
+	"ACCOUNT_NOT_ACTIVE":                          "a conta não está ativa",
+	"CREDIT_LINE_BLOCKED":                         "o crédito está bloqueado",
+	"INSUFFICIENT_LIMIT":                          "limite de crédito insuficiente",
+	"NO_CREDIT_LINE":                              "o crédito não está ativado",
+	"unknown card":                                "cartão não reconhecido",
+}
+
+// declineReason is the customer's words for a decline reason (as is when unknown).
+func declineReason(r string) string {
+	if t, ok := declineReasons[r]; ok {
+		return t
+	}
+	return r
+}
+
 // budgetCategories names the spending categories of a budget alert.
 var budgetCategories = map[string]string{
 	"TOTAL": "Gastos do mês", "FOOD": "Alimentação", "TRANSPORT": "Transporte", "SHOPPING": "Compras", "SUBSCRIPTIONS": "Assinaturas",
@@ -220,7 +253,7 @@ func FromEvent(ev Event, now time.Time) ([]Draft, error) {
 			return nil, nil // unknown card: nobody to tell
 		}
 		d.Category, d.Title, d.Important = CategoryCard, "Compra recusada", true
-		d.Body = fmt.Sprintf("Uma compra de %s em %s foi recusada: %s.", BRL(p.AmountMinor), p.MerchantName, p.Reason)
+		d.Body = fmt.Sprintf("Uma compra de %s em %s foi recusada: %s.", BRL(p.AmountMinor), p.MerchantName, declineReason(p.Reason))
 	case "card.dispute.opened":
 		d.Category, d.Title = CategoryCard, "Contestação aberta"
 		d.Body = fmt.Sprintf("Recebemos sua contestação de %s em %s. Avisamos quando ela for analisada.", BRL(p.AmountMinor), p.MerchantName)
