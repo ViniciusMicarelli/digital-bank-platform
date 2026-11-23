@@ -312,6 +312,9 @@ func FromEvent(ev Event, now time.Time) ([]Draft, error) {
 	case "account.blocked":
 		d.Category, d.Title, d.Important = CategoryAccount, "Conta bloqueada", true
 		d.Body = "Sua conta foi bloqueada. Fale com a gente se não reconhece isso."
+	case "account.closed":
+		d.Category, d.Title, d.Important = CategoryAccount, "Conta encerrada", true
+		d.Body = "Sua conta foi encerrada, com cartões cancelados e chaves Pix removidas. Os comprovantes e o extrato continuam disponíveis."
 	case "account.unblocked":
 		d.Category, d.Title, d.Important = CategoryAccount, "Conta desbloqueada", true
 		d.Body = "Sua conta voltou a funcionar normalmente."

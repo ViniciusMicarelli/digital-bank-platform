@@ -35,7 +35,8 @@ export function useAccounts() {
 /** The account the app works with: the first active one. */
 export function useAccount(): Account | undefined {
   const { data } = useAccounts()
-  return data?.find((a) => a.status === 'ACTIVE') ?? data?.[0]
+  // A closed account is history (statement, receipts), not one to work with.
+  return data?.find((a) => a.status === 'ACTIVE') ?? data?.find((a) => a.status !== 'CLOSED')
 }
 
 export function useBalance(id?: string) {

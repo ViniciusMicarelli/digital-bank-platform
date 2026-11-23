@@ -36,6 +36,7 @@ function Navigator({ signedIn }: { signedIn: boolean }) {
         <Stack.Screen name="caixinhas" options={{ ...header, title: 'Caixinhas' }} />
         <Stack.Screen name="gastos" options={{ ...header, title: 'Gastos' }} />
         <Stack.Screen name="dispositivos" options={{ ...header, title: 'Dispositivos conectados' }} />
+        <Stack.Screen name="encerrar-conta" options={{ ...header, title: 'Encerrar conta' }} />
         <Stack.Screen name="comprovante/[id]" options={{ ...header, title: 'Comprovante' }} />
       </Stack.Protected>
     </Stack>

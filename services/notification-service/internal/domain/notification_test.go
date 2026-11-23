@@ -53,6 +53,8 @@ func TestFromEvent(t *testing.T) {
 			"80% do orçamento: Alimentação", "Você já gastou R$ 410,00 dos R$ 500,00 planejados para o mês."},
 		{"statement.budget.threshold", map[string]any{"account_id": acc, "category": "TOTAL", "threshold": 100, "budget": 300000, "spent": 312050},
 			"Orçamento estourado: Gastos do mês", "Você gastou R$ 3.120,50 este mês, acima do orçamento de R$ 3.000,00."},
+		{"account.closed", map[string]any{"account_id": acc}, "Conta encerrada",
+			"Sua conta foi encerrada, com cartões cancelados e chaves Pix removidas. Os comprovantes e o extrato continuam disponíveis."},
 		{"credit.limit.changed", map[string]any{"account_id": acc, "previous_limit": 100000, "granted": 300000},
 			"Limite aumentado", "Seu limite passou de R$ 1.000,00 para R$ 3.000,00."},
 		{"credit.invoice.planned", map[string]any{"account_id": acc, "installments": 6, "installment": 11807},

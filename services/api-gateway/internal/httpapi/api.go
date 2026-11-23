@@ -189,6 +189,8 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/accounts/{id}/statement", a.authenticated(a.owned(a.statement)))
 	mux.HandleFunc("GET /v1/accounts/{id}/spending", a.authenticated(a.owned(a.spending)))
 	mux.HandleFunc("GET /v1/accounts/{id}/budgets", a.authenticated(a.owned(a.budgets)))
+	mux.HandleFunc("GET /v1/accounts/{id}/closure", a.authenticated(a.owned(a.closureCheck)))
+	mux.HandleFunc("POST /v1/accounts/{id}/close", a.authenticated(a.steppedUp(a.owned(a.closeAccount))))
 	mux.HandleFunc("PUT /v1/accounts/{id}/budgets/{category}", a.authenticated(a.owned(a.setBudget)))
 	mux.HandleFunc("DELETE /v1/accounts/{id}/budgets/{category}", a.authenticated(a.owned(a.setBudget)))
 	mux.HandleFunc("GET /v1/accounts/{id}/statement.csv", a.authenticated(a.owned(a.statementCSV)))

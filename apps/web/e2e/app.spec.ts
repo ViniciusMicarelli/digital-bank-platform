@@ -300,3 +300,31 @@ test('connected devices: see and end another session', async ({ page }) => {
   await expect(panel.getByText('Safari no iPhone')).toBeHidden()
   await expect(panel.getByText('Este dispositivo')).toBeVisible()
 })
+
+test('close the account', async ({ page }) => {
+  await onboard(page)
+  await fund(page, '50,00')
+  await page.goto('/ajustes')
+  await page.getByRole('button', { name: 'Encerrar minha conta' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Encerrar conta' })
+  // Money left: the way out is to send it somewhere first.
+  await expect(dialog.getByText('Ainda há R$ 50,00 na conta')).toBeVisible()
+  await dialog.getByRole('link', { name: 'Resolver' }).click()
+  await page.getByLabel('Chave Pix').fill('maria@outrobanco.com.br')
+  await page.getByRole('button', { name: 'Continuar' }).click()
+  await page.getByLabel('Valor').fill('50,00')
+  await page.getByRole('button', { name: /^Enviar R\$ 50,00/ }).click()
+  await expect(page.getByText('Pix enviado').first()).toBeVisible()
+
+  await expect(async () => {
+    await page.goto('/ajustes')
+    await page.getByRole('button', { name: 'Encerrar minha conta' }).click()
+    await expect(page.getByRole('button', { name: 'Encerrar definitivamente' })).toBeVisible({ timeout: 2000 })
+  }).toPass({ timeout: 20_000 })
+  await shot(page, '21-close-account')
+  await page.getByLabel('Por que você está saindo? (opcional)').fill('Mudei de banco')
+  await page.getByRole('button', { name: 'Encerrar definitivamente' }).click()
+  await page.getByLabel('Senha').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Confirmar' }).click()
+  await expect(page.getByText('Conta encerrada').first()).toBeVisible()
+})

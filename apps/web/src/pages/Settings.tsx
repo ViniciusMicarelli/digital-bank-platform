@@ -3,11 +3,81 @@ import QRCode from 'qrcode'
 import { useState } from 'react'
 import { useAccount, useProfile } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
-import { KeyRound, LogOut, MonitorSmartphone, Palette, SlidersHorizontal, UserRound } from 'lucide-react'
+import { DoorClosed, KeyRound, LogOut, MonitorSmartphone, Palette, SlidersHorizontal, UserRound } from 'lucide-react'
 import { ThemeSwitch } from '../components/ThemeSwitch'
-import { Alert, Badge, Button, Field, PageTitle, Panel } from '../components/ui'
+import { Alert, Badge, Button, Field, Modal, PageTitle, Panel } from '../components/ui'
 import { api, logout } from '../lib/api'
-import { errorMessage, formatBRL, lastSeen, type Session } from '@bank/core'
+import { closureBlockerText, errorMessage, formatBRL, lastSeen, type ClosureCheck, type Session } from '@bank/core'
+import { Link } from 'react-router'
+import { useStepUp } from '../components/StepUp'
+
+/** Closing the account: what is in the way, what will be cancelled, then
+ * the password again. */
+function ClosePanel({ accountId }: { accountId: string }) {
+  const qc = useQueryClient()
+  const { confirm, modal } = useStepUp()
+  const [open, setOpen] = useState(false)
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState('')
+  const check = useQuery({
+    queryKey: ['closure', accountId],
+    enabled: open,
+    queryFn: () => api<ClosureCheck>('GET', `/v1/accounts/${accountId}/closure`),
+  })
+  const close = useMutation({
+    mutationFn: async () => api('POST', `/v1/accounts/${accountId}/close`, { body: { reason }, stepUp: await confirm() }),
+    onSuccess: () => { setOpen(false); qc.invalidateQueries() },
+    onError: (e) => { setError(errorMessage(e)); check.refetch() },
+  })
+  const c = check.data
+  const wc = c?.will_cancel
+  const cancels = wc ? [
+    wc.pix_schedules && `${wc.pix_schedules} Pix agendado${wc.pix_schedules > 1 ? 's' : ''}`,
+    wc.boleto_schedules && `${wc.boleto_schedules} boleto${wc.boleto_schedules > 1 ? 's' : ''} agendado${wc.boleto_schedules > 1 ? 's' : ''}`,
+    wc.pix_automatico && `${wc.pix_automatico} autorizaç${wc.pix_automatico > 1 ? 'ões' : 'ão'} de Pix Automático`,
+    wc.empty_savings_boxes && `${wc.empty_savings_boxes} caixinha${wc.empty_savings_boxes > 1 ? 's' : ''} vazia${wc.empty_savings_boxes > 1 ? 's' : ''}`,
+  ].filter(Boolean) as string[] : []
+  return (
+    <Panel title="Encerrar conta" icon={DoorClosed}>
+      <p className="mb-4 text-sm text-fg-2">Você pode encerrar sua conta quando quiser. O extrato e os comprovantes continuam disponíveis.</p>
+      <Button variant="secondary" onClick={() => { setError(''); setOpen(true) }}>Encerrar minha conta</Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Encerrar conta">
+        {check.isLoading || !c ? <p className="text-sm text-muted">Verificando sua conta…</p> : (
+          <div className="space-y-4">
+            {c.blockers.length > 0 ? (
+              <>
+                <p className="text-sm text-fg-2">Antes de encerrar, resolva:</p>
+                <ul className="space-y-2">
+                  {c.blockers.map((b) => {
+                    const t = closureBlockerText(b)
+                    return (
+                      <li key={b.code} className="rounded-2xl bg-surface-2 px-4 py-3 text-sm">
+                        <p className="font-medium text-fg">{t.title}</p>
+                        <p className="text-xs text-muted">{t.action} <Link className="font-medium text-brand-strong" to={t.route} onClick={() => setOpen(false)}>Resolver</Link></p>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </>
+            ) : (
+              <>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-fg-2">
+                  <li>Seus cartões serão cancelados e suas chaves Pix, removidas.</li>
+                  {cancels.length > 0 && <li>Também cancelamos: {cancels.join(', ')}.</li>}
+                  <li>Não dá para desfazer; você pode abrir uma conta nova depois.</li>
+                </ul>
+                <Field label="Por que você está saindo? (opcional)" maxLength={200} value={reason} onChange={(e) => setReason(e.target.value)} />
+                <Alert>{error}</Alert>
+                <Button variant="danger" className="w-full" loading={close.isPending} onClick={() => { setError(''); close.mutate() }}>Encerrar definitivamente</Button>
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
+      {modal}
+    </Panel>
+  )
+}
 
 /** Where the customer is signed in; ends any other session, or all of them. */
 function SessionsPanel() {
@@ -146,6 +216,7 @@ export function SettingsPage() {
           <ThemeSwitch />
         </Panel>
         <SessionsPanel />
+        {account?.status === 'ACTIVE' && <ClosePanel accountId={account.id} />}
       </div>
     </div>
   )

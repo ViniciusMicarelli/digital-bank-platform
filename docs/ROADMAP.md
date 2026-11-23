@@ -259,6 +259,11 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - A credit limit above R$ 10.000,00 needs two analysts: the first one's approval becomes a request in the approvals queue (with the current limit, usage and score), and only a different analyst's approval grants it.
 - Enforced in credit-service too (`FOUR_EYES_REQUIRED`); the automatic analysis no longer grants above that line on its own.
 
+## Phase 39 — Closing the account ✅
+
+- The holder can close their account from the app: a check lists what is in the way (money left, money in savings boxes, card debt, payments under way) with where to fix each, and what closing will cancel (scheduled Pix and boletos, Pix Automático, empty boxes); closing asks for the password again.
+- Cards are cancelled and Pix keys removed by the `account.closed` event; the customer is notified; the app treats a closed account as history and offers to open a new one.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

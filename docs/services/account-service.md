@@ -58,7 +58,7 @@ If step 3 fails, retrying with the same key completes it. An orphan ledger accou
 | `account.opened` | — (asks user-service synchronously when opening) |
 | `account.blocked` | |
 | `account.unblocked` | |
-| `account.closed` | |
+| `account.closed` | pix-service removes the keys, card-service cancels the cards, notification-service tells the customer |
 | `account.limits.changed` | |
 
 ## Dependencies

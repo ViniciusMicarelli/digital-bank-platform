@@ -1,4 +1,4 @@
-import type { Money } from './money'
+import { formatBRL, type Money } from './money'
 
 export interface Account {
   id: string
@@ -412,4 +412,30 @@ export function lastSeen(iso: string, now = Date.now()): string {
   if (h < 24) return h === 1 ? 'há 1 hora' : `há ${h} horas`
   const d = Math.round(h / 24)
   return d === 1 ? 'há 1 dia' : `há ${d} dias`
+}
+
+export type ClosureBlockerCode = 'BALANCE' | 'SAVINGS' | 'CREDIT_DEBT' | 'PAYMENTS_IN_PROGRESS'
+
+/** What stands between an account and its closing. */
+export interface ClosureCheck {
+  account_id: string
+  status: 'ACTIVE' | 'BLOCKED' | 'CLOSED'
+  can_close: boolean
+  blockers: { code: ClosureBlockerCode; amount?: Money; count?: number }[]
+  /** Cancelled when the account is closed. */
+  will_cancel: { pix_schedules: number; boleto_schedules: number; pix_automatico: number; empty_savings_boxes: number }
+}
+
+/** What to do about a blocker, in pt-BR, and where (an app route). */
+export function closureBlockerText(b: ClosureCheck['blockers'][number]): { title: string; action: string; route: string } {
+  switch (b.code) {
+    case 'BALANCE':
+      return { title: `Ainda há ${b.amount ? formatBRL(b.amount) : 'saldo'} na conta`, action: 'Transfira tudo por Pix para outra conta sua.', route: '/pix?aba=enviar' }
+    case 'SAVINGS':
+      return { title: `${b.count === 1 ? '1 caixinha tem' : `${b.count} caixinhas têm`} ${b.amount ? formatBRL(b.amount) : 'dinheiro'}`, action: 'Resgate ou encerre as caixinhas.', route: '/caixinhas' }
+    case 'CREDIT_DEBT':
+      return { title: `Há ${b.amount ? formatBRL(b.amount) : 'valores'} a pagar no cartão de crédito`, action: 'Pague a fatura e as parcelas que faltam.', route: '/credito' }
+    case 'PAYMENTS_IN_PROGRESS':
+      return { title: 'Há pagamentos em andamento', action: 'Espere eles terminarem (alguns minutos).', route: '/boletos' }
+  }
 }

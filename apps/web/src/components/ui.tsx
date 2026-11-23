@@ -177,6 +177,7 @@ export function Loading({ rows = 3 }: { rows?: number }) {
 
 export function Modal({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null)
+  const titleId = useId()
   useEffect(() => {
     const d = ref.current
     if (!d) return
@@ -187,12 +188,12 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
     if (!open && d.open) d.close()
   }, [open])
   return (
-    <dialog ref={ref} onClose={onClose}
+    <dialog ref={ref} onClose={onClose} aria-labelledby={titleId}
       className="glass-strong mx-auto mt-auto mb-0 w-full max-w-none rounded-t-[32px] rounded-b-none p-0 text-fg backdrop:bg-black/50 sm:m-auto sm:w-[min(30rem,calc(100%-2rem))] sm:rounded-[32px]">
       <div className="p-6 pb-8">
         <span aria-hidden className="mx-auto -mt-2 mb-4 block h-[5px] w-10 rounded-full bg-fg/20 sm:hidden" />
         <div className="mb-5 flex items-start justify-between gap-4">
-          <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+          <h2 id={titleId} className="text-lg font-semibold tracking-tight">{title}</h2>
           <IconButton icon={X} label="Fechar" onClick={onClose} className="-mt-2 -mr-2" />
         </div>
         {open && children}

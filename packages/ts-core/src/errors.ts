@@ -53,6 +53,7 @@ const messages: Record<string, string> = {
   FOUR_EYES_REQUIRED: 'Acima de R$ 10.000,00 um segundo analista precisa confirmar.',
   SAME_ANALYST: 'Outro analista precisa decidir (quatro olhos).',
   APPROVAL_ALREADY_PENDING: 'Este pedido já está esperando um segundo analista.',
+  CLOSURE_BLOCKED: 'Ainda há pendências antes de encerrar a conta.',
   NO_SCHEDULE: 'Esta caixinha não tem depósito programado.',
   NOTHING_TO_YIELD: 'Guarde algum valor na caixinha primeiro.',
   RECEIPT_NOT_FOUND: 'Este código não corresponde a um comprovante do Digital Bank.',
