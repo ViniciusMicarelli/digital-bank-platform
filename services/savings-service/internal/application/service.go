@@ -485,3 +485,39 @@ func (s *Service) RunSchedule(ctx context.Context, id uuid.UUID) (domain.Movemen
 	v, err := s.Box(ctx, id)
 	return m, v, err
 }
+
+// BoxYear is one box in the year's tax report: its balance at the end of
+// the previous year and of this one (Brasília), and the yield paid in it.
+type BoxYear struct {
+	Box               domain.Box
+	Start, End, Yield int64
+}
+
+// YearReport lists the account's boxes that existed during the year (closed
+// ones included) for the annual tax report ("informe de rendimentos").
+func (s *Service) YearReport(ctx context.Context, account uuid.UUID, year int) ([]BoxYear, error) {
+	from := time.Date(year, 1, 1, 0, 0, 0, 0, domain.Brasilia)
+	to := from.AddDate(1, 0, 0)
+	boxes, err := s.store.AllBoxes(ctx, account, to)
+	if err != nil {
+		return nil, err
+	}
+	out := []BoxYear{}
+	for _, b := range boxes {
+		y := BoxYear{Box: b}
+		if y.Start, err = s.ledger.BalanceAt(ctx, b.ID, from); err != nil {
+			return nil, err
+		}
+		if y.End, err = s.ledger.BalanceAt(ctx, b.ID, to); err != nil {
+			return nil, err
+		}
+		if y.Yield, err = s.store.Yielded(ctx, b.ID, from, to); err != nil {
+			return nil, err
+		}
+		if y.Start == 0 && y.End == 0 && y.Yield == 0 {
+			continue // nothing to declare (e.g. opened and closed empty)
+		}
+		out = append(out, y)
+	}
+	return out, nil
+}

@@ -30,6 +30,10 @@ service SavingsService {
   // Sandbox: makes the next monthly deposit now.
   rpc RunSchedule(RunScheduleRequest) returns (RunScheduleResponse);
 
+  // The account's boxes in a year, for the annual tax report: balances on
+  // 31/12 of the year before and of the year, and the yield paid in it.
+  rpc GetYearReport(GetYearReportRequest) returns (GetYearReportResponse);
+
   // Sandbox: pays the yield of `days` days at once, on today's balance.
   rpc SimulateYield(SimulateYieldRequest) returns (SimulateYieldResponse);
 }
@@ -182,4 +186,25 @@ message RunScheduleRequest {
 message RunScheduleResponse {
   Movement movement = 1;
   Box box = 2;
+}
+
+message GetYearReportRequest {
+  string account_id = 1;
+  int32 year = 2;
+}
+
+message BoxYear {
+  string box_id = 1;
+  string name = 2;
+  // ACTIVE, CLOSED (now).
+  string status = 3;
+  // Balance at the end of the previous year and of this one (Brasília).
+  bank.common.v1.Money balance_start = 4;
+  bank.common.v1.Money balance_end = 5;
+  bank.common.v1.Money yielded = 6;
+}
+
+message GetYearReportResponse {
+  int32 year = 1;
+  repeated BoxYear boxes = 2;
 }

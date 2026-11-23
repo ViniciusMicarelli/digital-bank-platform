@@ -281,3 +281,34 @@ func TestMonthlyDeposit(t *testing.T) {
 		t.Fatalf("closed box keeps its schedule: %+v", closed.Schedule)
 	}
 }
+
+func TestYearReport(t *testing.T) {
+	e := setup(t) // Nov 18, 2026, R$ 1.000 in checking
+	b, _ := e.svc.Create(e.ctx, "k1", e.account, "Reserva", 0)
+	_, _, _ = e.svc.Deposit(e.ctx, "d1", b.ID, 600_00)
+	empty, _ := e.svc.Create(e.ctx, "k2", e.account, "Vazia", 0)
+	_, _ = e.svc.Close(e.ctx, "c2", empty.ID)
+
+	// The yield is paid every day into January, then more money in 2027.
+	for e.now.Before(time.Date(2027, 1, 10, 15, 0, 0, 0, time.UTC)) {
+		e.now = e.now.Add(24 * time.Hour)
+		e.svc.AccrueOnce(e.ctx)
+	}
+	_, _, _ = e.svc.Deposit(e.ctx, "d2", b.ID, 100_00)
+
+	r, err := e.svc.YearReport(e.ctx, e.account, 2026)
+	if err != nil || len(r) != 1 || r[0].Box.ID != b.ID {
+		t.Fatalf("2026 = %+v %v", r, err)
+	}
+	y := r[0]
+	if y.Start != 0 || y.Yield <= 0 || y.End != 600_00+y.Yield {
+		t.Fatalf("2026 box = start %d end %d yield %d", y.Start, y.End, y.Yield)
+	}
+	if r, _ := e.svc.YearReport(e.ctx, e.account, 2025); len(r) != 0 {
+		t.Fatalf("2025 = %+v", r)
+	}
+	r27, _ := e.svc.YearReport(e.ctx, e.account, 2027)
+	if len(r27) != 1 || r27[0].Start != y.End {
+		t.Fatalf("2027 starts where 2026 ended: %+v", r27)
+	}
+}

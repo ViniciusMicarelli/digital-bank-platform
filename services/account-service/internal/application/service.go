@@ -102,6 +102,14 @@ func (s *Service) Balance(ctx context.Context, id uuid.UUID) (ports.Balance, err
 	return s.ledger.Balance(ctx, id)
 }
 
+// BalanceAt is the account's posted balance at an instant.
+func (s *Service) BalanceAt(ctx context.Context, id uuid.UUID, at time.Time) (int64, error) {
+	if _, err := s.store.Account(ctx, id); err != nil {
+		return 0, err
+	}
+	return s.ledger.BalanceAt(ctx, id, at)
+}
+
 func (s *Service) Block(ctx context.Context, id uuid.UUID, reason string) (domain.Account, error) {
 	return s.transition(ctx, id, "account.blocked", func(a *domain.Account) error { return a.Block(reason) })
 }

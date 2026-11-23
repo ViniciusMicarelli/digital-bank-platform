@@ -320,7 +320,10 @@ export function StatementPage() {
     <div>
       <div data-reveal className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-[34px] font-bold tracking-[-0.02em] text-fg">Extrato</h1>
-        {account && <ExportCSV accountId={account.id} />}
+        <div className="flex flex-wrap items-end gap-2">
+          {account && <ExportCSV accountId={account.id} />}
+          <Link to="/informe" className="rounded-full px-3 py-2.5 text-sm font-medium text-brand-strong hover:bg-surface-2">Informe de rendimentos</Link>
+        </div>
       </div>
       <Panel>
         {feed.isLoading ? <Loading rows={6} /> : items.length === 0 ? <Empty icon={ArrowLeftRight}>Nenhuma movimentação ainda.</Empty> : (

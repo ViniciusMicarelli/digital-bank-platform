@@ -4,8 +4,10 @@ package ledger
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	commonv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/common/v1"
 	ledgerv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/ledger/v1"
@@ -41,4 +43,12 @@ func (l *Client) Balance(ctx context.Context, id uuid.UUID) (ports.Balance, erro
 		*dst = m
 	}
 	return out, nil
+}
+
+func (l *Client) BalanceAt(ctx context.Context, id uuid.UUID, at time.Time) (int64, error) {
+	resp, err := l.c.GetBalanceAt(ctx, &ledgerv1.GetBalanceAtRequest{AccountId: id.String(), At: timestamppb.New(at)})
+	if err != nil {
+		return 0, err
+	}
+	return resp.GetPosted().GetMinorUnits(), nil
 }

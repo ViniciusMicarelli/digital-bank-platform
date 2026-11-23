@@ -1425,6 +1425,196 @@ func (x *RunScheduleResponse) GetBox() *Box {
 	return nil
 }
 
+type GetYearReportRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Year          int32                  `protobuf:"varint,2,opt,name=year,proto3" json:"year,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetYearReportRequest) Reset() {
+	*x = GetYearReportRequest{}
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetYearReportRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetYearReportRequest) ProtoMessage() {}
+
+func (x *GetYearReportRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetYearReportRequest.ProtoReflect.Descriptor instead.
+func (*GetYearReportRequest) Descriptor() ([]byte, []int) {
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *GetYearReportRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GetYearReportRequest) GetYear() int32 {
+	if x != nil {
+		return x.Year
+	}
+	return 0
+}
+
+type BoxYear struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	BoxId string                 `protobuf:"bytes,1,opt,name=box_id,json=boxId,proto3" json:"box_id,omitempty"`
+	Name  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	// ACTIVE, CLOSED (now).
+	Status string `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	// Balance at the end of the previous year and of this one (Brasília).
+	BalanceStart  *v1.Money `protobuf:"bytes,4,opt,name=balance_start,json=balanceStart,proto3" json:"balance_start,omitempty"`
+	BalanceEnd    *v1.Money `protobuf:"bytes,5,opt,name=balance_end,json=balanceEnd,proto3" json:"balance_end,omitempty"`
+	Yielded       *v1.Money `protobuf:"bytes,6,opt,name=yielded,proto3" json:"yielded,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BoxYear) Reset() {
+	*x = BoxYear{}
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BoxYear) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BoxYear) ProtoMessage() {}
+
+func (x *BoxYear) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BoxYear.ProtoReflect.Descriptor instead.
+func (*BoxYear) Descriptor() ([]byte, []int) {
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *BoxYear) GetBoxId() string {
+	if x != nil {
+		return x.BoxId
+	}
+	return ""
+}
+
+func (x *BoxYear) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *BoxYear) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *BoxYear) GetBalanceStart() *v1.Money {
+	if x != nil {
+		return x.BalanceStart
+	}
+	return nil
+}
+
+func (x *BoxYear) GetBalanceEnd() *v1.Money {
+	if x != nil {
+		return x.BalanceEnd
+	}
+	return nil
+}
+
+func (x *BoxYear) GetYielded() *v1.Money {
+	if x != nil {
+		return x.Yielded
+	}
+	return nil
+}
+
+type GetYearReportResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Year          int32                  `protobuf:"varint,1,opt,name=year,proto3" json:"year,omitempty"`
+	Boxes         []*BoxYear             `protobuf:"bytes,2,rep,name=boxes,proto3" json:"boxes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetYearReportResponse) Reset() {
+	*x = GetYearReportResponse{}
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetYearReportResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetYearReportResponse) ProtoMessage() {}
+
+func (x *GetYearReportResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_bank_savings_v1_savings_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetYearReportResponse.ProtoReflect.Descriptor instead.
+func (*GetYearReportResponse) Descriptor() ([]byte, []int) {
+	return file_bank_savings_v1_savings_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *GetYearReportResponse) GetYear() int32 {
+	if x != nil {
+		return x.Year
+	}
+	return 0
+}
+
+func (x *GetYearReportResponse) GetBoxes() []*BoxYear {
+	if x != nil {
+		return x.Boxes
+	}
+	return nil
+}
+
 var File_bank_savings_v1_savings_proto protoreflect.FileDescriptor
 
 const file_bank_savings_v1_savings_proto_rawDesc = "" +
@@ -1521,7 +1711,22 @@ const file_bank_savings_v1_savings_proto_rawDesc = "" +
 	"\x06box_id\x18\x01 \x01(\tR\x05boxId\"t\n" +
 	"\x13RunScheduleResponse\x125\n" +
 	"\bmovement\x18\x01 \x01(\v2\x19.bank.savings.v1.MovementR\bmovement\x12&\n" +
-	"\x03box\x18\x02 \x01(\v2\x14.bank.savings.v1.BoxR\x03box2\xbb\a\n" +
+	"\x03box\x18\x02 \x01(\v2\x14.bank.savings.v1.BoxR\x03box\"I\n" +
+	"\x14GetYearReportRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x12\n" +
+	"\x04year\x18\x02 \x01(\x05R\x04year\"\xf1\x01\n" +
+	"\aBoxYear\x12\x15\n" +
+	"\x06box_id\x18\x01 \x01(\tR\x05boxId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12:\n" +
+	"\rbalance_start\x18\x04 \x01(\v2\x15.bank.common.v1.MoneyR\fbalanceStart\x126\n" +
+	"\vbalance_end\x18\x05 \x01(\v2\x15.bank.common.v1.MoneyR\n" +
+	"balanceEnd\x12/\n" +
+	"\ayielded\x18\x06 \x01(\v2\x15.bank.common.v1.MoneyR\ayielded\"[\n" +
+	"\x15GetYearReportResponse\x12\x12\n" +
+	"\x04year\x18\x01 \x01(\x05R\x04year\x12.\n" +
+	"\x05boxes\x18\x02 \x03(\v2\x18.bank.savings.v1.BoxYearR\x05boxes2\x9b\b\n" +
 	"\x0eSavingsService\x12R\n" +
 	"\tCreateBox\x12!.bank.savings.v1.CreateBoxRequest\x1a\".bank.savings.v1.CreateBoxResponse\x12I\n" +
 	"\x06GetBox\x12\x1e.bank.savings.v1.GetBoxRequest\x1a\x1f.bank.savings.v1.GetBoxResponse\x12R\n" +
@@ -1533,6 +1738,7 @@ const file_bank_savings_v1_savings_proto_rawDesc = "" +
 	"\rListMovements\x12%.bank.savings.v1.ListMovementsRequest\x1a&.bank.savings.v1.ListMovementsResponse\x12X\n" +
 	"\vSetSchedule\x12#.bank.savings.v1.SetScheduleRequest\x1a$.bank.savings.v1.SetScheduleResponse\x12X\n" +
 	"\vRunSchedule\x12#.bank.savings.v1.RunScheduleRequest\x1a$.bank.savings.v1.RunScheduleResponse\x12^\n" +
+	"\rGetYearReport\x12%.bank.savings.v1.GetYearReportRequest\x1a&.bank.savings.v1.GetYearReportResponse\x12^\n" +
 	"\rSimulateYield\x12%.bank.savings.v1.SimulateYieldRequest\x1a&.bank.savings.v1.SimulateYieldResponseB\xe0\x01\n" +
 	"\x13com.bank.savings.v1B\fSavingsProtoP\x01Z]github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/savings/v1;savingsv1\xa2\x02\x03BSX\xaa\x02\x0fBank.Savings.V1\xca\x02\x0fBank\\Savings\\V1\xe2\x02\x1bBank\\Savings\\V1\\GPBMetadata\xea\x02\x11Bank::Savings::V1b\x06proto3"
 
@@ -1548,7 +1754,7 @@ func file_bank_savings_v1_savings_proto_rawDescGZIP() []byte {
 	return file_bank_savings_v1_savings_proto_rawDescData
 }
 
-var file_bank_savings_v1_savings_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_bank_savings_v1_savings_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_bank_savings_v1_savings_proto_goTypes = []any{
 	(*Box)(nil),                   // 0: bank.savings.v1.Box
 	(*Schedule)(nil),              // 1: bank.savings.v1.Schedule
@@ -1575,65 +1781,74 @@ var file_bank_savings_v1_savings_proto_goTypes = []any{
 	(*SetScheduleResponse)(nil),   // 22: bank.savings.v1.SetScheduleResponse
 	(*RunScheduleRequest)(nil),    // 23: bank.savings.v1.RunScheduleRequest
 	(*RunScheduleResponse)(nil),   // 24: bank.savings.v1.RunScheduleResponse
-	(*v1.Money)(nil),              // 25: bank.common.v1.Money
-	(*timestamppb.Timestamp)(nil), // 26: google.protobuf.Timestamp
+	(*GetYearReportRequest)(nil),  // 25: bank.savings.v1.GetYearReportRequest
+	(*BoxYear)(nil),               // 26: bank.savings.v1.BoxYear
+	(*GetYearReportResponse)(nil), // 27: bank.savings.v1.GetYearReportResponse
+	(*v1.Money)(nil),              // 28: bank.common.v1.Money
+	(*timestamppb.Timestamp)(nil), // 29: google.protobuf.Timestamp
 }
 var file_bank_savings_v1_savings_proto_depIdxs = []int32{
-	25, // 0: bank.savings.v1.Box.goal:type_name -> bank.common.v1.Money
-	25, // 1: bank.savings.v1.Box.balance:type_name -> bank.common.v1.Money
-	25, // 2: bank.savings.v1.Box.yielded:type_name -> bank.common.v1.Money
-	26, // 3: bank.savings.v1.Box.created_at:type_name -> google.protobuf.Timestamp
+	28, // 0: bank.savings.v1.Box.goal:type_name -> bank.common.v1.Money
+	28, // 1: bank.savings.v1.Box.balance:type_name -> bank.common.v1.Money
+	28, // 2: bank.savings.v1.Box.yielded:type_name -> bank.common.v1.Money
+	29, // 3: bank.savings.v1.Box.created_at:type_name -> google.protobuf.Timestamp
 	1,  // 4: bank.savings.v1.Box.schedule:type_name -> bank.savings.v1.Schedule
-	25, // 5: bank.savings.v1.Schedule.amount:type_name -> bank.common.v1.Money
-	25, // 6: bank.savings.v1.Movement.amount:type_name -> bank.common.v1.Money
-	26, // 7: bank.savings.v1.Movement.created_at:type_name -> google.protobuf.Timestamp
-	25, // 8: bank.savings.v1.CreateBoxRequest.goal:type_name -> bank.common.v1.Money
+	28, // 5: bank.savings.v1.Schedule.amount:type_name -> bank.common.v1.Money
+	28, // 6: bank.savings.v1.Movement.amount:type_name -> bank.common.v1.Money
+	29, // 7: bank.savings.v1.Movement.created_at:type_name -> google.protobuf.Timestamp
+	28, // 8: bank.savings.v1.CreateBoxRequest.goal:type_name -> bank.common.v1.Money
 	0,  // 9: bank.savings.v1.CreateBoxResponse.box:type_name -> bank.savings.v1.Box
 	0,  // 10: bank.savings.v1.GetBoxResponse.box:type_name -> bank.savings.v1.Box
 	0,  // 11: bank.savings.v1.ListBoxesResponse.boxes:type_name -> bank.savings.v1.Box
-	25, // 12: bank.savings.v1.UpdateBoxRequest.goal:type_name -> bank.common.v1.Money
+	28, // 12: bank.savings.v1.UpdateBoxRequest.goal:type_name -> bank.common.v1.Money
 	0,  // 13: bank.savings.v1.UpdateBoxResponse.box:type_name -> bank.savings.v1.Box
 	0,  // 14: bank.savings.v1.CloseBoxResponse.box:type_name -> bank.savings.v1.Box
-	25, // 15: bank.savings.v1.DepositRequest.amount:type_name -> bank.common.v1.Money
+	28, // 15: bank.savings.v1.DepositRequest.amount:type_name -> bank.common.v1.Money
 	2,  // 16: bank.savings.v1.DepositResponse.movement:type_name -> bank.savings.v1.Movement
 	0,  // 17: bank.savings.v1.DepositResponse.box:type_name -> bank.savings.v1.Box
-	25, // 18: bank.savings.v1.WithdrawRequest.amount:type_name -> bank.common.v1.Money
+	28, // 18: bank.savings.v1.WithdrawRequest.amount:type_name -> bank.common.v1.Money
 	2,  // 19: bank.savings.v1.WithdrawResponse.movement:type_name -> bank.savings.v1.Movement
 	0,  // 20: bank.savings.v1.WithdrawResponse.box:type_name -> bank.savings.v1.Box
 	2,  // 21: bank.savings.v1.ListMovementsResponse.movements:type_name -> bank.savings.v1.Movement
 	2,  // 22: bank.savings.v1.SimulateYieldResponse.movement:type_name -> bank.savings.v1.Movement
 	0,  // 23: bank.savings.v1.SimulateYieldResponse.box:type_name -> bank.savings.v1.Box
-	25, // 24: bank.savings.v1.SetScheduleRequest.amount:type_name -> bank.common.v1.Money
+	28, // 24: bank.savings.v1.SetScheduleRequest.amount:type_name -> bank.common.v1.Money
 	0,  // 25: bank.savings.v1.SetScheduleResponse.box:type_name -> bank.savings.v1.Box
 	2,  // 26: bank.savings.v1.RunScheduleResponse.movement:type_name -> bank.savings.v1.Movement
 	0,  // 27: bank.savings.v1.RunScheduleResponse.box:type_name -> bank.savings.v1.Box
-	3,  // 28: bank.savings.v1.SavingsService.CreateBox:input_type -> bank.savings.v1.CreateBoxRequest
-	5,  // 29: bank.savings.v1.SavingsService.GetBox:input_type -> bank.savings.v1.GetBoxRequest
-	7,  // 30: bank.savings.v1.SavingsService.ListBoxes:input_type -> bank.savings.v1.ListBoxesRequest
-	9,  // 31: bank.savings.v1.SavingsService.UpdateBox:input_type -> bank.savings.v1.UpdateBoxRequest
-	11, // 32: bank.savings.v1.SavingsService.CloseBox:input_type -> bank.savings.v1.CloseBoxRequest
-	13, // 33: bank.savings.v1.SavingsService.Deposit:input_type -> bank.savings.v1.DepositRequest
-	15, // 34: bank.savings.v1.SavingsService.Withdraw:input_type -> bank.savings.v1.WithdrawRequest
-	17, // 35: bank.savings.v1.SavingsService.ListMovements:input_type -> bank.savings.v1.ListMovementsRequest
-	21, // 36: bank.savings.v1.SavingsService.SetSchedule:input_type -> bank.savings.v1.SetScheduleRequest
-	23, // 37: bank.savings.v1.SavingsService.RunSchedule:input_type -> bank.savings.v1.RunScheduleRequest
-	19, // 38: bank.savings.v1.SavingsService.SimulateYield:input_type -> bank.savings.v1.SimulateYieldRequest
-	4,  // 39: bank.savings.v1.SavingsService.CreateBox:output_type -> bank.savings.v1.CreateBoxResponse
-	6,  // 40: bank.savings.v1.SavingsService.GetBox:output_type -> bank.savings.v1.GetBoxResponse
-	8,  // 41: bank.savings.v1.SavingsService.ListBoxes:output_type -> bank.savings.v1.ListBoxesResponse
-	10, // 42: bank.savings.v1.SavingsService.UpdateBox:output_type -> bank.savings.v1.UpdateBoxResponse
-	12, // 43: bank.savings.v1.SavingsService.CloseBox:output_type -> bank.savings.v1.CloseBoxResponse
-	14, // 44: bank.savings.v1.SavingsService.Deposit:output_type -> bank.savings.v1.DepositResponse
-	16, // 45: bank.savings.v1.SavingsService.Withdraw:output_type -> bank.savings.v1.WithdrawResponse
-	18, // 46: bank.savings.v1.SavingsService.ListMovements:output_type -> bank.savings.v1.ListMovementsResponse
-	22, // 47: bank.savings.v1.SavingsService.SetSchedule:output_type -> bank.savings.v1.SetScheduleResponse
-	24, // 48: bank.savings.v1.SavingsService.RunSchedule:output_type -> bank.savings.v1.RunScheduleResponse
-	20, // 49: bank.savings.v1.SavingsService.SimulateYield:output_type -> bank.savings.v1.SimulateYieldResponse
-	39, // [39:50] is the sub-list for method output_type
-	28, // [28:39] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	28, // 28: bank.savings.v1.BoxYear.balance_start:type_name -> bank.common.v1.Money
+	28, // 29: bank.savings.v1.BoxYear.balance_end:type_name -> bank.common.v1.Money
+	28, // 30: bank.savings.v1.BoxYear.yielded:type_name -> bank.common.v1.Money
+	26, // 31: bank.savings.v1.GetYearReportResponse.boxes:type_name -> bank.savings.v1.BoxYear
+	3,  // 32: bank.savings.v1.SavingsService.CreateBox:input_type -> bank.savings.v1.CreateBoxRequest
+	5,  // 33: bank.savings.v1.SavingsService.GetBox:input_type -> bank.savings.v1.GetBoxRequest
+	7,  // 34: bank.savings.v1.SavingsService.ListBoxes:input_type -> bank.savings.v1.ListBoxesRequest
+	9,  // 35: bank.savings.v1.SavingsService.UpdateBox:input_type -> bank.savings.v1.UpdateBoxRequest
+	11, // 36: bank.savings.v1.SavingsService.CloseBox:input_type -> bank.savings.v1.CloseBoxRequest
+	13, // 37: bank.savings.v1.SavingsService.Deposit:input_type -> bank.savings.v1.DepositRequest
+	15, // 38: bank.savings.v1.SavingsService.Withdraw:input_type -> bank.savings.v1.WithdrawRequest
+	17, // 39: bank.savings.v1.SavingsService.ListMovements:input_type -> bank.savings.v1.ListMovementsRequest
+	21, // 40: bank.savings.v1.SavingsService.SetSchedule:input_type -> bank.savings.v1.SetScheduleRequest
+	23, // 41: bank.savings.v1.SavingsService.RunSchedule:input_type -> bank.savings.v1.RunScheduleRequest
+	25, // 42: bank.savings.v1.SavingsService.GetYearReport:input_type -> bank.savings.v1.GetYearReportRequest
+	19, // 43: bank.savings.v1.SavingsService.SimulateYield:input_type -> bank.savings.v1.SimulateYieldRequest
+	4,  // 44: bank.savings.v1.SavingsService.CreateBox:output_type -> bank.savings.v1.CreateBoxResponse
+	6,  // 45: bank.savings.v1.SavingsService.GetBox:output_type -> bank.savings.v1.GetBoxResponse
+	8,  // 46: bank.savings.v1.SavingsService.ListBoxes:output_type -> bank.savings.v1.ListBoxesResponse
+	10, // 47: bank.savings.v1.SavingsService.UpdateBox:output_type -> bank.savings.v1.UpdateBoxResponse
+	12, // 48: bank.savings.v1.SavingsService.CloseBox:output_type -> bank.savings.v1.CloseBoxResponse
+	14, // 49: bank.savings.v1.SavingsService.Deposit:output_type -> bank.savings.v1.DepositResponse
+	16, // 50: bank.savings.v1.SavingsService.Withdraw:output_type -> bank.savings.v1.WithdrawResponse
+	18, // 51: bank.savings.v1.SavingsService.ListMovements:output_type -> bank.savings.v1.ListMovementsResponse
+	22, // 52: bank.savings.v1.SavingsService.SetSchedule:output_type -> bank.savings.v1.SetScheduleResponse
+	24, // 53: bank.savings.v1.SavingsService.RunSchedule:output_type -> bank.savings.v1.RunScheduleResponse
+	27, // 54: bank.savings.v1.SavingsService.GetYearReport:output_type -> bank.savings.v1.GetYearReportResponse
+	20, // 55: bank.savings.v1.SavingsService.SimulateYield:output_type -> bank.savings.v1.SimulateYieldResponse
+	44, // [44:56] is the sub-list for method output_type
+	32, // [32:44] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_bank_savings_v1_savings_proto_init() }
@@ -1647,7 +1862,7 @@ func file_bank_savings_v1_savings_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_bank_savings_v1_savings_proto_rawDesc), len(file_bank_savings_v1_savings_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

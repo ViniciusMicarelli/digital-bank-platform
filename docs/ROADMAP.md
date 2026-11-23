@@ -269,6 +269,10 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - An analyst can ask to credit a customer account (goodwill, a correction) with a reason the customer sees; the money moves only when a different analyst approves, from a new `manual-adjustments` ledger account, once.
 - transaction-service now accepts the types that pay out of the bank's own accounts (savings yield, manual credit) only from the service each belongs to.
 
+## Phase 41 — Annual income report ✅
+
+- The "informe de rendimentos" for the income tax return: checking and savings box balances on 31/12 of the year and the year before, and what each box yielded, for any account (closed ones too) and year; printable (or saved as PDF) on the web, shareable on mobile.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.

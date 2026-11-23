@@ -78,6 +78,21 @@ func (s *Server) GetBalance(ctx context.Context, req *accountv1.GetBalanceReques
 	return &accountv1.GetBalanceResponse{Posted: moneyPB(b.Posted), Pending: moneyPB(b.Pending), Available: moneyPB(b.Available)}, nil
 }
 
+func (s *Server) GetBalanceAt(ctx context.Context, req *accountv1.GetBalanceAtRequest) (*accountv1.GetBalanceAtResponse, error) {
+	id, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	if req.GetAt() == nil {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_ARGUMENT", "at is required")
+	}
+	posted, err := s.app.BalanceAt(ctx, id, req.GetAt().AsTime())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &accountv1.GetBalanceAtResponse{Posted: &commonv1.Money{MinorUnits: posted, Currency: "BRL"}}, nil
+}
+
 func (s *Server) BlockAccount(ctx context.Context, req *accountv1.BlockAccountRequest) (*accountv1.BlockAccountResponse, error) {
 	id, err := parseID(req.GetId())
 	if err != nil {

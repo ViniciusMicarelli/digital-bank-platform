@@ -188,3 +188,15 @@ func (u *unit) SaveMovement(m domain.Movement) error {
 		m.ID, m.Status, m.FailureReason)
 	return err
 }
+
+func (s *Store) AllBoxes(ctx context.Context, account uuid.UUID, until time.Time) ([]domain.Box, error) {
+	rows, err := s.pool.Query(ctx, `SELECT `+boxCols+` FROM boxes WHERE account_id = $1 AND created_at < $2 ORDER BY created_at`, account, until)
+	return collect(rows, err, scanBox)
+}
+
+func (s *Store) Yielded(ctx context.Context, box uuid.UUID, from, to time.Time) (int64, error) {
+	var n int64
+	err := s.pool.QueryRow(ctx, `SELECT COALESCE(sum(amount), 0) FROM movements
+		WHERE box_id = $1 AND kind = 'YIELD' AND status = 'COMPLETED' AND created_at >= $2 AND created_at < $3`, box, from, to).Scan(&n)
+	return n, err
+}

@@ -52,6 +52,7 @@
 | `GET` | `/v1/accounts` | My accounts |
 | `GET` | `/v1/accounts/{id}` | Account details |
 | `GET` | `/v1/accounts/{id}/balance` | `available`, `posted`, `pending` |
+| `GET` | `/v1/accounts/{id}/tax-report` | Annual income report (`?year=YYYY`, last year by default; closed accounts too): holder (CPF masked), checking and each savings box's balance on 31/12 of the year before and of the year, yields in the year; `complete` is false while the year runs |
 | `GET` | `/v1/accounts/{id}/closure` | Can the account be closed now: `{can_close, blockers [{code: BALANCE \| SAVINGS \| CREDIT_DEBT \| PAYMENTS_IN_PROGRESS, amount?, count?}], will_cancel {pix_schedules, boleto_schedules, pix_automatico, empty_savings_boxes}}` |
 | `POST` | `/v1/accounts/{id}/close` | 🔐 Close the account at the holder's request `{reason?}`: 409 `CLOSURE_BLOCKED` (with the check) while something blocks it; otherwise scheduled Pix and boletos, Pix Automático authorizations and empty boxes are cancelled, the account is closed, and `account.closed` cancels cards and removes Pix keys. The statement and receipts stay readable |
 | `GET` / `PUT` | `/v1/accounts/{id}/limits` | Limits and today's usage / change limits |

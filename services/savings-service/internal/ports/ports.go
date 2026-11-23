@@ -20,6 +20,10 @@ type Store interface {
 	PendingMovements(ctx context.Context, before time.Time, limit int) ([]domain.Movement, error)
 	// BoxesToAccrue lists active boxes whose yield was last paid before day.
 	BoxesToAccrue(ctx context.Context, day time.Time, limit int) ([]uuid.UUID, error)
+	// AllBoxes lists the account's boxes in any status created before until.
+	AllBoxes(ctx context.Context, account uuid.UUID, until time.Time) ([]domain.Box, error)
+	// Yielded is the yield paid into a box in [from, to).
+	Yielded(ctx context.Context, box uuid.UUID, from, to time.Time) (int64, error)
 	// BoxesScheduled lists active boxes with a monthly deposit due by day.
 	BoxesScheduled(ctx context.Context, day time.Time, limit int) ([]uuid.UUID, error)
 }

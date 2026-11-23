@@ -15,6 +15,7 @@ Savings boxes (*caixinhas*): money a customer sets apart from the checking accou
 | Exactly once: each day's yield has a deterministic key (`yield:<day>`); a crash or outage between paying and recording replays the same movement; the loop catches up on missed days | ✅ |
 | Movements left `PENDING` by an outage are settled by the recovery loop | ✅ |
 | Monthly scheduled deposit (*depósito programado*): an amount on a day 1–28, first run the next such day (setting it never moves money); runs once per month with a deterministic key (`schedule:<day>`), an outage keeps it due, a refusal for lack of funds skips the month and is kept on the box (`last_failure`); months missed while the service was down are not caught up | ✅ |
+| Year report for the income tax statement (`GetYearReport`): each box that existed in the year, closed ones included, with its balance on 31/12 of the year before and of the year (ledger balance at the instant) and the yield paid in the year | ✅ |
 | Sandbox: pay N days of yield at once on today's balance; make the next monthly deposit now | ✅ |
 | Business-day CDI with the daily published rate, income tax (IOF / IR regressivo) | planned |
 

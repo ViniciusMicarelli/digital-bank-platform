@@ -29,6 +29,7 @@ const (
 	SavingsService_ListMovements_FullMethodName = "/bank.savings.v1.SavingsService/ListMovements"
 	SavingsService_SetSchedule_FullMethodName   = "/bank.savings.v1.SavingsService/SetSchedule"
 	SavingsService_RunSchedule_FullMethodName   = "/bank.savings.v1.SavingsService/RunSchedule"
+	SavingsService_GetYearReport_FullMethodName = "/bank.savings.v1.SavingsService/GetYearReport"
 	SavingsService_SimulateYield_FullMethodName = "/bank.savings.v1.SavingsService/SimulateYield"
 )
 
@@ -58,6 +59,9 @@ type SavingsServiceClient interface {
 	SetSchedule(ctx context.Context, in *SetScheduleRequest, opts ...grpc.CallOption) (*SetScheduleResponse, error)
 	// Sandbox: makes the next monthly deposit now.
 	RunSchedule(ctx context.Context, in *RunScheduleRequest, opts ...grpc.CallOption) (*RunScheduleResponse, error)
+	// The account's boxes in a year, for the annual tax report: balances on
+	// 31/12 of the year before and of the year, and the yield paid in it.
+	GetYearReport(ctx context.Context, in *GetYearReportRequest, opts ...grpc.CallOption) (*GetYearReportResponse, error)
 	// Sandbox: pays the yield of `days` days at once, on today's balance.
 	SimulateYield(ctx context.Context, in *SimulateYieldRequest, opts ...grpc.CallOption) (*SimulateYieldResponse, error)
 }
@@ -170,6 +174,16 @@ func (c *savingsServiceClient) RunSchedule(ctx context.Context, in *RunScheduleR
 	return out, nil
 }
 
+func (c *savingsServiceClient) GetYearReport(ctx context.Context, in *GetYearReportRequest, opts ...grpc.CallOption) (*GetYearReportResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetYearReportResponse)
+	err := c.cc.Invoke(ctx, SavingsService_GetYearReport_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *savingsServiceClient) SimulateYield(ctx context.Context, in *SimulateYieldRequest, opts ...grpc.CallOption) (*SimulateYieldResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SimulateYieldResponse)
@@ -206,6 +220,9 @@ type SavingsServiceServer interface {
 	SetSchedule(context.Context, *SetScheduleRequest) (*SetScheduleResponse, error)
 	// Sandbox: makes the next monthly deposit now.
 	RunSchedule(context.Context, *RunScheduleRequest) (*RunScheduleResponse, error)
+	// The account's boxes in a year, for the annual tax report: balances on
+	// 31/12 of the year before and of the year, and the yield paid in it.
+	GetYearReport(context.Context, *GetYearReportRequest) (*GetYearReportResponse, error)
 	// Sandbox: pays the yield of `days` days at once, on today's balance.
 	SimulateYield(context.Context, *SimulateYieldRequest) (*SimulateYieldResponse, error)
 	mustEmbedUnimplementedSavingsServiceServer()
@@ -247,6 +264,9 @@ func (UnimplementedSavingsServiceServer) SetSchedule(context.Context, *SetSchedu
 }
 func (UnimplementedSavingsServiceServer) RunSchedule(context.Context, *RunScheduleRequest) (*RunScheduleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RunSchedule not implemented")
+}
+func (UnimplementedSavingsServiceServer) GetYearReport(context.Context, *GetYearReportRequest) (*GetYearReportResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetYearReport not implemented")
 }
 func (UnimplementedSavingsServiceServer) SimulateYield(context.Context, *SimulateYieldRequest) (*SimulateYieldResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SimulateYield not implemented")
@@ -452,6 +472,24 @@ func _SavingsService_RunSchedule_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SavingsService_GetYearReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetYearReportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SavingsServiceServer).GetYearReport(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SavingsService_GetYearReport_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SavingsServiceServer).GetYearReport(ctx, req.(*GetYearReportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SavingsService_SimulateYield_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SimulateYieldRequest)
 	if err := dec(in); err != nil {
@@ -516,6 +554,10 @@ var SavingsService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RunSchedule",
 			Handler:    _SavingsService_RunSchedule_Handler,
+		},
+		{
+			MethodName: "GetYearReport",
+			Handler:    _SavingsService_GetYearReport_Handler,
 		},
 		{
 			MethodName: "SimulateYield",

@@ -13,6 +13,7 @@ import { OnboardingPage } from './pages/Onboarding'
 const page = <K extends string>(load: () => Promise<Record<K, React.ComponentType>>, name: K) =>
   lazy(() => load().then((m) => ({ default: m[name] })))
 const PixPage = page(() => import('./pages/Pix'), 'PixPage')
+const TaxReportPage = page(() => import('./pages/TaxReport'), 'TaxReportPage')
 const CardsPage = page(() => import('./pages/Cards'), 'CardsPage')
 const CreditPage = page(() => import('./pages/Credit'), 'CreditPage')
 const BoletosPage = page(() => import('./pages/Boletos'), 'BoletosPage')
@@ -84,6 +85,7 @@ export default function App() {
               <Route path="/boletos" element={<BoletosPage />} />
               <Route path="/caixinhas" element={<SavingsPage />} />
               <Route path="/gastos" element={<SpendingPage />} />
+              <Route path="/informe" element={<TaxReportPage />} />
               <Route path="/notificacoes" element={<NotificationsPage />} />
               <Route path="/ajustes" element={<SettingsPage />} />
               <Route path="/mais" element={<MorePage />} />

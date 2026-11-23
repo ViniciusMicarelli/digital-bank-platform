@@ -23,6 +23,7 @@ const (
 	AccountService_GetAccount_FullMethodName     = "/bank.account.v1.AccountService/GetAccount"
 	AccountService_ListAccounts_FullMethodName   = "/bank.account.v1.AccountService/ListAccounts"
 	AccountService_GetBalance_FullMethodName     = "/bank.account.v1.AccountService/GetBalance"
+	AccountService_GetBalanceAt_FullMethodName   = "/bank.account.v1.AccountService/GetBalanceAt"
 	AccountService_BlockAccount_FullMethodName   = "/bank.account.v1.AccountService/BlockAccount"
 	AccountService_UnblockAccount_FullMethodName = "/bank.account.v1.AccountService/UnblockAccount"
 	AccountService_CloseAccount_FullMethodName   = "/bank.account.v1.AccountService/CloseAccount"
@@ -44,6 +45,8 @@ type AccountServiceClient interface {
 	GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*GetAccountResponse, error)
 	ListAccounts(ctx context.Context, in *ListAccountsRequest, opts ...grpc.CallOption) (*ListAccountsResponse, error)
 	GetBalance(ctx context.Context, in *GetBalanceRequest, opts ...grpc.CallOption) (*GetBalanceResponse, error)
+	// The posted balance at an instant (e.g. 31/12 for the tax report).
+	GetBalanceAt(ctx context.Context, in *GetBalanceAtRequest, opts ...grpc.CallOption) (*GetBalanceAtResponse, error)
 	BlockAccount(ctx context.Context, in *BlockAccountRequest, opts ...grpc.CallOption) (*BlockAccountResponse, error)
 	UnblockAccount(ctx context.Context, in *UnblockAccountRequest, opts ...grpc.CallOption) (*UnblockAccountResponse, error)
 	// Closes the account. Requires a zero ledger balance and no pending holds.
@@ -100,6 +103,16 @@ func (c *accountServiceClient) GetBalance(ctx context.Context, in *GetBalanceReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetBalanceResponse)
 	err := c.cc.Invoke(ctx, AccountService_GetBalance_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *accountServiceClient) GetBalanceAt(ctx context.Context, in *GetBalanceAtRequest, opts ...grpc.CallOption) (*GetBalanceAtResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetBalanceAtResponse)
+	err := c.cc.Invoke(ctx, AccountService_GetBalanceAt_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -188,6 +201,8 @@ type AccountServiceServer interface {
 	GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error)
 	ListAccounts(context.Context, *ListAccountsRequest) (*ListAccountsResponse, error)
 	GetBalance(context.Context, *GetBalanceRequest) (*GetBalanceResponse, error)
+	// The posted balance at an instant (e.g. 31/12 for the tax report).
+	GetBalanceAt(context.Context, *GetBalanceAtRequest) (*GetBalanceAtResponse, error)
 	BlockAccount(context.Context, *BlockAccountRequest) (*BlockAccountResponse, error)
 	UnblockAccount(context.Context, *UnblockAccountRequest) (*UnblockAccountResponse, error)
 	// Closes the account. Requires a zero ledger balance and no pending holds.
@@ -221,6 +236,9 @@ func (UnimplementedAccountServiceServer) ListAccounts(context.Context, *ListAcco
 }
 func (UnimplementedAccountServiceServer) GetBalance(context.Context, *GetBalanceRequest) (*GetBalanceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetBalance not implemented")
+}
+func (UnimplementedAccountServiceServer) GetBalanceAt(context.Context, *GetBalanceAtRequest) (*GetBalanceAtResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetBalanceAt not implemented")
 }
 func (UnimplementedAccountServiceServer) BlockAccount(context.Context, *BlockAccountRequest) (*BlockAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BlockAccount not implemented")
@@ -332,6 +350,24 @@ func _AccountService_GetBalance_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AccountServiceServer).GetBalance(ctx, req.(*GetBalanceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AccountService_GetBalanceAt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetBalanceAtRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AccountServiceServer).GetBalanceAt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AccountService_GetBalanceAt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AccountServiceServer).GetBalanceAt(ctx, req.(*GetBalanceAtRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -484,6 +520,10 @@ var AccountService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetBalance",
 			Handler:    _AccountService_GetBalance_Handler,
+		},
+		{
+			MethodName: "GetBalanceAt",
+			Handler:    _AccountService_GetBalanceAt_Handler,
 		},
 		{
 			MethodName: "BlockAccount",

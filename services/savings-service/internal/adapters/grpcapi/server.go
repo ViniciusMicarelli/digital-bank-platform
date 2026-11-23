@@ -238,3 +238,23 @@ func (s *Server) RunSchedule(ctx context.Context, req *savingsv1.RunScheduleRequ
 	}
 	return &savingsv1.RunScheduleResponse{Movement: movementPB(m), Box: s.boxPB(v)}, nil
 }
+
+func (s *Server) GetYearReport(ctx context.Context, req *savingsv1.GetYearReportRequest) (*savingsv1.GetYearReportResponse, error) {
+	account, err := parseID(req.GetAccountId())
+	if err != nil {
+		return nil, err
+	}
+	if y := req.GetYear(); y < 2000 || y > 2100 {
+		return nil, grpcserver.Error(codes.InvalidArgument, "INVALID_YEAR", "year must be between 2000 and 2100")
+	}
+	list, err := s.app.YearReport(ctx, account, int(req.GetYear()))
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	out := &savingsv1.GetYearReportResponse{Year: req.GetYear()}
+	for _, b := range list {
+		out.Boxes = append(out.Boxes, &savingsv1.BoxYear{BoxId: b.Box.ID.String(), Name: b.Box.Name, Status: string(b.Box.Status),
+			BalanceStart: brl(b.Start), BalanceEnd: brl(b.End), Yielded: brl(b.Yield)})
+	}
+	return out, nil
+}

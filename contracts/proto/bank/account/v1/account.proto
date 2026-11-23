@@ -13,6 +13,8 @@ service AccountService {
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
   rpc ListAccounts(ListAccountsRequest) returns (ListAccountsResponse);
   rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+  // The posted balance at an instant (e.g. 31/12 for the tax report).
+  rpc GetBalanceAt(GetBalanceAtRequest) returns (GetBalanceAtResponse);
 
   rpc BlockAccount(BlockAccountRequest) returns (BlockAccountResponse);
   rpc UnblockAccount(UnblockAccountRequest) returns (UnblockAccountResponse);
@@ -103,6 +105,15 @@ message GetBalanceResponse {
   bank.common.v1.Money posted = 1;
   bank.common.v1.Money pending = 2;
   bank.common.v1.Money available = 3;
+}
+
+message GetBalanceAtRequest {
+  string account_id = 1;
+  google.protobuf.Timestamp at = 2;
+}
+
+message GetBalanceAtResponse {
+  bank.common.v1.Money posted = 1;
 }
 
 message BlockAccountRequest {

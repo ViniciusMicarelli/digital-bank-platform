@@ -39,6 +39,12 @@ func (f *fakeLedger) CreateCustomerAccount(_ context.Context, id uuid.UUID, _ mo
 	return nil
 }
 
+func (f *fakeLedger) BalanceAt(_ context.Context, id uuid.UUID, _ time.Time) (int64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.balances[id], nil
+}
+
 func (f *fakeLedger) Balance(_ context.Context, id uuid.UUID) (ports.Balance, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

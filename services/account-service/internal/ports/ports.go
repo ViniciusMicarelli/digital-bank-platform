@@ -51,6 +51,8 @@ type Ledger interface {
 	// CreateCustomerAccount is idempotent on id.
 	CreateCustomerAccount(ctx context.Context, id uuid.UUID, currency money.Currency) error
 	Balance(ctx context.Context, id uuid.UUID) (Balance, error)
+	// BalanceAt is the posted balance at an instant (statements, tax reports).
+	BalanceAt(ctx context.Context, id uuid.UUID, at time.Time) (int64, error)
 }
 
 // Identity is a customer's identity as verified by user-service.

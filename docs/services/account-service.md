@@ -33,6 +33,7 @@ Defined in [`contracts/proto/bank/account/v1/account.proto`](../../contracts/pro
 | `GetBalance` | Proxy to the ledger balance |
 | `BlockAccount` / `UnblockAccount` | Change status |
 | `CloseAccount` | Close the account (zero balance, nothing held) |
+| `GetBalanceAt` | The posted balance at an instant (from the ledger; the annual income report) |
 | `GetLimits` / `UpdateLimits` | Limits and current usage |
 | `ConsumeLimit` | Check **and record** an outgoing amount atomically (idempotent on `transaction_id`) |
 | `RestoreLimit` | Give the usage back (saga compensation) |
