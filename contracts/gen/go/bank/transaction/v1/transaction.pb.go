@@ -49,6 +49,9 @@ const (
 	TransactionType_TRANSACTION_TYPE_SAVINGS_DEPOSIT    TransactionType = 11
 	TransactionType_TRANSACTION_TYPE_SAVINGS_WITHDRAWAL TransactionType = 12
 	TransactionType_TRANSACTION_TYPE_SAVINGS_YIELD      TransactionType = 13
+	// A credit by the back office (manual-adjustments -> customer), approved
+	// by two analysts (one step, no limits).
+	TransactionType_TRANSACTION_TYPE_MANUAL_CREDIT TransactionType = 14
 )
 
 // Enum value maps for TransactionType.
@@ -68,6 +71,7 @@ var (
 		11: "TRANSACTION_TYPE_SAVINGS_DEPOSIT",
 		12: "TRANSACTION_TYPE_SAVINGS_WITHDRAWAL",
 		13: "TRANSACTION_TYPE_SAVINGS_YIELD",
+		14: "TRANSACTION_TYPE_MANUAL_CREDIT",
 	}
 	TransactionType_value = map[string]int32{
 		"TRANSACTION_TYPE_UNSPECIFIED":            0,
@@ -84,6 +88,7 @@ var (
 		"TRANSACTION_TYPE_SAVINGS_DEPOSIT":        11,
 		"TRANSACTION_TYPE_SAVINGS_WITHDRAWAL":     12,
 		"TRANSACTION_TYPE_SAVINGS_YIELD":          13,
+		"TRANSACTION_TYPE_MANUAL_CREDIT":          14,
 	}
 )
 
@@ -1082,7 +1087,7 @@ const file_bank_transaction_v1_transaction_proto_rawDesc = "" +
 	"\x15GetTransactionRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"\\\n" +
 	"\x16GetTransactionResponse\x12B\n" +
-	"\vtransaction\x18\x01 \x01(\v2 .bank.transaction.v1.TransactionR\vtransaction*\xa0\x04\n" +
+	"\vtransaction\x18\x01 \x01(\v2 .bank.transaction.v1.TransactionR\vtransaction*\xc4\x04\n" +
 	"\x0fTransactionType\x12 \n" +
 	"\x1cTRANSACTION_TYPE_UNSPECIFIED\x10\x00\x12&\n" +
 	"\"TRANSACTION_TYPE_INTERNAL_TRANSFER\x10\x01\x12\x1c\n" +
@@ -1098,7 +1103,8 @@ const file_bank_transaction_v1_transaction_proto_rawDesc = "" +
 	"\x12$\n" +
 	" TRANSACTION_TYPE_SAVINGS_DEPOSIT\x10\v\x12'\n" +
 	"#TRANSACTION_TYPE_SAVINGS_WITHDRAWAL\x10\f\x12\"\n" +
-	"\x1eTRANSACTION_TYPE_SAVINGS_YIELD\x10\r*\xde\x01\n" +
+	"\x1eTRANSACTION_TYPE_SAVINGS_YIELD\x10\r\x12\"\n" +
+	"\x1eTRANSACTION_TYPE_MANUAL_CREDIT\x10\x0e*\xde\x01\n" +
 	"\x11TransactionStatus\x12\"\n" +
 	"\x1eTRANSACTION_STATUS_UNSPECIFIED\x10\x00\x12\x1e\n" +
 	"\x1aTRANSACTION_STATUS_PENDING\x10\x01\x12\x1f\n" +

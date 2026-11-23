@@ -188,6 +188,49 @@ func (a *API) unblockAccount(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, approvalJSON(resp.GetApproval()))
 }
 
+// requestManualCredit asks for a credit to a customer account {amount,
+// reason}; it runs once a second analyst approves it (202).
+func (a *API) requestManualCredit(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Amount string `json:"amount"`
+		Reason string `json:"reason"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	if strings.TrimSpace(req.Reason) == "" {
+		writeError(w, r.Context(), http.StatusBadRequest, "REASON_REQUIRED", "a manual credit needs a reason")
+		return
+	}
+	amount, ok := parseBRL(w, r, req.Amount)
+	if !ok {
+		return
+	}
+	id := r.PathValue("id")
+	acc, err := a.c.Accounts.GetAccount(r.Context(), &accountv1.GetAccountRequest{Id: id})
+	if err != nil {
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	if acc.GetAccount().GetStatus() != accountv1.AccountStatus_ACCOUNT_STATUS_ACTIVE {
+		writeError(w, r.Context(), http.StatusUnprocessableEntity, "ACCOUNT_NOT_ACTIVE", "only an active account can be credited")
+		return
+	}
+	minor := strconv.FormatInt(amount.GetMinorUnits(), 10)
+	if !a.audit(w, r, "MANUAL_CREDIT_REQUESTED", "account", id, map[string]string{"amount_minor": minor, "reason": req.Reason}) {
+		return
+	}
+	resp, err := a.c.BackOffice.RequestApproval(r.Context(), &backofficev1.RequestApprovalRequest{
+		Kind: backofficev1.ApprovalKind_APPROVAL_KIND_MANUAL_CREDIT, TargetId: id, Reason: req.Reason, RequestedBy: customerID(r.Context()),
+		Params: map[string]string{"amount_minor": minor}})
+	if err != nil {
+		a.auditFailure(r.Context(), "MANUAL_CREDIT_REQUESTED", "account", id, err)
+		writeGRPCError(w, r.Context(), err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, approvalJSON(resp.GetApproval()))
+}
+
 func enumName(s, prefix string) string { return strings.TrimPrefix(s, prefix) }
 
 func paramsJSON(m map[string]string) map[string]string {

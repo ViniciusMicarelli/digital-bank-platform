@@ -14,6 +14,7 @@ import (
 	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-common/money"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
+	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/mtls"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/transaction-service/internal/application"
 	"github.com/ViniciusMicarelli/digital-bank-platform/services/transaction-service/internal/domain"
 )
@@ -24,6 +25,28 @@ type Server struct {
 }
 
 func NewServer(app *application.Service) *Server { return &Server{app: app} }
+
+// fundedByTheBank are the types paid out of the bank's own cost accounts,
+// and the only workload allowed to ask for each: being allowed to call this
+// service is not enough to create money.
+var fundedByTheBank = map[domain.Type]string{
+	domain.TypeSavingsYield: "savings-service",
+	domain.TypeManualCredit: "backoffice-service",
+}
+
+// callerMayPost refuses a bank-funded type from any other workload. Without
+// mTLS (local runs, tests) there is no identity to check; with it, the
+// interceptor already required one.
+func callerMayPost(ctx context.Context, typ domain.Type) error {
+	want, restricted := fundedByTheBank[typ]
+	if !restricted {
+		return nil
+	}
+	if id, ok := mtls.PeerIdentity(ctx); ok && id != want {
+		return grpcserver.Error(codes.PermissionDenied, "CALLER_NOT_ALLOWED", id+" may not post "+string(typ))
+	}
+	return nil
+}
 
 var types = map[txv1.TransactionType]domain.Type{
 	txv1.TransactionType_TRANSACTION_TYPE_INTERNAL_TRANSFER:      domain.TypeInternalTransfer,
@@ -39,6 +62,7 @@ var types = map[txv1.TransactionType]domain.Type{
 	txv1.TransactionType_TRANSACTION_TYPE_SAVINGS_DEPOSIT:        domain.TypeSavingsDeposit,
 	txv1.TransactionType_TRANSACTION_TYPE_SAVINGS_WITHDRAWAL:     domain.TypeSavingsWithdrawal,
 	txv1.TransactionType_TRANSACTION_TYPE_SAVINGS_YIELD:          domain.TypeSavingsYield,
+	txv1.TransactionType_TRANSACTION_TYPE_MANUAL_CREDIT:          domain.TypeManualCredit,
 }
 
 func (s *Server) CreateTransfer(ctx context.Context, req *txv1.CreateTransferRequest) (*txv1.CreateTransferResponse, error) {
@@ -49,6 +73,9 @@ func (s *Server) CreateTransfer(ctx context.Context, req *txv1.CreateTransferReq
 	typ := domain.TypeInternalTransfer
 	if req.GetType() != txv1.TransactionType_TRANSACTION_TYPE_UNSPECIFIED {
 		typ = types[req.GetType()]
+	}
+	if err := callerMayPost(ctx, typ); err != nil {
+		return nil, err
 	}
 	t, err := s.app.Post(ctx, req.GetIdempotencyKey(), typ, from, to, amount, req.GetDescription(), req.GetMetadata())
 	return respond(t, err, func(p *txv1.Transaction) *txv1.CreateTransferResponse {

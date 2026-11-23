@@ -182,3 +182,37 @@ test('a limit above R$ 10.000 needs two analysts', async ({ page, browser }) => 
   await page.reload()
   await expect(page.getByText('Limite atual de R$ 15.000,00.', { exact: false })).toBeVisible()
 })
+
+test('a manual credit needs a second analyst', async ({ page, browser, request }) => {
+  const email = `bo-${crypto.randomUUID().slice(0, 8)}@example.com`
+  const name = 'Elisa Prado'
+  await request.post(api('/v1/auth/register'), { data: { email, password: PASSWORD, full_name: name } })
+  const login = await (await request.post(api('/v1/auth/login'), { data: { email, password: PASSWORD } })).json()
+  const auth = { Authorization: `Bearer ${login.access_token}` }
+  await request.put(api('/v1/me/profile'), { headers: auth, data: { full_name: name, cpf: randomCPF(), birth_date: '1991-03-02',
+    address: { postal_code: '01310100', street: 'Av. Paulista', number: '30', city: 'São Paulo', state: 'SP' } } })
+  expect((await (await request.post(api('/v1/me/kyc'), { headers: auth })).json()).kyc_status).toBe('APPROVED')
+  const account = await (await request.post(api('/v1/accounts'), { headers: { ...auth, 'Idempotency-Key': crypto.randomUUID() }, data: {} })).json()
+  const me = await (await request.get(api('/v1/me'), { headers: auth })).json()
+  const balance = async () => (await (await request.get(api(`/v1/accounts/${account.id}/balance`), { headers: auth })).json()).available.amount
+
+  await staffLogin(page, ANALYST)
+  await page.getByLabel('Buscar cliente pelo id').fill(me.customer_id)
+  await page.getByRole('button', { name: 'Abrir' }).click()
+  await page.getByRole('button', { name: 'Creditar valor na conta' }).click()
+  await page.getByLabel('Valor do crédito').fill('25')
+  await page.getByLabel('Motivo (o cliente vê)').fill('Estorno da tarifa cobrada por engano.')
+  await page.getByRole('button', { name: 'Pedir crédito' }).click()
+  await expect(page.getByText('Crédito pedido.')).toBeVisible()
+  expect(await balance()).toBe('0.00')
+
+  const other = await browser.newContext()
+  const reviewer = await other.newPage()
+  await staffLogin(reviewer, REVIEWER)
+  const item = reviewer.getByRole('listitem').filter({ hasText: `Crédito de R$ 25,00 para ${name} · conta ${account.number}` })
+  await expect(item.getByText('Estorno da tarifa cobrada por engano.', { exact: false })).toBeVisible()
+  await shot(reviewer, '22-manual-credit')
+  await item.getByRole('button', { name: 'Aprovar' }).click()
+  await expect.poll(balance).toBe('25.00')
+  await other.close()
+})

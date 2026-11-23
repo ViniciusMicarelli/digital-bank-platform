@@ -147,6 +147,7 @@ type payload struct {
 	Budget          int64             `json:"budget"`
 	Spent           int64             `json:"spent"`
 	Device          string            `json:"device"`
+	Description     string            `json:"description"`
 }
 
 // budgetCategories names the spending categories of a budget alert.
@@ -194,6 +195,12 @@ func FromEvent(ev Event, now time.Time) ([]Draft, error) {
 		d.Category, d.Title, d.Important = CategoryPix, "Pix não concluído", true
 		d.Body = fmt.Sprintf("Seu Pix de %s para %s não foi concluído (%s). O valor não saiu da sua conta.", BRL(p.AmountMinor), p.CounterpartName, p.FailureReason)
 	case "transaction.completed":
+		if p.Type == "MANUAL_CREDIT" { // a credit by the bank (two analysts approved it)
+			account = p.ToAccountID
+			d.Category, d.Title, d.Important = CategoryAccount, "Crédito do Digital Bank", true
+			d.Body = fmt.Sprintf("Creditamos %s na sua conta. %s", BRL(p.AmountMinor), strings.TrimPrefix(p.Description, "Crédito do Digital Bank: "))
+			break
+		}
 		// Transfers between accounts here, other than Pix (pix-service notifies those).
 		if p.Type != "INTERNAL_TRANSFER" || p.Metadata["end_to_end_id"] != "" {
 			return nil, nil

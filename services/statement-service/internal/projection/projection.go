@@ -117,7 +117,7 @@ func sides(t transactionEvent) []item {
 		}
 	case "PIX_OUT":
 		return []item{{account: t.FromAccountID, direction: "DEBIT", counterpartyName: name}}
-	case "PIX_IN", "CARD_REFUND", "SAVINGS_WITHDRAWAL":
+	case "PIX_IN", "CARD_REFUND", "SAVINGS_WITHDRAWAL", "MANUAL_CREDIT":
 		return []item{{account: t.ToAccountID, direction: "CREDIT", counterpartyName: name}}
 	case "SAVINGS_DEPOSIT":
 		return []item{{account: t.FromAccountID, direction: "DEBIT", counterpartyName: name}}

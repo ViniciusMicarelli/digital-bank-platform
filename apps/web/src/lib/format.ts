@@ -28,4 +28,5 @@ export const typeLabels: Record<string, string> = {
   CARD_REFUND: 'Estorno no cartão',
   SAVINGS_DEPOSIT: 'Guardado na caixinha',
   SAVINGS_WITHDRAWAL: 'Resgate da caixinha',
+  MANUAL_CREDIT: 'Crédito do banco',
 }

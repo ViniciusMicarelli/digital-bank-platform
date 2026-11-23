@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,9 +17,18 @@ const (
 	// grant alone. Target: the limit request; params: account_id,
 	// granted_minor (the limit to grant, in centavos).
 	KindLimitIncrease Kind = "LIMIT_INCREASE"
+	// KindManualCredit credits a customer account from the bank's
+	// manual-adjustments account (goodwill, corrections). Target: the
+	// account; params: amount_minor (centavos, up to MaxManualCredit).
+	KindManualCredit Kind = "MANUAL_CREDIT"
 )
 
-func (k Kind) Valid() bool { return k == KindUnblockAccount || k == KindLimitIncrease }
+// MaxManualCredit is the largest manual credit (R$ 50.000,00).
+const MaxManualCredit = 50_000_00
+
+func (k Kind) Valid() bool {
+	return k == KindUnblockAccount || k == KindLimitIncrease || k == KindManualCredit
+}
 
 // Status of an approval.
 type Status string
@@ -66,12 +76,19 @@ func NewApproval(kind Kind, target, reason, requestedBy string, params map[strin
 		return Approval{}, invalid("requested_by is required")
 	case kind == KindLimitIncrease && (params["account_id"] == "" || params["granted_minor"] == ""):
 		return Approval{}, invalid("a limit increase needs account_id and granted_minor")
+	case kind == KindManualCredit && !validCredit(params["amount_minor"]):
+		return Approval{}, invalid("a manual credit needs amount_minor between 1 and 5000000 centavos")
 	}
 	if params == nil {
 		params = map[string]string{}
 	}
 	return Approval{ID: uuid.Must(uuid.NewV7()), Kind: kind, TargetID: target, Reason: strings.TrimSpace(reason),
 		RequestedBy: requestedBy, Params: params, Status: StatusPending, CreatedAt: now, ExpiresAt: now.Add(ApprovalTTL)}, nil
+}
+
+func validCredit(v string) bool {
+	n, err := strconv.ParseInt(v, 10, 64)
+	return err == nil && n > 0 && n <= MaxManualCredit
 }
 
 // Expired reports whether a pending request ran out of time.

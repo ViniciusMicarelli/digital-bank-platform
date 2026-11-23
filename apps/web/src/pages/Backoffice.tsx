@@ -1,6 +1,6 @@
 import { disputeReasons, errorMessage, formatBRL, type Account, type Dispute, type LimitRequest, type Money, type Profile } from '@bank/core'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, CreditCard, FileClock, Gauge, Inbox, Landmark, Lock, LockOpen, LogOut, Search, ShieldAlert, ShieldCheck, UserRound, Users, X } from 'lucide-react'
+import { Check, CreditCard, FileClock, Gauge, HandCoins, Inbox, Landmark, Lock, LockOpen, LogOut, Search, ShieldAlert, ShieldCheck, UserRound, Users, X } from 'lucide-react'
 import { useState } from 'react'
 import { useMe } from '../app/queries'
 import { Brand } from '../components/Brand'
@@ -15,7 +15,7 @@ import { TOTP } from './Settings'
 interface Review extends Profile { customer_id: string; reviewed_by: string; updated_at: string }
 interface CustomerFile { customer_id: string; profile?: Review; accounts: { account: Account; available?: Money }[] }
 interface Approval {
-  id: string; kind: 'UNBLOCK_ACCOUNT' | 'LIMIT_INCREASE'; target_id: string; reason: string; requested_by: string
+  id: string; kind: 'UNBLOCK_ACCOUNT' | 'LIMIT_INCREASE' | 'MANUAL_CREDIT'; target_id: string; reason: string; requested_by: string
   params: Record<string, string>
   status: 'PENDING' | 'APPROVED' | 'EXECUTED' | 'REJECTED' | 'FAILED' | 'EXPIRED'
   decided_by: string; decision_reason: string; failure_reason: string; created_at: string; expires_at: string
@@ -68,6 +68,39 @@ function Decision({ review, onDone }: { review: Review; onDone: () => void }) {
   )
 }
 
+/** A goodwill or correction credit: one analyst asks, another approves it. */
+function ManualCredit({ accountId, onChange }: { accountId: string; onChange: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [amount, setAmount] = useState<string | null>(null)
+  const [reason, setReason] = useState('')
+  const [error, setError] = useState('')
+  const [sent, setSent] = useState(false)
+  const ask = useMutation({
+    mutationFn: () => api('POST', `/v1/backoffice/accounts/${accountId}/credits`, { body: { amount, reason } }),
+    onSuccess: () => { setOpen(false); setReason(''); setError(''); setSent(true); onChange() },
+    onError: (e) => setError(errorMessage(e)),
+  })
+  if (!open) {
+    return (
+      <div className="space-y-2">
+        <Button size="sm" variant="ghost" icon={HandCoins} onClick={() => { setSent(false); setOpen(true) }}>Creditar valor na conta</Button>
+        {sent && <Alert tone="green">Crédito pedido. Ele entra na conta quando outro analista aprovar.</Alert>}
+      </div>
+    )
+  }
+  return (
+    <form className="space-y-2 rounded-2xl bg-surface-2 p-3" onSubmit={(e) => { e.preventDefault(); ask.mutate() }}>
+      <MoneyField label="Valor do crédito" hint="Até R$ 50.000,00. Outro analista precisa aprovar." onValue={setAmount} />
+      <Field label="Motivo (o cliente vê)" maxLength={140} value={reason} onChange={(e) => setReason(e.target.value)} />
+      <Alert>{error}</Alert>
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={!amount || !reason.trim()} loading={ask.isPending}>Pedir crédito</Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+      </div>
+    </form>
+  )
+}
+
 function AccountRow({ item, onChange }: { item: CustomerFile['accounts'][number]; onChange: () => void }) {
   const a = item.account
   const [reason, setReason] = useState('')
@@ -103,6 +136,7 @@ function AccountRow({ item, onChange }: { item: CustomerFile['accounts'][number]
       )}
       {sent && <Alert tone="green">Pedido enviado. A conta é desbloqueada quando outro analista aprovar.</Alert>}
       <Alert>{error}</Alert>
+      {a.status === 'ACTIVE' && <ManualCredit accountId={a.id} onChange={onChange} />}
     </li>
   )
 }
@@ -192,9 +226,13 @@ function ApprovalItem({ item, me, onOpen }: { item: Approval; me?: string; onOpe
   return (
     <li className="space-y-3 rounded-2xl px-3 py-3 hover:bg-surface-2">
       <div className="flex items-start gap-3">
-        <IconTile icon={item.kind === 'LIMIT_INCREASE' ? Gauge : LockOpen} tone="credit" />
+        <IconTile icon={{ LIMIT_INCREASE: Gauge, MANUAL_CREDIT: HandCoins, UNBLOCK_ACCOUNT: LockOpen }[item.kind]} tone="credit" />
         <div className="min-w-0 flex-1">
-          {item.kind === 'LIMIT_INCREASE' ? (
+          {item.kind === 'MANUAL_CREDIT' ? (
+            <p className="text-sm font-semibold text-fg">
+              Crédito de {formatBRL(centsToBRL(item.params.amount_minor))} para {item.account ? `${item.account.holder_name} · conta ${item.account.number}` : `conta ${short(item.target_id)}`}
+            </p>
+          ) : item.kind === 'LIMIT_INCREASE' ? (
             <>
               <p className="text-sm font-semibold text-fg">
                 Limite de {formatBRL(centsToBRL(item.params.granted_minor))} para {item.account?.holder_name ?? 'o cliente'}

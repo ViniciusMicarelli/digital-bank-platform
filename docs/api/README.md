@@ -133,6 +133,7 @@
 | `GET` | `/v1/backoffice/disputes` | 👤 Card disputes (`?status=OPEN` by default, or `WON`, `LOST`, `ALL`), with the account holder and customer |
 | `POST` | `/v1/backoffice/disputes/{id}/decide` | 👤 `{won, reason}` (reason required to reject); won refunds the amount; audited on the account |
 | `GET` | `/v1/backoffice/limit-requests` | 👤 Limit requests (`?status=IN_REVIEW` by default, or `APPROVED`, `REJECTED`, `ALL`) with the holder and what is used |
+| `POST` | `/v1/backoffice/accounts/{id}/credits` | 👤 Ask for a manual credit `{amount, reason}` (up to R$ 50.000,00; the reason is shown to the customer) → 202 with a `MANUAL_CREDIT` approval; another analyst's approval posts it; audited |
 | `POST` | `/v1/backoffice/limit-requests/{id}/decide` | 👤 `{approve, granted?, reason}` (reason required to reject; may grant less); audited on the account. Approving more than R$ 10.000,00 (reason required) answers 202 `AWAITING_SECOND_ANALYST` with a `LIMIT_INCREASE` approval for another analyst |
 | `GET` | `/v1/backoffice/audit` | 👤 Audit trail, newest first (`?target_id=`, `?actor_id=`, `?limit=`) |
 | `GET` | `/v1/backoffice/audit/verify` | 👤 Recompute the hash chain → `{intact, events, broken_at}` |

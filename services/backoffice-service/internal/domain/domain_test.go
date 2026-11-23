@@ -76,3 +76,15 @@ func TestLimitIncreaseApproval(t *testing.T) {
 		t.Fatalf("approval = %+v %v", a, err)
 	}
 }
+
+func TestManualCreditApproval(t *testing.T) {
+	now := time.Now()
+	for _, amount := range []string{"", "0", "-5", "abc", "5000001"} {
+		if _, err := NewApproval(KindManualCredit, "acc", "estorno de tarifa", "a1", map[string]string{"amount_minor": amount}, now); err == nil {
+			t.Errorf("amount %q accepted", amount)
+		}
+	}
+	if _, err := NewApproval(KindManualCredit, "acc", "estorno de tarifa", "a1", map[string]string{"amount_minor": "2500"}, now); err != nil {
+		t.Fatal(err)
+	}
+}

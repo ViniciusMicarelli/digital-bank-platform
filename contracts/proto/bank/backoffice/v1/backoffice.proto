@@ -81,6 +81,10 @@ enum ApprovalKind {
   // Grant a credit limit above R$ 10.000,00. Target: the limit request;
   // params: account_id, granted_minor.
   APPROVAL_KIND_LIMIT_INCREASE = 2;
+  // Credit a customer account from the bank's manual-adjustments account
+  // (goodwill, corrections). Target: the account; params: amount_minor
+  // (up to R$ 50.000,00).
+  APPROVAL_KIND_MANUAL_CREDIT = 3;
 }
 
 enum ApprovalStatus {

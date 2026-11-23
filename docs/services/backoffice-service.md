@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Makes what bank staff do **accountable**: a tamper-evident audit trail of every back-office action and **four-eyes approvals**, where a sensitive action requested by one analyst only runs once a different analyst approves it. Only the api-gateway calls it; it calls account-service and credit-service to carry out approved actions.
+Makes what bank staff do **accountable**: a tamper-evident audit trail of every back-office action and **four-eyes approvals**, where a sensitive action requested by one analyst only runs once a different analyst approves it. Only the api-gateway calls it; it calls account-service, credit-service and transaction-service to carry out approved actions.
 
 ## Capabilities
 
@@ -16,7 +16,8 @@ Makes what bank staff do **accountable**: a tamper-evident audit trail of every 
 | Approved actions run right away; a transient failure leaves the approval `APPROVED` and a recovery loop retries it (the unblock is idempotent: an account already active counts as done); a refusal settles it `FAILED` with the reason | ✅ |
 | Every approval step (requested, approved / rejected, executed / failed, expired) is written to the trail in the same transaction | ✅ |
 | Four-eyes on credit limits above R$ 10.000,00 (`LIMIT_INCREASE`, params `account_id` and `granted_minor`): the first analyst's approval opens the request, the second one's runs `DecideLimitRequest` in credit-service with both names (idempotent: a request already granted with this approval counts as done); credit-service refuses such a grant without a different second approver (`FOUR_EYES_REQUIRED`), and its automatic analysis never grants above that line | ✅ |
-| More four-eyes actions (manual credits, closing accounts), audit export to WORM storage | planned |
+| Four-eyes manual credits (`MANUAL_CREDIT`, up to R$ 50.000,00, reason shown to the customer): approving posts a `MANUAL_CREDIT` from the ledger's `manual-adjustments` account (0008), idempotent on the approval; the customer sees it in the statement and is notified | ✅ |
+| Audit export to WORM storage | planned |
 
 ## Approval States
 

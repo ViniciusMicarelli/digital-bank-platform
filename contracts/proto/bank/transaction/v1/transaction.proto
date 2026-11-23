@@ -49,6 +49,9 @@ enum TransactionType {
   TRANSACTION_TYPE_SAVINGS_DEPOSIT = 11;
   TRANSACTION_TYPE_SAVINGS_WITHDRAWAL = 12;
   TRANSACTION_TYPE_SAVINGS_YIELD = 13;
+  // A credit by the back office (manual-adjustments -> customer), approved
+  // by two analysts (one step, no limits).
+  TRANSACTION_TYPE_MANUAL_CREDIT = 14;
 }
 
 enum TransactionStatus {

@@ -170,11 +170,13 @@ services:
       GRPC_ADDR: ":9013"
       ACCOUNT_ADDR: account-service:9002
       CREDIT_ADDR: credit-service:9009
+      TRANSACTION_ADDR: transaction-service:9003
     ports: ["9013:9013"]
     depends_on:
       postgres: { condition: service_healthy }
       account-service: { condition: service_healthy }
       credit-service: { condition: service_healthy }
+      transaction-service: { condition: service_healthy }
 
   savings-service:
     build: { context: ., args: { SERVICE: savings-service } }
@@ -214,7 +216,7 @@ services:
       TLS_CA: /certs/ca.pem
       TLS_CERT: /certs/transaction-service.pem
       TLS_KEY: /certs/transaction-service-key.pem
-      ALLOWED_CALLERS: api-gateway,pix-service,card-service,credit-service,payment-service,savings-service,dev-client
+      ALLOWED_CALLERS: api-gateway,pix-service,card-service,credit-service,payment-service,savings-service,backoffice-service,dev-client
       DATABASE_URL: postgres://bank:bank@postgres:5432/transaction?sslmode=disable
       KAFKA_BROKERS: kafka:9092
       OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4317

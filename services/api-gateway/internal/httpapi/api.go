@@ -121,6 +121,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/backoffice/customers/{customerID}", a.staff(a.customerFile))
 	mux.HandleFunc("POST /v1/backoffice/accounts/{id}/block", a.staff(a.blockAccount))
 	mux.HandleFunc("POST /v1/backoffice/accounts/{id}/unblock", a.staff(a.unblockAccount))
+	mux.HandleFunc("POST /v1/backoffice/accounts/{id}/credits", a.staff(a.requestManualCredit))
 	mux.HandleFunc("GET /v1/backoffice/approvals", a.staff(a.approvals))
 	mux.HandleFunc("POST /v1/backoffice/approvals/{id}/approve", a.staff(a.decideApproval(true)))
 	mux.HandleFunc("POST /v1/backoffice/approvals/{id}/reject", a.staff(a.decideApproval(false)))

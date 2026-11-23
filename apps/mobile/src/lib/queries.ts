@@ -49,6 +49,7 @@ export const typeLabels: Record<string, string> = {
   DEBIT_CARD_PURCHASE: 'Compra no débito', CREDIT_INVOICE_PAYMENT: 'Pagamento de fatura', BOLETO_PAYMENT: 'Boleto',
   CARD_REFUND: 'Estorno no cartão',
   SAVINGS_DEPOSIT: 'Guardado na caixinha', SAVINGS_WITHDRAWAL: 'Resgate da caixinha',
+  MANUAL_CREDIT: 'Crédito do banco',
 }
 
 export const dateTime = (iso: string) =>

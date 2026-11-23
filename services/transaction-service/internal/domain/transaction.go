@@ -65,11 +65,14 @@ const (
 	TypeSavingsDeposit    Type = "SAVINGS_DEPOSIT"
 	TypeSavingsWithdrawal Type = "SAVINGS_WITHDRAWAL"
 	TypeSavingsYield      Type = "SAVINGS_YIELD"
+	// A credit by the back office (manual-adjustments -> customer), approved
+	// by two analysts.
+	TypeManualCredit Type = "MANUAL_CREDIT"
 )
 
 var validTypes = []Type{TypeInternalTransfer, TypePixOut, TypePixIn, TypeDebitCard,
 	TypeCreditPurchase, TypeCreditInvoicePayment, TypeCreditCharges, TypeBoletoPayment, TypeCardRefund, TypeCreditCardRefund,
-	TypeSavingsDeposit, TypeSavingsWithdrawal, TypeSavingsYield}
+	TypeSavingsDeposit, TypeSavingsWithdrawal, TypeSavingsYield, TypeManualCredit}
 
 type Status string
 
@@ -151,7 +154,8 @@ func (t Transaction) DebitsCustomerWithoutLimit() bool {
 // (which must exist and be active), rather than a bank-internal account such
 // as Pix settlement or card clearing.
 func (t Transaction) CreditsCustomer() bool {
-	return t.Type == TypeInternalTransfer || t.Type == TypePixIn || t.Type == TypeCardRefund || t.Type == TypeSavingsWithdrawal
+	return t.Type == TypeInternalTransfer || t.Type == TypePixIn || t.Type == TypeCardRefund || t.Type == TypeSavingsWithdrawal ||
+		t.Type == TypeManualCredit
 }
 
 // TwoPhase reports whether the money is held before an external confirmation.

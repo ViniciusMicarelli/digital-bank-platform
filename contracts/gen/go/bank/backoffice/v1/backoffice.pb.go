@@ -31,6 +31,10 @@ const (
 	// Grant a credit limit above R$ 10.000,00. Target: the limit request;
 	// params: account_id, granted_minor.
 	ApprovalKind_APPROVAL_KIND_LIMIT_INCREASE ApprovalKind = 2
+	// Credit a customer account from the bank's manual-adjustments account
+	// (goodwill, corrections). Target: the account; params: amount_minor
+	// (up to R$ 50.000,00).
+	ApprovalKind_APPROVAL_KIND_MANUAL_CREDIT ApprovalKind = 3
 )
 
 // Enum value maps for ApprovalKind.
@@ -39,11 +43,13 @@ var (
 		0: "APPROVAL_KIND_UNSPECIFIED",
 		1: "APPROVAL_KIND_UNBLOCK_ACCOUNT",
 		2: "APPROVAL_KIND_LIMIT_INCREASE",
+		3: "APPROVAL_KIND_MANUAL_CREDIT",
 	}
 	ApprovalKind_value = map[string]int32{
 		"APPROVAL_KIND_UNSPECIFIED":     0,
 		"APPROVAL_KIND_UNBLOCK_ACCOUNT": 1,
 		"APPROVAL_KIND_LIMIT_INCREASE":  2,
+		"APPROVAL_KIND_MANUAL_CREDIT":   3,
 	}
 )
 
@@ -1128,11 +1134,12 @@ const file_bank_backoffice_v1_backoffice_proto_rawDesc = "" +
 	"\aapprove\x18\x03 \x01(\bR\aapprove\x12\x16\n" +
 	"\x06reason\x18\x04 \x01(\tR\x06reason\"R\n" +
 	"\x16DecideApprovalResponse\x128\n" +
-	"\bapproval\x18\x01 \x01(\v2\x1c.bank.backoffice.v1.ApprovalR\bapproval*r\n" +
+	"\bapproval\x18\x01 \x01(\v2\x1c.bank.backoffice.v1.ApprovalR\bapproval*\x93\x01\n" +
 	"\fApprovalKind\x12\x1d\n" +
 	"\x19APPROVAL_KIND_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dAPPROVAL_KIND_UNBLOCK_ACCOUNT\x10\x01\x12 \n" +
-	"\x1cAPPROVAL_KIND_LIMIT_INCREASE\x10\x02*\xe1\x01\n" +
+	"\x1cAPPROVAL_KIND_LIMIT_INCREASE\x10\x02\x12\x1f\n" +
+	"\x1bAPPROVAL_KIND_MANUAL_CREDIT\x10\x03*\xe1\x01\n" +
 	"\x0eApprovalStatus\x12\x1f\n" +
 	"\x1bAPPROVAL_STATUS_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17APPROVAL_STATUS_PENDING\x10\x01\x12\x1c\n" +

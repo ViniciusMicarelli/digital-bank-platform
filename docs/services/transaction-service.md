@@ -69,3 +69,7 @@ Defined in [`contracts/proto/bank/transaction/v1/transaction.proto`](../../contr
 
 - `ledger-service` (gRPC)
 - `account-service` (gRPC, limit checks)
+
+## Bank-funded types
+
+`SAVINGS_YIELD` and `MANUAL_CREDIT` are paid out of the bank's own cost accounts, so being an allowed caller is not enough: each is accepted only from its workload's mTLS identity (`savings-service`, `backoffice-service`; `PERMISSION_DENIED CALLER_NOT_ALLOWED` otherwise). A manual credit is one step and consumes no limits; the receiving account must be active.

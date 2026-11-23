@@ -1,6 +1,6 @@
 // Command server runs the backoffice-service: the staff audit trail and
 // four-eyes approvals (gRPC), and the loop that settles approved actions
-// (account-service, credit-service).
+// (account-service, credit-service, transaction-service).
 package main
 
 import (
@@ -13,6 +13,7 @@ import (
 	accountv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/account/v1"
 	backofficev1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/backoffice/v1"
 	creditv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/credit/v1"
+	txv1 "github.com/ViniciusMicarelli/digital-bank-platform/contracts/gen/go/bank/transaction/v1"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/config"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/grpcserver"
 	"github.com/ViniciusMicarelli/digital-bank-platform/packages/go-platform/postgres"
@@ -55,9 +56,16 @@ func main() {
 		os.Exit(1)
 	}
 	defer func() { _ = creditConn.Close() }()
+	txConn, err := grpcserver.Dial(config.String("TRANSACTION_ADDR", "127.0.0.1:9003"))
+	if err != nil {
+		log.Error("dial transaction-service", "error", err)
+		os.Exit(1)
+	}
+	defer func() { _ = txConn.Close() }()
 
 	app := application.New(pgstore.NewStore(pool),
-		actions.New(accountv1.NewAccountServiceClient(accountConn), creditv1.NewCreditServiceClient(creditConn)), log)
+		actions.New(accountv1.NewAccountServiceClient(accountConn), creditv1.NewCreditServiceClient(creditConn),
+			txv1.NewTransactionServiceClient(txConn)), log)
 	go app.RunRecovery(ctx, config.Duration("RECOVERY_INTERVAL", 30*time.Second))
 
 	srvOpts, err := grpcserver.OptionsFromEnv()

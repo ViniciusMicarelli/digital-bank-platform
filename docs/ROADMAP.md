@@ -264,7 +264,12 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 - The holder can close their account from the app: a check lists what is in the way (money left, money in savings boxes, card debt, payments under way) with where to fix each, and what closing will cancel (scheduled Pix and boletos, Pix Automático, empty boxes); closing asks for the password again.
 - Cards are cancelled and Pix keys removed by the `account.closed` event; the customer is notified; the app treats a closed account as history and offers to open a new one.
 
+## Phase 40 — Four-eyes manual credits ✅
+
+- An analyst can ask to credit a customer account (goodwill, a correction) with a reason the customer sees; the money moves only when a different analyst approves, from a new `manual-adjustments` ledger account, once.
+- transaction-service now accepts the types that pay out of the bank's own accounts (savings yield, manual credit) only from the service each belongs to.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.
-- Back office: staff SSO (OIDC) with WebAuthn, four-eyes on manual credits and account closing; card representment and arbitration.
+- Back office: staff SSO (OIDC) with WebAuthn, four-eyes on closing accounts by the bank; card representment and arbitration.

@@ -32,6 +32,7 @@ var (
 	kindToPB = map[domain.Kind]backofficev1.ApprovalKind{
 		domain.KindUnblockAccount: backofficev1.ApprovalKind_APPROVAL_KIND_UNBLOCK_ACCOUNT,
 		domain.KindLimitIncrease:  backofficev1.ApprovalKind_APPROVAL_KIND_LIMIT_INCREASE,
+		domain.KindManualCredit:   backofficev1.ApprovalKind_APPROVAL_KIND_MANUAL_CREDIT,
 	}
 	statusToPB = map[domain.Status]backofficev1.ApprovalStatus{
 		domain.StatusPending:  backofficev1.ApprovalStatus_APPROVAL_STATUS_PENDING,
