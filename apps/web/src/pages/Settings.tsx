@@ -3,13 +3,42 @@ import QRCode from 'qrcode'
 import { useState } from 'react'
 import { useAccount, useProfile } from '../app/queries'
 import { MoneyField } from '../components/MoneyField'
-import { DoorClosed, KeyRound, LogOut, MonitorSmartphone, Palette, SlidersHorizontal, UserRound } from 'lucide-react'
+import { DoorClosed, FileDown, KeyRound, LogOut, MonitorSmartphone, Palette, SlidersHorizontal, UserRound } from 'lucide-react'
 import { ThemeSwitch } from '../components/ThemeSwitch'
 import { Alert, Badge, Button, Field, Modal, PageTitle, Panel } from '../components/ui'
 import { api, logout } from '../lib/api'
 import { closureBlockerText, errorMessage, formatBRL, lastSeen, type ClosureCheck, type Session } from '@bank/core'
 import { Link } from 'react-router'
 import { useStepUp } from '../components/StepUp'
+
+/** LGPD: everything the bank keeps about the customer, as a file. */
+function DataPanel() {
+  const { confirm, modal } = useStepUp()
+  const [error, setError] = useState('')
+  const download = useMutation({
+    mutationFn: async () => api<unknown>('POST', '/v1/me/data-export', { stepUp: await confirm() }),
+    onSuccess: (data) => {
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }))
+      link.download = `meus-dados-${new Date().toISOString().slice(0, 10)}.json`
+      link.click()
+      URL.revokeObjectURL(link.href)
+      setError('')
+    },
+    onError: (e) => { if (!(e instanceof Error && e.message === 'cancelled')) setError(errorMessage(e)) },
+  })
+  return (
+    <Panel title="Seus dados" icon={FileDown}>
+      <p className="mb-4 text-sm text-fg-2">
+        Baixe tudo o que guardamos sobre você: cadastro, contas, chaves Pix, cartões (só os 4 últimos dígitos), caixinhas, extrato e acessos.
+        Registros de conta e de transações ficam guardados pelo prazo exigido por lei, mesmo depois de encerrar a conta.
+      </p>
+      <Button variant="secondary" icon={FileDown} loading={download.isPending} onClick={() => download.mutate()}>Baixar meus dados</Button>
+      {error && <div className="mt-3"><Alert>{error}</Alert></div>}
+      {modal}
+    </Panel>
+  )
+}
 
 /** Closing the account: what is in the way, what will be cancelled, then
  * the password again. */
@@ -216,6 +245,7 @@ export function SettingsPage() {
           <ThemeSwitch />
         </Panel>
         <SessionsPanel />
+        <DataPanel />
         {account?.status === 'ACTIVE' && <ClosePanel accountId={account.id} />}
       </div>
     </div>

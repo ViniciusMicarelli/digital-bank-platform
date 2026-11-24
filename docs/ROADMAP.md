@@ -286,7 +286,12 @@ The source of truth for money ([ADR-0005](decisions/0005-double-entry-ledger.md)
 
 - The statement can be narrowed to money in or out and searched by name or description, on the web and on mobile; pages keep working within a filter.
 
+## Phase 45 — Your data (LGPD) ✅
+
+- Customers download everything the bank keeps about them (profile, accounts, Pix keys, cards with the last 4 digits only, savings, credit, statement, sessions) after confirming their password, on the web and on mobile; the page explains what is kept for the legal period.
+
 ## Next
 
 - Store builds (EAS) with push notifications (APNs / FCM) for the notification-service.
+- Per-customer data keys for personal data, so it can be crypto-shredded when the legal retention ends.
 - Back office: staff SSO (OIDC) with WebAuthn, four-eyes on closing accounts by the bank; card representment and arbitration.

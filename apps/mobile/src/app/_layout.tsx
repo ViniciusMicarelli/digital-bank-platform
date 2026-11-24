@@ -38,6 +38,7 @@ function Navigator({ signedIn }: { signedIn: boolean }) {
         <Stack.Screen name="dispositivos" options={{ ...header, title: 'Dispositivos conectados' }} />
         <Stack.Screen name="encerrar-conta" options={{ ...header, title: 'Encerrar conta' }} />
         <Stack.Screen name="informe" options={{ ...header, title: 'Informe de rendimentos' }} />
+        <Stack.Screen name="meus-dados" options={{ ...header, title: 'Seus dados' }} />
         <Stack.Screen name="comprovante/[id]" options={{ ...header, title: 'Comprovante' }} />
       </Stack.Protected>
     </Stack>

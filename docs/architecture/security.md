@@ -479,3 +479,8 @@ trivy config
 | tls.md | TLS configuration |
 | compliance.md | Compliance requirements |
 | testing.md | Security testing procedures |
+
+## Personal data (LGPD)
+
+- **Access and portability.** A customer downloads everything the bank keeps about them (`POST /v1/me/data-export`, after a step-up since it holds the full CPF). Card numbers and CVVs never leave the card vault: exports show the last 4 digits only.
+- **Retention.** Account and transaction records (and the identity verification behind them) are kept for the legal period of the anti-money-laundering rules, also after an account is closed, so erasure requests are limited to what those rules allow. Per-customer data keys (crypto-shredding at the end of that period) are a planned step: today the CPF is encrypted with one service-wide data key.

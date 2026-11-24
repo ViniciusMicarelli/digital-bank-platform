@@ -42,6 +42,7 @@
 | `POST` | `/v1/auth/mfa/totp` | Start TOTP enrollment → `{secret, otpauth_uri}` |
 | `POST` | `/v1/auth/mfa/totp/confirm` | `{code}` → enables TOTP |
 | `GET` | `/v1/me` | Who is signed in: `{customer_id, role, mfa}` (`CUSTOMER` or `ANALYST`; `mfa` when the session has a second factor) |
+| `POST` | `/v1/me/data-export` | 🔐 Everything the bank keeps about the caller (LGPD, art. 18: access and portability) as a JSON file: profile with the full CPF, sessions, notification preferences, and per account the balance, Pix keys, cards (last 4 only), savings boxes, credit line, budgets and statement (up to 2.000 items) |
 | `GET` | `/v1/me/sessions` | Where the customer is signed in: `[{id, device, ip, created_at, last_used_at, current}]`, most recently used first |
 | `DELETE` | `/v1/me/sessions/{id}` | End one session → 204 (404 for someone else's or one already ended) |
 | `POST` | `/v1/me/sessions/end-others` | End every session but the one asking → `{ended}` (409 `SESSION_UNKNOWN` for a token from before sessions existed) |

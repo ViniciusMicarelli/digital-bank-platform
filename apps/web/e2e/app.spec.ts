@@ -388,3 +388,18 @@ test('card monthly limit', async ({ page }) => {
   await expect(page.getByText('Recusada (código 61): passou do limite mensal do cartão.')).toBeVisible()
   await shot(page, '24-card-monthly-limit')
 })
+
+test('download my data (LGPD)', async ({ page }) => {
+  await onboard(page)
+  await page.goto('/ajustes')
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Baixar meus dados' }).click()
+  await page.getByLabel('Senha').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Confirmar' }).click()
+  const file = await download
+  expect(file.suggestedFilename()).toMatch(/^meus-dados-\d{4}-\d{2}-\d{2}\.json$/)
+  const data = JSON.parse(await (await import('node:fs/promises')).readFile((await file.path())!, 'utf8'))
+  expect(data.profile.full_name).toBe('Ana Souza')
+  expect(data.profile.cpf).toMatch(/^\d{11}$/)
+  expect(data.accounts).toHaveLength(1)
+})

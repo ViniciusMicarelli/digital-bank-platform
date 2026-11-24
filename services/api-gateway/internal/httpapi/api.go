@@ -133,6 +133,7 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/backoffice/audit/verify", a.staff(a.verifyAudit))
 	mux.HandleFunc("GET /v1/me/profile", a.authenticated(a.getProfile))
 	mux.HandleFunc("GET /v1/me/sessions", a.authenticated(a.sessions))
+	mux.HandleFunc("POST /v1/me/data-export", a.authenticated(a.steppedUp(a.dataExport)))
 	mux.HandleFunc("DELETE /v1/me/sessions/{sessionID}", a.authenticated(a.endSession))
 	mux.HandleFunc("POST /v1/me/sessions/end-others", a.authenticated(a.endOtherSessions))
 	mux.HandleFunc("PUT /v1/me/profile", a.authenticated(a.putProfile))
